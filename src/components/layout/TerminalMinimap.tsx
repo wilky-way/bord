@@ -17,8 +17,10 @@ export default function TerminalMinimap() {
                 <button
                   class="h-2 rounded-sm transition-all"
                   classList={{
-                    "w-6 bg-[var(--accent)]": isActive(),
-                    "w-4 bg-[var(--accent)] opacity-30 hover:opacity-60": !isActive() && !term.needsAttention,
+                    "w-6 bg-[#D97757]": isActive() && !!term.sessionId,
+                    "w-6 bg-[var(--accent)]": isActive() && !term.sessionId,
+                    "w-4 bg-[#D97757] opacity-40 hover:opacity-70": !isActive() && !term.needsAttention && !!term.sessionId,
+                    "w-4 bg-[var(--accent)] opacity-30 hover:opacity-60": !isActive() && !term.needsAttention && !term.sessionId,
                     "w-4 bg-[var(--warning)] animate-pulse": !!term.needsAttention,
                   }}
                   onClick={() => setActiveTerminal(term.id)}

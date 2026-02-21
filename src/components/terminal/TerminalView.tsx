@@ -124,30 +124,53 @@ export default function TerminalView(props: Props) {
 
 const FONT_SIZE = 13;
 const LINE_HEIGHT = 1.2;
-// Monospace character width is ~0.6x the font size
-const CHAR_WIDTH_RATIO = 0.6;
+const CANVAS_PADDING = 6; // Must match .terminal-container canvas padding in styles.css
+
+let cachedMetrics: { cellWidth: number; cellHeight: number; fontSize: number } | null = null;
+
+function measureFontMetrics(fontSize: number): { cellWidth: number; cellHeight: number } {
+  if (cachedMetrics && cachedMetrics.fontSize === fontSize) {
+    return cachedMetrics;
+  }
+
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d")!;
+  ctx.font = `${fontSize}px monospace`;
+
+  const testString = "MMMMMMMMMM";
+  const metrics = ctx.measureText(testString);
+  const cellWidth = metrics.width / testString.length;
+
+  const cellHeight = Math.ceil(
+    metrics.actualBoundingBoxAscent !== undefined
+      ? (metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent) * LINE_HEIGHT
+      : fontSize * LINE_HEIGHT
+  );
+
+  cachedMetrics = { cellWidth, cellHeight, fontSize };
+  return cachedMetrics;
+}
 
 function fitTerminal(terminal: Terminal, container: HTMLElement, ptyId: string) {
   // Use proposeDimensions if available (xterm.js API compat)
   if (typeof (terminal as any).proposeDimensions === "function") {
     const dims = (terminal as any).proposeDimensions();
-    if (dims) {
+    if (dims && dims.cols > 0 && dims.rows > 0) {
       terminal.resize(dims.cols, dims.rows);
       sendResize(ptyId, dims.cols, dims.rows);
       return;
     }
   }
 
-  // Manual calculation from container size and font metrics
+  // Fallback: measure actual font metrics via Canvas API
   const rect = container.getBoundingClientRect();
   if (rect.width === 0 || rect.height === 0) return;
 
-  const cellWidth = Math.floor(FONT_SIZE * CHAR_WIDTH_RATIO);
-  const cellHeight = Math.ceil(FONT_SIZE * LINE_HEIGHT);
-  const padding = 8; // 4px padding on each side
+  const { cellWidth, cellHeight } = measureFontMetrics(FONT_SIZE);
+  const totalPadding = CANVAS_PADDING * 2;
 
-  const newCols = Math.max(2, Math.floor((rect.width - padding) / cellWidth));
-  const newRows = Math.max(1, Math.floor((rect.height - padding) / cellHeight));
+  const newCols = Math.max(2, Math.floor((rect.width - totalPadding) / cellWidth));
+  const newRows = Math.max(1, Math.floor((rect.height - totalPadding) / cellHeight));
 
   if (newCols !== terminal.cols || newRows !== terminal.rows) {
     terminal.resize(newCols, newRows);

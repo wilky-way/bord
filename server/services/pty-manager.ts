@@ -3,14 +3,78 @@ import type { ServerWebSocket } from "bun";
 const BUFFER_LIMIT = 2 * 1024 * 1024; // 2MB circular buffer
 const BUFFER_CHUNK = 64 * 1024; // 64KB replay chunks
 
+interface RingBuffer {
+  data: Uint8Array; // Pre-allocated 2MB
+  writePos: number; // Write head [0, BUFFER_LIMIT)
+  totalWritten: number; // Total bytes ever written (monotonically increasing)
+}
+
 interface PtySession {
   id: string;
   proc: ReturnType<typeof Bun.spawn>;
   cwd: string;
-  buffer: string;
-  bufferCursor: number; // bytes trimmed from buffer start (monotonically increasing)
-  cursor: number; // absolute byte position of buffer end
+  ring: RingBuffer;
   subscribers: Map<ServerWebSocket<{ path: string }>, { cursor: number }>;
+}
+
+function createRingBuffer(): RingBuffer {
+  return {
+    data: new Uint8Array(BUFFER_LIMIT),
+    writePos: 0,
+    totalWritten: 0,
+  };
+}
+
+function ringWrite(ring: RingBuffer, chunk: Uint8Array): void {
+  const len = chunk.byteLength;
+
+  if (len >= BUFFER_LIMIT) {
+    // Chunk larger than entire buffer -- keep only the tail
+    ring.data.set(chunk.subarray(len - BUFFER_LIMIT), 0);
+    ring.writePos = 0;
+    ring.totalWritten += len;
+    return;
+  }
+
+  const spaceBeforeWrap = BUFFER_LIMIT - ring.writePos;
+
+  if (len <= spaceBeforeWrap) {
+    ring.data.set(chunk, ring.writePos);
+    ring.writePos += len;
+    if (ring.writePos === BUFFER_LIMIT) ring.writePos = 0;
+  } else {
+    // Wrap: first part to end, second part from start
+    ring.data.set(chunk.subarray(0, spaceBeforeWrap), ring.writePos);
+    ring.data.set(chunk.subarray(spaceBeforeWrap), 0);
+    ring.writePos = len - spaceBeforeWrap;
+  }
+
+  ring.totalWritten += len;
+}
+
+function ringRead(ring: RingBuffer, fromCursor: number): Uint8Array | null {
+  const bufferStart = Math.max(0, ring.totalWritten - BUFFER_LIMIT);
+  const effectiveFrom = Math.max(fromCursor, bufferStart);
+
+  if (effectiveFrom >= ring.totalWritten) return null;
+
+  const bytesToRead = ring.totalWritten - effectiveFrom;
+  const result = new Uint8Array(bytesToRead);
+
+  const readStartPos =
+    ((ring.writePos - bytesToRead) % BUFFER_LIMIT + BUFFER_LIMIT) %
+    BUFFER_LIMIT;
+
+  if (readStartPos + bytesToRead <= BUFFER_LIMIT) {
+    result.set(ring.data.subarray(readStartPos, readStartPos + bytesToRead));
+  } else {
+    // Wraps around
+    const firstPart = BUFFER_LIMIT - readStartPos;
+    result.set(ring.data.subarray(readStartPos, BUFFER_LIMIT));
+    result.set(ring.data.subarray(0, bytesToRead - firstPart), firstPart);
+  }
+
+  return result;
 }
 
 const sessions = new Map<string, PtySession>();
@@ -26,9 +90,7 @@ export function createPty(
     id,
     proc: null as unknown as ReturnType<typeof Bun.spawn>,
     cwd,
-    buffer: "",
-    bufferCursor: 0,
-    cursor: 0,
+    ring: createRingBuffer(),
     subscribers: new Map(),
   };
 
@@ -51,7 +113,7 @@ export function createPty(
         for (const [ws, meta] of session.subscribers) {
           if (ws.readyState === 1) {
             ws.sendBinary(data);
-            meta.cursor = session.cursor;
+            meta.cursor = session.ring.totalWritten;
           }
         }
       },
@@ -71,14 +133,7 @@ export function createPty(
 }
 
 function appendToBuffer(session: PtySession, data: Uint8Array) {
-  const text = new TextDecoder().decode(data);
-  session.buffer += text;
-  session.cursor += data.byteLength;
-  if (session.buffer.length > BUFFER_LIMIT) {
-    const trim = session.buffer.length - BUFFER_LIMIT;
-    session.buffer = session.buffer.slice(trim);
-    session.bufferCursor += trim;
-  }
+  ringWrite(session.ring, data);
 }
 
 export function attachWs(
@@ -89,24 +144,22 @@ export function attachWs(
   const session = sessions.get(id);
   if (!session) return false;
 
-  session.subscribers.set(ws, { cursor: session.cursor });
+  session.subscribers.set(ws, { cursor: session.ring.totalWritten });
 
   // Replay buffered data if client needs it
-  if (clientCursor < session.cursor) {
-    const bufferStart = session.bufferCursor;
-    const offset = Math.max(0, clientCursor - bufferStart);
-    const replay = session.buffer.slice(offset);
-
-    // Send in chunks to avoid overwhelming the WebSocket
-    const encoder = new TextEncoder();
-    for (let i = 0; i < replay.length; i += BUFFER_CHUNK) {
-      const chunk = replay.slice(i, i + BUFFER_CHUNK);
-      ws.sendBinary(encoder.encode(chunk));
+  if (clientCursor < session.ring.totalWritten) {
+    const replay = ringRead(session.ring, clientCursor);
+    if (replay) {
+      // Send in chunks to avoid overwhelming the WebSocket
+      for (let i = 0; i < replay.byteLength; i += BUFFER_CHUNK) {
+        const end = Math.min(i + BUFFER_CHUNK, replay.byteLength);
+        ws.sendBinary(replay.subarray(i, end));
+      }
     }
   }
 
   // Send current cursor position so client can track
-  ws.send(JSON.stringify({ type: "cursor", cursor: session.cursor }));
+  ws.send(JSON.stringify({ type: "cursor", cursor: session.ring.totalWritten }));
 
   return true;
 }
