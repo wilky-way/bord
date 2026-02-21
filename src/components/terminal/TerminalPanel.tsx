@@ -1,7 +1,7 @@
 import { createSignal, createEffect, onMount, onCleanup, Show } from "solid-js";
 import { Portal } from "solid-js/web";
 import TerminalView from "./TerminalView";
-import { removeTerminal, setActiveTerminal, stashTerminal, setTerminalTitle } from "../../store/terminals";
+import { removeTerminal, setActiveTerminal, stashTerminal, setTerminalTitle, setTerminalMuted } from "../../store/terminals";
 import { state } from "../../store/core";
 import { toggleGitPanel, closeGitPanel } from "../../store/git";
 import { ClaudeIcon } from "../icons/ProviderIcons";
@@ -241,6 +241,31 @@ export default function TerminalPanel(props: Props) {
           <span class="text-[10px] text-[var(--text-secondary)] opacity-50 truncate">
             {props.cwd}
           </span>
+          <button
+            class="shrink-0 flex items-center justify-center rounded-[var(--btn-radius)] transition-colors"
+            classList={{
+              "text-[var(--text-secondary)] opacity-50 hover:opacity-100": !!terminal()?.muted,
+              "text-[var(--text-secondary)] opacity-30 hover:opacity-60": !terminal()?.muted,
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              setTerminalMuted(props.id, !terminal()?.muted);
+            }}
+            title={terminal()?.muted ? "Unmute notifications" : "Mute notifications"}
+          >
+            {terminal()?.muted ? (
+              <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                <path d="M8 2C6 2 4.5 3.5 4.5 5v3L3 10.5V12h10v-1.5L11.5 8V5c0-1.5-1.5-3-3.5-3z" />
+                <path d="M6.5 12a1.5 1.5 0 003 0" />
+                <path d="M2 2l12 12" />
+              </svg>
+            ) : (
+              <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                <path d="M8 2C6 2 4.5 3.5 4.5 5v3L3 10.5V12h10v-1.5L11.5 8V5c0-1.5-1.5-3-3.5-3z" />
+                <path d="M6.5 12a1.5 1.5 0 003 0" />
+              </svg>
+            )}
+          </button>
         </div>
         <div class="flex items-center gap-1 shrink-0">
           {/* Push button - shows when ahead > 0 */}

@@ -12,6 +12,7 @@ export interface TerminalInstance {
   lastOutputAt?: number; // Date.now() of last PTY data received
   lastSeenAt?: number; // Date.now() when user last viewed this terminal
   needsAttention?: boolean; // notification flag — set when idle, cleared on focus
+  muted?: boolean; // per-terminal mute — skips idle detection entirely
 }
 
 export interface Workspace {
@@ -44,4 +45,6 @@ export interface AppState {
   sidebarOpen: boolean;
   layoutColumns: number; // 0 = auto-fit all visible, 1–4 = fixed columns visible at once
   gitPanelTerminalId: string | null; // which terminal's git overlay is open (null = none)
+  bellMuted: boolean; // global mute — suppresses all notifications across all terminals
+  sidebarCollapsed: { workspaces: boolean; sessions: boolean; docker: boolean };
 }

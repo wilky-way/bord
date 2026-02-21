@@ -14,6 +14,7 @@ The following features have shipped and are available in the current build:
 - **Claude session scanning** — discovers sessions from `~/.claude/projects/`, resume via `--resume` flag
 - **Git integration** — branch badge + dirty indicator on title bar, stage/unstage, diff viewer, commit, push/pull, branch checkout
 - **Editor integration** — open workspace in VS Code or Cursor with preference persistence
+- **Per-terminal notification mute** with global override — bell toggle in terminal header and stash popover, idle detection skips muted terminals entirely
 - **Catppuccin Frappe theme** with CSS custom properties
 - **Tauri v2 desktop shell** with CSP and window configuration
 - **2-finger horizontal scroll fix** for ghostty-web canvas
@@ -30,6 +31,7 @@ The following features have shipped and are available in the current build:
 - [x] Navigation hotkeys (Cmd+Arrow to snap next/prev terminal)
 - [x] Drag + drop reorder terminals
 - [x] Layout density buttons (1x/2x/3x/4x columns in TopBar)
+- [x] Per-terminal mute toggle (mitigates spurious notifications until root cause is fixed)
 - [ ] Investigate spurious terminal focus notifications (external file changes triggering attention badges)
 - [x] Open in VS Code / Cursor buttons (workspace context, via CLI)
 

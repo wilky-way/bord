@@ -133,6 +133,30 @@ export const api = {
       body: JSON.stringify({ cwd, editor, ...(file && { file }) }),
     }),
 
+  // Docker
+  dockerDiscover: (paths: string[]) =>
+    request<{ files: Array<{ path: string; dir: string; name: string }> }>(
+      `/docker/discover?paths=${encodeURIComponent(paths.join(","))}`
+    ),
+  dockerContainers: (composePath: string) =>
+    request<{ containers: Array<{ id: string; name: string; service: string; state: string; status: string }> }>(
+      `/docker/containers?composePath=${encodeURIComponent(composePath)}`
+    ),
+  dockerUp: (composePath: string, service?: string) =>
+    request<{ ok: boolean; error?: string }>("/docker/up", {
+      method: "POST",
+      body: JSON.stringify({ composePath, service }),
+    }),
+  dockerDown: (composePath: string, service?: string) =>
+    request<{ ok: boolean; error?: string }>("/docker/down", {
+      method: "POST",
+      body: JSON.stringify({ composePath, service }),
+    }),
+  dockerLogs: (containerId: string, tail = 50) =>
+    request<{ logs: string }>(
+      `/docker/logs?containerId=${encodeURIComponent(containerId)}&tail=${tail}`
+    ),
+
   // Filesystem
   browseDir: (path?: string) => {
     const params = path ? `?path=${encodeURIComponent(path)}` : "";

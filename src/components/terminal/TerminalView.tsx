@@ -26,6 +26,7 @@ export default function TerminalView(props: Props) {
   let containerRef!: HTMLDivElement;
   let terminal: Terminal | undefined;
   let cleanup: (() => void) | undefined;
+  let disposed = false;
   const [ready, setReady] = createSignal(false);
 
   onMount(async () => {
@@ -101,17 +102,20 @@ export default function TerminalView(props: Props) {
 
     // Handle resize
     const resizeObserver = new ResizeObserver(() => {
-      if (terminal && ready()) {
+      if (!disposed && terminal && ready()) {
         fitTerminal(terminal, containerRef, props.ptyId);
       }
     });
     resizeObserver.observe(containerRef);
 
     onCleanup(() => {
+      disposed = true;
+      writer.dispose();
       unregisterTerminal(props.ptyId);
       resizeObserver.disconnect();
       cleanup?.();
       terminal?.dispose();
+      terminal = undefined;
     });
   });
 

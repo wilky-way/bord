@@ -71,6 +71,7 @@ export default function ChangedFilesList(props: Props) {
                     class="flex-1 text-left text-xs text-[var(--text-primary)] truncate hover:text-[var(--accent)]"
                     onClick={() => props.onViewDiff(file.path, true)}
                     onDblClick={() => props.onOpenFile(file.path)}
+                    title="Double-click to open in editor"
                   >
                     {file.path}
                   </button>
@@ -113,6 +114,7 @@ export default function ChangedFilesList(props: Props) {
                     class="flex-1 text-left text-xs text-[var(--text-primary)] truncate hover:text-[var(--accent)]"
                     onClick={() => props.onViewDiff(file.path, false)}
                     onDblClick={() => props.onOpenFile(file.path)}
+                    title="Double-click to open in editor"
                   >
                     {file.path}
                   </button>

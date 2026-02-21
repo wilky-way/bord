@@ -1,7 +1,7 @@
 import { createSignal, createMemo, onMount, onCleanup, For, Show } from "solid-js";
 import { state, setState } from "../../store/core";
 import { api } from "../../lib/api";
-import { addTerminal, setActiveTerminal, unstashTerminal, setTerminalNeedsAttention, setTerminalLastSeen } from "../../store/terminals";
+import { addTerminal, setActiveTerminal, unstashTerminal, setTerminalNeedsAttention, setTerminalLastSeen, setTerminalMuted } from "../../store/terminals";
 import type { Workspace } from "../../store/types";
 import { ClaudeIcon } from "../icons/ProviderIcons";
 import EditorButton from "../shared/EditorButton";
@@ -25,30 +25,7 @@ function playAttentionChime() {
   } catch { /* AudioContext may not be available */ }
 }
 
-setInterval(() => {
-  setTick((t) => t + 1);
-  const now = Date.now();
-
-  // Keep lastSeenAt current for the terminal the user is actively viewing
-  const activeId = state.activeTerminalId;
-  if (activeId) {
-    const active = state.terminals.find((at) => at.id === activeId && !at.stashed);
-    if (active) setTerminalLastSeen(activeId);
-  }
-
-  // Check all Claude session terminals for idle state → set needsAttention
-  for (const t of state.terminals) {
-    if (
-      t.sessionId &&
-      t.lastOutputAt &&
-      now - t.lastOutputAt > IDLE_THRESHOLD &&
-      t.lastOutputAt > (t.lastSeenAt ?? 0)
-    ) {
-      if (!t.needsAttention) playAttentionChime();
-      setTerminalNeedsAttention(t.id, true);
-    }
-  }
-}, 1000);
+// Idle-detection interval is started inside WorkspaceList component (see onMount)
 
 interface GitInfo {
   branch: string;
@@ -83,6 +60,37 @@ export default function WorkspaceList() {
     } catch {
       // Workspaces may not be available
     }
+  });
+
+  // Idle-detection interval — must be inside component lifecycle
+  onMount(() => {
+    const idleInterval = setInterval(() => {
+      setTick((t) => t + 1);
+      const now = Date.now();
+
+      // Keep lastSeenAt current for the terminal the user is actively viewing
+      const activeId = state.activeTerminalId;
+      if (activeId) {
+        const active = state.terminals.find((at) => at.id === activeId && !at.stashed);
+        if (active) setTerminalLastSeen(activeId);
+      }
+
+      // Check all Claude session terminals for idle state → set needsAttention
+      for (const t of state.terminals) {
+        // Skip globally muted or per-terminal muted
+        if (state.bellMuted || t.muted) continue;
+        if (
+          t.sessionId &&
+          t.lastOutputAt &&
+          now - t.lastOutputAt > IDLE_THRESHOLD &&
+          t.lastOutputAt > (t.lastSeenAt ?? 0)
+        ) {
+          if (!t.needsAttention) playAttentionChime();
+          setTerminalNeedsAttention(t.id, true);
+        }
+      }
+    }, 1000);
+    onCleanup(() => clearInterval(idleInterval));
   });
 
   // Fetch git info for all workspaces periodically
@@ -120,14 +128,24 @@ export default function WorkspaceList() {
   onCleanup(() => clearInterval(gitInterval));
 
   // Close stash popover on outside click
-  function handleGlobalClick(e: MouseEvent) {
-    // Skip if click originated from a stash-related element (icon, button, popover)
+  // Use pointerdown to capture the target before SolidJS re-renders detach it from the DOM
+  let lastPointerDownInStashZone = false;
+  function handlePointerDown(e: PointerEvent) {
     const target = e.target as HTMLElement;
-    if (target.closest?.("[data-stash-zone]")) return;
+    lastPointerDownInStashZone = !!target.closest?.("[data-stash-zone]");
+  }
+  function handleGlobalClick() {
+    if (lastPointerDownInStashZone) return;
     if (stashOpenId()) setStashOpenId(null);
   }
-  onMount(() => document.addEventListener("click", handleGlobalClick));
-  onCleanup(() => document.removeEventListener("click", handleGlobalClick));
+  onMount(() => {
+    document.addEventListener("pointerdown", handlePointerDown, true);
+    document.addEventListener("click", handleGlobalClick);
+  });
+  onCleanup(() => {
+    document.removeEventListener("pointerdown", handlePointerDown, true);
+    document.removeEventListener("click", handleGlobalClick);
+  });
 
   // Auto-name from path
   function handlePathInput(value: string) {
@@ -484,41 +502,70 @@ export default function WorkspaceList() {
                   </div>
                   <For each={wsTerminals()}>
                     {(term) => (
-                      <button
-                        class="w-full text-left px-2 py-1.5 text-xs hover:bg-[var(--bg-tertiary)] transition-colors flex items-center gap-1.5"
+                      <div data-stash-zone class="flex items-center px-2 py-1.5 text-xs hover:bg-[var(--bg-tertiary)] transition-colors gap-1.5"
                         classList={{
                           "bg-[var(--bg-tertiary)]": term.id === state.activeTerminalId && !term.stashed && !term.needsAttention,
                           "opacity-50": term.stashed && !term.needsAttention,
                           "bg-[color-mix(in_srgb,var(--warning)_10%,transparent)]": !!term.needsAttention,
                         }}
-                        onClick={() => {
-                          if (term.stashed) {
-                            unstashTerminal(term.id);
-                          } else {
-                            setActiveTerminal(term.id);
-                          }
-                          setStashOpenId(null);
-                        }}
                       >
-                        <span
-                          class="w-1.5 h-1.5 rounded-full shrink-0"
-                          classList={{
-                            "bg-[var(--warning)] animate-pulse": !!term.needsAttention,
-                            "bg-[var(--success)]": !term.needsAttention && term.wsConnected && !term.stashed,
-                            "bg-[var(--text-secondary)] opacity-40": !term.needsAttention && (!term.wsConnected || term.stashed),
+                        <button
+                          class="flex-1 flex items-center gap-1.5 min-w-0 text-left"
+                          onClick={() => {
+                            if (term.stashed) {
+                              unstashTerminal(term.id);
+                            } else {
+                              setActiveTerminal(term.id);
+                            }
+                            setStashOpenId(null);
                           }}
-                        />
-                        <Show when={term.sessionId}>
-                          <span class="shrink-0 flex items-center"><ClaudeIcon size={10} /></span>
-                        </Show>
-                        <span class="truncate" classList={{
-                          "text-[var(--warning)]": !!term.needsAttention,
-                          "text-[var(--text-primary)]": !term.needsAttention && !term.stashed,
-                          "text-[var(--text-secondary)] italic": !term.needsAttention && term.stashed,
-                        }}>
-                          {term.stashed ? "↑ " : ""}{term.customTitle || term.sessionTitle || term.title || term.cwd.split("/").pop() || "terminal"}
-                        </span>
-                      </button>
+                        >
+                          <span
+                            class="w-1.5 h-1.5 rounded-full shrink-0"
+                            classList={{
+                              "bg-[var(--warning)] animate-pulse": !!term.needsAttention,
+                              "bg-[var(--success)]": !term.needsAttention && term.wsConnected && !term.stashed,
+                              "bg-[var(--text-secondary)] opacity-40": !term.needsAttention && (!term.wsConnected || term.stashed),
+                            }}
+                          />
+                          <Show when={term.sessionId}>
+                            <span class="shrink-0 flex items-center"><ClaudeIcon size={10} /></span>
+                          </Show>
+                          <span class="truncate" classList={{
+                            "text-[var(--warning)]": !!term.needsAttention,
+                            "text-[var(--text-primary)]": !term.needsAttention && !term.stashed,
+                            "text-[var(--text-secondary)] italic": !term.needsAttention && term.stashed,
+                          }}>
+                            {term.stashed ? "↑ " : ""}{term.customTitle || term.sessionTitle || term.title || term.cwd.split("/").pop() || "terminal"}
+                          </span>
+                        </button>
+                        <button
+                          data-stash-zone
+                          class="shrink-0 flex items-center justify-center rounded-[var(--btn-radius)] transition-colors"
+                          classList={{
+                            "text-[var(--text-secondary)] opacity-50 hover:opacity-100": !!term.muted,
+                            "text-[var(--text-secondary)] opacity-30 hover:opacity-60": !term.muted,
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setTerminalMuted(term.id, !term.muted);
+                          }}
+                          title={term.muted ? "Unmute notifications" : "Mute notifications"}
+                        >
+                          {term.muted ? (
+                            <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                              <path d="M8 2C6 2 4.5 3.5 4.5 5v3L3 10.5V12h10v-1.5L11.5 8V5c0-1.5-1.5-3-3.5-3z" />
+                              <path d="M6.5 12a1.5 1.5 0 003 0" />
+                              <path d="M2 2l12 12" />
+                            </svg>
+                          ) : (
+                            <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                              <path d="M8 2C6 2 4.5 3.5 4.5 5v3L3 10.5V12h10v-1.5L11.5 8V5c0-1.5-1.5-3-3.5-3z" />
+                              <path d="M6.5 12a1.5 1.5 0 003 0" />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
                     )}
                   </For>
                 </div>

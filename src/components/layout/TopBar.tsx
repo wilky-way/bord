@@ -34,13 +34,42 @@ export default function TopBar() {
                 "bg-[var(--accent)] text-[var(--bg-primary)]": state.layoutColumns === n,
                 "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]": state.layoutColumns !== n,
               }}
-              onClick={() => setState("layoutColumns", state.layoutColumns === n ? 0 : n)}
+              onClick={() => {
+                // Reset all panel sizes to equal when switching layout
+                state.terminals.forEach((_, i) => {
+                  setState("terminals", i, "panelSize", 1);
+                });
+                setState("layoutColumns", state.layoutColumns === n ? 0 : n);
+              }}
               title={`${n} terminal${n > 1 ? "s" : ""} per view`}
             >
               {n}x
             </button>
           ))}
         </div>
+        {/* Bell mute toggle */}
+        <button
+          class="px-1.5 py-0.5 transition-colors rounded-[var(--btn-radius)]"
+          classList={{
+            "text-[var(--warning)]": !state.bellMuted,
+            "text-[var(--text-secondary)] hover:text-[var(--text-primary)]": state.bellMuted,
+          }}
+          onClick={() => setState("bellMuted", (v) => !v)}
+          title={state.bellMuted ? "Unmute all notifications" : "Mute all notifications"}
+        >
+          {state.bellMuted ? (
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+              <path d="M8 2C6 2 4.5 3.5 4.5 5v3L3 10.5V12h10v-1.5L11.5 8V5c0-1.5-1.5-3-3.5-3z" />
+              <path d="M6.5 12a1.5 1.5 0 003 0" />
+              <path d="M2 2l12 12" />
+            </svg>
+          ) : (
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+              <path d="M8 2C6 2 4.5 3.5 4.5 5v3L3 10.5V12h10v-1.5L11.5 8V5c0-1.5-1.5-3-3.5-3z" />
+              <path d="M6.5 12a1.5 1.5 0 003 0" />
+            </svg>
+          )}
+        </button>
         <button
           class={`px-2 py-1 text-xs rounded-[var(--btn-radius)] transition-colors ${
             scrollSyncEnabled()

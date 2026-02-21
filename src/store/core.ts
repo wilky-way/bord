@@ -9,6 +9,8 @@ const [state, setState] = createStore<AppState>({
   sidebarOpen: true,
   layoutColumns: 0,
   gitPanelTerminalId: null,
+  bellMuted: false,
+  sidebarCollapsed: { workspaces: false, sessions: false, docker: false },
 });
 
 export { state, setState };
