@@ -36,13 +36,21 @@ export default function TerminalPanel(props: Props) {
   let popoverRef: HTMLDivElement | undefined;
   const [popoverPos, setPopoverPos] = createSignal({ top: 0, left: 0 });
 
+  // Resizable popover state
+  const [popoverWidth, setPopoverWidth] = createSignal(380);
+  const [resizing, setResizing] = createSignal<"left" | "right" | null>(null);
+  let resizeStartX = 0;
+  let resizeStartWidth = 0;
+  let resizeStartLeft = 0;
+
   function updatePopoverPosition() {
     if (!branchButtonRef) return;
     const rect = branchButtonRef.getBoundingClientRect();
+    const w = popoverWidth();
     let top = rect.bottom + 4;
     let left = rect.left;
     // Clamp to viewport edges
-    if (left + 480 > window.innerWidth - 8) left = window.innerWidth - 480 - 8;
+    if (left + w > window.innerWidth - 8) left = window.innerWidth - w - 8;
     if (left < 8) left = 8;
     if (top > window.innerHeight - 100) {
       top = rect.top - 4;
@@ -67,6 +75,7 @@ export default function TerminalPanel(props: Props) {
   createEffect(() => {
     if (!isGitPanelOpen()) return;
     const handler = (e: MouseEvent) => {
+      if (resizing()) return; // Don't close while resizing
       const t = e.target as Node;
       if (popoverRef && !popoverRef.contains(t) && branchButtonRef && !branchButtonRef.contains(t)) {
         closeGitPanel();
@@ -75,6 +84,38 @@ export default function TerminalPanel(props: Props) {
     requestAnimationFrame(() => document.addEventListener("mousedown", handler));
     onCleanup(() => document.removeEventListener("mousedown", handler));
   });
+
+  // Popover resize handlers
+  function onResizeStart(side: "left" | "right", e: PointerEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setResizing(side);
+    resizeStartX = e.clientX;
+    resizeStartWidth = popoverWidth();
+    resizeStartLeft = popoverPos().left;
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+
+    const onMove = (ev: PointerEvent) => {
+      const delta = ev.clientX - resizeStartX;
+      const minW = 280;
+      const maxW = window.innerWidth * 0.9;
+      if (side === "right") {
+        setPopoverWidth(Math.max(minW, Math.min(maxW, resizeStartWidth + delta)));
+      } else {
+        const newWidth = Math.max(minW, Math.min(maxW, resizeStartWidth - delta));
+        const newLeft = resizeStartLeft + (resizeStartWidth - newWidth);
+        setPopoverWidth(newWidth);
+        setPopoverPos((prev) => ({ ...prev, left: Math.max(8, newLeft) }));
+      }
+    };
+    const onUp = () => {
+      setResizing(null);
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+    };
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
+  }
 
   async function fetchGitInfo() {
     try {
@@ -260,17 +301,29 @@ export default function TerminalPanel(props: Props) {
           <div
             ref={popoverRef}
             class="fixed z-[9999]"
-            style={{ top: `${popoverPos().top}px`, left: `${popoverPos().left}px` }}
+            style={{ top: `${popoverPos().top}px`, left: `${popoverPos().left}px`, width: `${popoverWidth()}px` }}
           >
             <div
-              class="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-lg overflow-hidden popover-appear"
+              class="relative bg-[var(--bg-secondary)] border border-[var(--border)] rounded-lg overflow-hidden popover-appear"
               style={{
-                "min-width": "280px",
-                "max-width": "480px",
                 "box-shadow": "0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.05)",
               }}
             >
-              <div class="overflow-y-auto" style={{ "max-height": "calc(100vh - 60px)" }}>
+              {/* Left resize handle */}
+              <div
+                class="absolute top-0 left-0 w-[6px] h-full z-20 cursor-col-resize group/resize"
+                onPointerDown={(e) => onResizeStart("left", e)}
+              >
+                <div class="absolute top-0 left-[2px] w-[2px] h-full opacity-0 group-hover/resize:opacity-100 bg-[var(--accent)] transition-opacity" />
+              </div>
+              {/* Right resize handle */}
+              <div
+                class="absolute top-0 right-0 w-[6px] h-full z-20 cursor-col-resize group/resize"
+                onPointerDown={(e) => onResizeStart("right", e)}
+              >
+                <div class="absolute top-0 right-[2px] w-[2px] h-full opacity-0 group-hover/resize:opacity-100 bg-[var(--accent)] transition-opacity" />
+              </div>
+              <div class="flex flex-col" style={{ "max-height": "calc(100vh - 60px)" }}>
                 <GitPanel cwd={props.cwd} onClose={() => closeGitPanel()} />
               </div>
             </div>

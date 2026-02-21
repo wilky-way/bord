@@ -123,6 +123,12 @@ export async function gitRoutes(req: Request, url: URL): Promise<Response | null
     return Response.json(stats);
   }
 
+  // GET /api/git/diff-stats-per-file?cwd=...
+  if (req.method === "GET" && url.pathname === "/api/git/diff-stats-per-file") {
+    const stats = await git.getDiffStatsPerFile(cwd);
+    return Response.json(stats);
+  }
+
   // GET /api/git/repo-tree?cwd=...
   if (req.method === "GET" && url.pathname === "/api/git/repo-tree") {
     const tree = await git.getRepoTree(cwd);

@@ -113,6 +113,11 @@ export const api = {
     }),
   gitDiffStats: (cwd: string) =>
     request<{ insertions: number; deletions: number }>(`/git/diff-stats?cwd=${encodeURIComponent(cwd)}`),
+  gitDiffStatsPerFile: (cwd: string) =>
+    request<{
+      staged: Record<string, { insertions: number; deletions: number }>;
+      unstaged: Record<string, { insertions: number; deletions: number }>;
+    }>(`/git/diff-stats-per-file?cwd=${encodeURIComponent(cwd)}`),
   gitRepoTree: (cwd: string) =>
     request<{
       current: { path: string; name: string; branch: string };

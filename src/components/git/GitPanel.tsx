@@ -25,6 +25,10 @@ export default function GitPanel(props: GitPanelProps) {
   const [branches, setBranches] = createSignal<string[]>([]);
   const [showBranchDropdown, setShowBranchDropdown] = createSignal(false);
   const [overrideCwd, setOverrideCwd] = createSignal<string | null>(null);
+  const [fileStats, setFileStats] = createSignal<{
+    staged: Record<string, { insertions: number; deletions: number }>;
+    unstaged: Record<string, { insertions: number; deletions: number }>;
+  } | null>(null);
   const effectiveCwd = () => overrideCwd() || props.cwd;
 
   // Clear selections when navigating to a different repo
@@ -38,17 +42,20 @@ export default function GitPanel(props: GitPanelProps) {
     const cwd = effectiveCwd();
     if (!cwd) return;
     try {
-      const [status, ab] = await Promise.all([
+      const [status, ab, perFileStats] = await Promise.all([
         api.gitStatus(cwd),
         api.gitAheadBehind(cwd),
+        api.gitDiffStatsPerFile(cwd),
       ]);
       setGitStatus(status);
       setAhead(ab.ahead);
       setBehind(ab.behind);
+      setFileStats(perFileStats);
     } catch {
       setGitStatus(null);
       setAhead(0);
       setBehind(0);
+      setFileStats(null);
     }
   }
 
@@ -190,7 +197,7 @@ export default function GitPanel(props: GitPanelProps) {
   }
 
   return (
-    <div class="p-2 flex flex-col max-w-[480px]">
+    <div class="p-2 flex flex-col h-full">
       <RepoNavigator
         cwd={props.cwd}
         effectiveCwd={effectiveCwd()}
@@ -315,10 +322,11 @@ export default function GitPanel(props: GitPanelProps) {
       </Show>
 
       <Show when={gitStatus()}>
-        <div class="overflow-y-auto space-y-2">
+        <div class="flex-1 min-h-0 overflow-y-auto space-y-2">
           <ChangedFilesList
             status={gitStatus()!}
             cwd={effectiveCwd()}
+            fileStats={fileStats()}
             onViewDiff={viewDiff}
             onStage={stageFile}
             onUnstage={unstageFile}
@@ -330,7 +338,9 @@ export default function GitPanel(props: GitPanelProps) {
           <Show when={selectedFile()}>
             <DiffViewer diff={selectedDiff()} fileName={selectedFile()!} cwd={effectiveCwd()} />
           </Show>
+        </div>
 
+        <div class="shrink-0 pt-2">
           <CommitInput onCommit={commit} />
         </div>
       </Show>

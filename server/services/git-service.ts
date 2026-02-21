@@ -249,6 +249,26 @@ export async function getRepoTree(cwd: string): Promise<RepoTree | null> {
   return { current, parent, siblings, children };
 }
 
+export async function getDiffStatsPerFile(cwd: string): Promise<{
+  staged: Record<string, { insertions: number; deletions: number }>;
+  unstaged: Record<string, { insertions: number; deletions: number }>;
+}> {
+  const [unstaged, staged] = await Promise.all([
+    runGit(cwd, ["diff", "--numstat"]),
+    runGit(cwd, ["diff", "--cached", "--numstat"]),
+  ]);
+  function parseNumstat(output: string) {
+    const result: Record<string, { insertions: number; deletions: number }> = {};
+    for (const line of output.split("\n").filter(Boolean)) {
+      const [ins, del, ...pathParts] = line.split("\t");
+      if (ins === "-" || del === "-") continue; // binary
+      result[pathParts.join("\t")] = { insertions: parseInt(ins) || 0, deletions: parseInt(del) || 0 };
+    }
+    return result;
+  }
+  return { unstaged: parseNumstat(unstaged.stdout), staged: parseNumstat(staged.stdout) };
+}
+
 export async function getDiffStats(cwd: string): Promise<{ insertions: number; deletions: number }> {
   const [unstaged, staged] = await Promise.all([
     runGit(cwd, ["diff", "--numstat"]),
