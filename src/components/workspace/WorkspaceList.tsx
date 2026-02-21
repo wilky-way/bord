@@ -3,7 +3,7 @@ import { state, setState } from "../../store/core";
 import { api } from "../../lib/api";
 import { addTerminal, setActiveTerminal, unstashTerminal, setTerminalNeedsAttention, setTerminalLastSeen, setTerminalMuted } from "../../store/terminals";
 import type { Workspace } from "../../store/types";
-import { ClaudeIcon } from "../icons/ProviderIcons";
+import { PROVIDER_ICONS } from "../../lib/providers";
 import EditorButton from "../shared/EditorButton";
 
 // Tick signal — drives idle-detection checks every second
@@ -527,8 +527,11 @@ export default function WorkspaceList() {
                               "bg-[var(--text-secondary)] opacity-40": !term.needsAttention && (!term.wsConnected || term.stashed),
                             }}
                           />
-                          <Show when={term.sessionId}>
-                            <span class="shrink-0 flex items-center"><ClaudeIcon size={10} /></span>
+                          <Show when={term.provider}>
+                            {(() => {
+                              const Icon = PROVIDER_ICONS[term.provider!];
+                              return <span class="shrink-0 flex items-center"><Icon size={10} /></span>;
+                            })()}
                           </Show>
                           <span class="truncate" classList={{
                             "text-[var(--warning)]": !!term.needsAttention,

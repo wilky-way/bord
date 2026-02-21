@@ -1,7 +1,7 @@
 import { For, Show } from "solid-js";
 import { state } from "../../store/core";
 import { setActiveTerminal, getVisibleTerminals } from "../../store/terminals";
-import { ClaudeIcon } from "../icons/ProviderIcons";
+import { PROVIDER_COLORS, PROVIDER_ICONS } from "../../lib/providers";
 
 export default function TerminalMinimap() {
   const visible = () => getVisibleTerminals();
@@ -17,19 +17,29 @@ export default function TerminalMinimap() {
                 <button
                   class="h-2 rounded-sm transition-all"
                   classList={{
-                    "w-6 bg-[#D97757]": isActive() && !!term.sessionId,
-                    "w-6 bg-[var(--accent)]": isActive() && !term.sessionId,
-                    "w-4 bg-[#D97757] opacity-40 hover:opacity-70": !isActive() && !term.needsAttention && !!term.sessionId,
-                    "w-4 bg-[var(--accent)] opacity-30 hover:opacity-60": !isActive() && !term.needsAttention && !term.sessionId,
-                    "w-4 bg-[var(--warning)] animate-pulse": !!term.needsAttention,
+                    "w-6": isActive(),
+                    "w-4": !isActive(),
+                    "opacity-40 hover:opacity-70": !isActive() && !term.needsAttention && !!term.provider,
+                    "opacity-30 hover:opacity-60": !isActive() && !term.needsAttention && !term.provider,
+                    "animate-pulse": !!term.needsAttention,
+                  }}
+                  style={{
+                    "background-color": term.needsAttention
+                      ? "var(--warning)"
+                      : term.provider
+                        ? PROVIDER_COLORS[term.provider]
+                        : "var(--accent)",
                   }}
                   onClick={() => setActiveTerminal(term.id)}
                 />
                 {/* Tooltip */}
                 <div class="absolute top-full mt-1.5 left-1/2 -translate-x-1/2 hidden group-hover:flex flex-col gap-0.5 px-2 py-1 bg-[var(--bg-tertiary)] border border-[var(--border)] rounded text-[10px] text-[var(--text-primary)] whitespace-nowrap z-50 shadow-lg">
                   <div class="flex items-center gap-1">
-                    <Show when={term.sessionId}>
-                      <ClaudeIcon size={10} />
+                    <Show when={term.provider}>
+                      {(() => {
+                        const Icon = PROVIDER_ICONS[term.provider!];
+                        return <Icon size={10} />;
+                      })()}
                     </Show>
                     <span>{term.customTitle || term.sessionTitle || term.title}</span>
                   </div>

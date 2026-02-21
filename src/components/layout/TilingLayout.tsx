@@ -6,8 +6,8 @@ import TerminalPanel from "../terminal/TerminalPanel";
 import ResizablePanel from "./ResizablePanel";
 
 const MIN_PANEL_WIDTH = 280;
-const PADDING = 12; // p-1.5 = 6px * 2
-const GAP = 6; // gap-1.5
+const PADDING = 4; // p-0.5 = 2px * 2
+const GAP = 4; // gap-1
 
 export default function TilingLayout() {
   const visibleTerminals = () => getVisibleTerminals();
@@ -71,7 +71,7 @@ export default function TilingLayout() {
   return (
     <div
       ref={containerRef}
-      class="flex flex-nowrap h-full p-1.5 gap-1.5 overflow-x-auto overflow-y-hidden flex-1 min-w-0"
+      class="flex flex-nowrap h-full p-0.5 gap-1 overflow-x-auto overflow-y-hidden flex-1 min-w-0"
     >
       <Show
         when={visibleTerminals().length > 0}

@@ -1,6 +1,7 @@
 import { state, setState } from "./core";
 import { api } from "../lib/api";
 import type { TerminalInstance } from "./types";
+import { getProviderFromCommand } from "../lib/providers";
 
 export function setTerminalTitle(id: string, title: string) {
   setState("terminals", (t) => t.id === id, "customTitle", title || undefined);
@@ -51,6 +52,8 @@ export async function addTerminal(cwd?: string, command?: string[], sessionTitle
     }
   }
 
+  const provider = getProviderFromCommand(command);
+
   const terminal: TerminalInstance = {
     id: result.id,
     cwd: result.cwd,
@@ -61,6 +64,7 @@ export async function addTerminal(cwd?: string, command?: string[], sessionTitle
     workspaceId: state.activeWorkspaceId ?? undefined,
     sessionId,
     sessionTitle,
+    provider,
   };
 
   setState("terminals", (prev) => [...prev, terminal]);

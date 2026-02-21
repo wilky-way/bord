@@ -1,3 +1,5 @@
+import type { Provider } from "../store/types";
+
 const BASE_URL = "/api";
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
@@ -36,8 +38,11 @@ export const api = {
   deleteWorkspace: (id: string) => request<{ ok: boolean }>(`/workspaces/${id}`, { method: "DELETE" }),
 
   // Sessions
-  listSessions: (project?: string) => {
-    const params = project ? `?project=${encodeURIComponent(project)}` : "";
+  listSessions: (project?: string, provider?: string) => {
+    const params = new URLSearchParams();
+    if (project) params.set("project", project);
+    if (provider) params.set("provider", provider);
+    const qs = params.toString();
     return request<Array<{
       id: string;
       title: string;
@@ -45,7 +50,8 @@ export const api = {
       startedAt: string;
       updatedAt: string;
       messageCount: number;
-    }>>(`/sessions${params}`);
+      provider: Provider;
+    }>>(`/sessions${qs ? `?${qs}` : ""}`);
   },
 
   // Git

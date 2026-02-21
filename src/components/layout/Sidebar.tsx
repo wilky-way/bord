@@ -2,6 +2,7 @@ import { Show, type JSX } from "solid-js";
 import { state, setState } from "../../store/core";
 import WorkspaceList from "../workspace/WorkspaceList";
 import SessionList from "../session/SessionList";
+import ProviderTabs from "../session/ProviderTabs";
 import DockerPanel from "../docker/DockerPanel";
 
 function SectionHeader(props: {
@@ -55,6 +56,9 @@ export default function Sidebar() {
         </div>
 
         <div class="border-t border-[var(--border)]" />
+
+        {/* Provider filter */}
+        <ProviderTabs />
 
         {/* Sessions */}
         <div class="flex-1 min-h-0 flex flex-col">

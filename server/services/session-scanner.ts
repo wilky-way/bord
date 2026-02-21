@@ -2,6 +2,8 @@ import { readdir, readFile, stat } from "fs/promises";
 import { join } from "path";
 import { homedir } from "os";
 
+export type Provider = "claude" | "codex" | "opencode" | "gemini";
+
 export interface SessionInfo {
   id: string;
   title: string;
@@ -9,6 +11,7 @@ export interface SessionInfo {
   startedAt: string;
   updatedAt: string;
   messageCount: number;
+  provider: Provider;
 }
 
 interface IndexEntry {
@@ -23,6 +26,7 @@ interface IndexEntry {
 }
 
 const CLAUDE_PROJECTS_DIR = join(homedir(), ".claude", "projects");
+const CODEX_SESSIONS_DIR = join(homedir(), ".codex", "sessions");
 
 /** Decode Claude project dir name back to an absolute path */
 function decodeDirToPath(dir: string): string {
@@ -61,7 +65,169 @@ async function readSessionIndex(
   return map;
 }
 
-export async function scanSessions(projectPath?: string): Promise<SessionInfo[]> {
+async function scanCodexSessions(projectPath?: string): Promise<SessionInfo[]> {
+  const sessions: SessionInfo[] = [];
+  try {
+    // Codex stores sessions under ~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl
+    const years = await readdir(CODEX_SESSIONS_DIR).catch((): string[] => []);
+    for (const year of years) {
+      const months = await readdir(join(CODEX_SESSIONS_DIR, year)).catch((): string[] => []);
+      for (const month of months) {
+        const days = await readdir(join(CODEX_SESSIONS_DIR, year, month)).catch((): string[] => []);
+        for (const day of days) {
+          const dayDir = join(CODEX_SESSIONS_DIR, year, month, day);
+          const dayStat = await stat(dayDir).catch(() => null);
+          if (!dayStat?.isDirectory()) continue;
+
+          const files = await readdir(dayDir).catch((): string[] => []);
+          for (const file of files.filter((f: string) => f.endsWith(".jsonl"))) {
+            const filePath = join(dayDir, file);
+            const fileStat = await stat(filePath).catch(() => null);
+            if (!fileStat) continue;
+
+            let sessionId = "";
+            let title = "Untitled Session";
+            let cwd = "";
+            let timestamp = "";
+            let messageCount = 0;
+
+            // Parse JSONL: first line is session_meta, then scan for user_message events
+            try {
+              const content = await readFile(filePath, "utf-8");
+              const lines = content.split("\n").filter(Boolean);
+
+              for (const line of lines) {
+                try {
+                  const obj = JSON.parse(line);
+                  if (obj.type === "session_meta") {
+                    const p = obj.payload ?? obj;
+                    sessionId = p.id ?? "";
+                    cwd = p.cwd ?? "";
+                    timestamp = p.timestamp ?? "";
+                  } else if (obj.type === "event_msg") {
+                    const p = obj.payload ?? {};
+                    if (p.type === "user_message") {
+                      messageCount++;
+                      if (title === "Untitled Session" && p.message) {
+                        // Strip IDE context prefix, get the actual request
+                        const msg = typeof p.message === "string" ? p.message : "";
+                        const reqMatch = msg.match(/My request for Codex:\s*\n?([\s\S]*)/i);
+                        const text = reqMatch ? reqMatch[1].trim() : msg.trim();
+                        if (text) title = text.replace(/\s+/g, " ").slice(0, 80);
+                      }
+                    } else if (p.type === "agent_message" || p.type === "agent_reasoning") {
+                      messageCount++;
+                    }
+                  }
+                } catch {
+                  // Skip malformed lines
+                }
+              }
+            } catch {
+              // Skip unreadable files
+            }
+
+            if (!sessionId) {
+              // Fallback: extract UUID from filename (rollout-YYYY-MM-DDTHH-MM-SS-UUID.jsonl)
+              const match = file.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/);
+              sessionId = match?.[1] ?? file.replace(".jsonl", "");
+            }
+
+            // Filter by projectPath using cwd
+            if (projectPath && cwd) {
+              const normalizedProject = projectPath.endsWith("/") ? projectPath : projectPath + "/";
+              const normalizedCwd = cwd.endsWith("/") ? cwd : cwd + "/";
+              if (cwd !== projectPath && !normalizedCwd.startsWith(normalizedProject) && !normalizedProject.startsWith(normalizedCwd)) {
+                continue;
+              }
+            }
+
+            // Skip sessions with no usable path
+            if (!cwd) continue;
+
+            sessions.push({
+              id: sessionId,
+              title,
+              projectPath: cwd,
+              startedAt: timestamp || fileStat.birthtime.toISOString(),
+              updatedAt: fileStat.mtime.toISOString(),
+              messageCount,
+              provider: "codex",
+            });
+          }
+        }
+      }
+    }
+  } catch {
+    // ~/.codex/sessions/ may not exist
+  }
+  sessions.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  return sessions;
+}
+
+const OPENCODE_SESSIONS_DIR = join(homedir(), ".local", "share", "opencode", "storage", "session");
+
+async function scanOpenCodeSessions(projectPath?: string): Promise<SessionInfo[]> {
+  const sessions: SessionInfo[] = [];
+  try {
+    // OpenCode stores sessions as JSON files under ~/.local/share/opencode/storage/session/{projectHash}/*.json
+    const projectDirs = await readdir(OPENCODE_SESSIONS_DIR).catch((): string[] => []);
+    for (const dir of projectDirs) {
+      const dirPath = join(OPENCODE_SESSIONS_DIR, dir);
+      const dirStat = await stat(dirPath).catch(() => null);
+      if (!dirStat?.isDirectory()) continue;
+
+      const files = await readdir(dirPath).catch((): string[] => []);
+      for (const file of files.filter((f: string) => f.endsWith(".json"))) {
+        const filePath = join(dirPath, file);
+        try {
+          const raw = await readFile(filePath, "utf-8");
+          const session = JSON.parse(raw);
+
+          const cwd = session.directory ?? "";
+          const title = session.title || session.slug || "Untitled Session";
+          const sessionId = session.id ?? file.replace(".json", "");
+
+          // Filter by projectPath
+          if (projectPath && cwd) {
+            const normalizedProject = projectPath.endsWith("/") ? projectPath : projectPath + "/";
+            const normalizedCwd = cwd.endsWith("/") ? cwd : cwd + "/";
+            if (cwd !== projectPath && !normalizedCwd.startsWith(normalizedProject) && !normalizedProject.startsWith(normalizedCwd)) {
+              continue;
+            }
+          }
+
+          if (!cwd) continue;
+
+          const created = session.time?.created ? new Date(session.time.created).toISOString() : "";
+          const updated = session.time?.updated ? new Date(session.time.updated).toISOString() : "";
+
+          sessions.push({
+            id: sessionId,
+            title,
+            projectPath: cwd,
+            startedAt: created || new Date().toISOString(),
+            updatedAt: updated || new Date().toISOString(),
+            messageCount: (session.summary?.files ?? 0) > 0 ? 1 : 0,
+            provider: "opencode",
+          });
+        } catch {
+          // Skip unreadable files
+        }
+      }
+    }
+  } catch {
+    // OpenCode sessions dir may not exist
+  }
+  sessions.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  return sessions;
+}
+
+async function scanGeminiSessions(_projectPath?: string): Promise<SessionInfo[]> {
+  return [];
+}
+
+async function scanClaudeSessions(projectPath?: string): Promise<SessionInfo[]> {
   const sessions: SessionInfo[] = [];
 
   try {
@@ -87,7 +253,7 @@ export async function scanSessions(projectPath?: string): Promise<SessionInfo[]>
       const index = await readSessionIndex(projectDir);
 
       const files = await readdir(projectDir).catch((): string[] => []);
-      const jsonlFiles = files.filter((f) => f.endsWith(".jsonl"));
+      const jsonlFiles = files.filter((f: string) => f.endsWith(".jsonl"));
 
       for (const file of jsonlFiles) {
         const sessionId = file.replace(".jsonl", "");
@@ -150,6 +316,9 @@ export async function scanSessions(projectPath?: string): Promise<SessionInfo[]>
           if (messageCount === 0) messageCount = jsonlCount;
         }
 
+        // Skip sessions with no actual conversation (only file-history-snapshot, system, etc.)
+        if (messageCount === 0 && title === "Untitled Session") continue;
+
         sessions.push({
           id: sessionId,
           title,
@@ -157,6 +326,7 @@ export async function scanSessions(projectPath?: string): Promise<SessionInfo[]>
           startedAt: indexEntry?.created ?? fileStat.birthtime.toISOString(),
           updatedAt: indexEntry?.modified ?? indexEntry?.lastUpdated ?? fileStat.mtime.toISOString(),
           messageCount,
+          provider: "claude",
         });
       }
     }
@@ -167,4 +337,14 @@ export async function scanSessions(projectPath?: string): Promise<SessionInfo[]>
   // Sort by most recently updated
   sessions.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   return sessions;
+}
+
+export async function scanSessions(projectPath?: string, provider?: Provider): Promise<SessionInfo[]> {
+  switch (provider) {
+    case "claude": return scanClaudeSessions(projectPath);
+    case "codex": return scanCodexSessions(projectPath);
+    case "opencode": return scanOpenCodeSessions(projectPath);
+    case "gemini": return scanGeminiSessions(projectPath);
+    default: return scanClaudeSessions(projectPath);
+  }
 }

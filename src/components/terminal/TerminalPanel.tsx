@@ -1,10 +1,10 @@
 import { createSignal, createEffect, onMount, onCleanup, Show } from "solid-js";
-import { Portal } from "solid-js/web";
+import { Portal, Dynamic } from "solid-js/web";
 import TerminalView from "./TerminalView";
 import { removeTerminal, setActiveTerminal, stashTerminal, setTerminalTitle, setTerminalMuted } from "../../store/terminals";
 import { state } from "../../store/core";
 import { toggleGitPanel, closeGitPanel } from "../../store/git";
-import { ClaudeIcon } from "../icons/ProviderIcons";
+import { PROVIDER_ICONS } from "../../lib/providers";
 import EditorButton from "../shared/EditorButton";
 import GitPanel from "../git/GitPanel";
 import { api } from "../../lib/api";
@@ -228,8 +228,10 @@ export default function TerminalPanel(props: Props) {
               autofocus
             />
           }>
-            <Show when={terminal()?.sessionId}>
-              <span class="shrink-0 mr-0.5 flex items-center"><ClaudeIcon size={11} /></span>
+            <Show when={terminal()?.provider}>
+              <span class="shrink-0 mr-0.5 flex items-center">
+                <Dynamic component={PROVIDER_ICONS[terminal()!.provider!]} size={11} />
+              </span>
             </Show>
             <span
               class="text-xs text-[var(--text-secondary)] truncate cursor-text"

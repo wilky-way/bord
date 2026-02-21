@@ -10,6 +10,7 @@ const [state, setState] = createStore<AppState>({
   layoutColumns: 0,
   gitPanelTerminalId: null,
   bellMuted: false,
+  activeProvider: "claude",
   sidebarCollapsed: { workspaces: false, sessions: false, docker: false },
 });
 

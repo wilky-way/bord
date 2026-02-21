@@ -2,6 +2,7 @@ import type { ServerWebSocket } from "bun";
 
 const BUFFER_LIMIT = 2 * 1024 * 1024; // 2MB circular buffer
 const BUFFER_CHUNK = 64 * 1024; // 64KB replay chunks
+const MAX_REPLAY_BURST = 128 * 1024; // 128KB max replay on attach
 
 interface RingBuffer {
   data: Uint8Array; // Pre-allocated 2MB
@@ -148,7 +149,8 @@ export function attachWs(
 
   // Replay buffered data if client needs it
   if (clientCursor < session.ring.totalWritten) {
-    const replay = ringRead(session.ring, clientCursor);
+    const replayStart = Math.max(clientCursor, session.ring.totalWritten - MAX_REPLAY_BURST);
+    const replay = ringRead(session.ring, replayStart);
     if (replay) {
       // Send in chunks to avoid overwhelming the WebSocket
       for (let i = 0; i < replay.byteLength; i += BUFFER_CHUNK) {

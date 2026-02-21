@@ -1,3 +1,5 @@
+export type Provider = "claude" | "codex" | "opencode" | "gemini";
+
 export interface TerminalInstance {
   id: string;
   cwd: string;
@@ -13,6 +15,7 @@ export interface TerminalInstance {
   lastSeenAt?: number; // Date.now() when user last viewed this terminal
   needsAttention?: boolean; // notification flag — set when idle, cleared on focus
   muted?: boolean; // per-terminal mute — skips idle detection entirely
+  provider?: Provider; // which AI provider spawned this terminal
 }
 
 export interface Workspace {
@@ -28,6 +31,7 @@ export interface SessionInfo {
   startedAt: string;
   updatedAt: string;
   messageCount: number;
+  provider: Provider;
 }
 
 export interface GitStatus {
@@ -46,5 +50,6 @@ export interface AppState {
   layoutColumns: number; // 0 = auto-fit all visible, 1–4 = fixed columns visible at once
   gitPanelTerminalId: string | null; // which terminal's git overlay is open (null = none)
   bellMuted: boolean; // global mute — suppresses all notifications across all terminals
+  activeProvider: Provider;
   sidebarCollapsed: { workspaces: boolean; sessions: boolean; docker: boolean };
 }

@@ -47,6 +47,8 @@ export default function TerminalView(props: Props) {
 
     // Set up write batching
     const writer = createTerminalWriter(terminal);
+    let initialReplay = true;
+    let replayIdleTimer: ReturnType<typeof setTimeout> | undefined;
 
     // Connect to PTY via WebSocket
     cleanup = connectTerminal(
@@ -56,6 +58,16 @@ export default function TerminalView(props: Props) {
           writer.write(new Uint8Array(data));
         } else if (typeof data === "string") {
           writer.write(data);
+        }
+
+        if (initialReplay && terminal) {
+          clearTimeout(replayIdleTimer);
+          replayIdleTimer = setTimeout(() => {
+            if (!disposed && terminal) {
+              terminal.scrollToBottom();
+            }
+            initialReplay = false;
+          }, 200);
         }
       },
       (connected) => {
@@ -110,6 +122,7 @@ export default function TerminalView(props: Props) {
 
     onCleanup(() => {
       disposed = true;
+      clearTimeout(replayIdleTimer);
       writer.dispose();
       unregisterTerminal(props.ptyId);
       resizeObserver.disconnect();
@@ -124,7 +137,6 @@ export default function TerminalView(props: Props) {
 
 const FONT_SIZE = 13;
 const LINE_HEIGHT = 1.2;
-const CANVAS_PADDING = 6; // Must match .terminal-container canvas padding in styles.css
 
 let cachedMetrics: { cellWidth: number; cellHeight: number; fontSize: number } | null = null;
 
@@ -166,11 +178,25 @@ function fitTerminal(terminal: Terminal, container: HTMLElement, ptyId: string) 
   const rect = container.getBoundingClientRect();
   if (rect.width === 0 || rect.height === 0) return;
 
-  const { cellWidth, cellHeight } = measureFontMetrics(FONT_SIZE);
-  const totalPadding = CANVAS_PADDING * 2;
+  const rendererMetrics = (terminal as any).renderer?.getMetrics?.();
+  const fallbackMetrics = measureFontMetrics(FONT_SIZE);
+  const cellWidth = rendererMetrics?.width ?? fallbackMetrics.cellWidth;
+  const cellHeight = rendererMetrics?.height ?? fallbackMetrics.cellHeight;
 
-  const newCols = Math.max(2, Math.floor((rect.width - totalPadding) / cellWidth));
-  const newRows = Math.max(1, Math.floor((rect.height - totalPadding) / cellHeight));
+  const canvas = container.querySelector("canvas");
+  const style = canvas ? getComputedStyle(canvas) : null;
+  const paddingX = style
+    ? (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0)
+    : 0;
+  const paddingY = style
+    ? (parseFloat(style.paddingTop) || 0) + (parseFloat(style.paddingBottom) || 0)
+    : 0;
+
+  const availableWidth = Math.max(0, rect.width - paddingX);
+  const availableHeight = Math.max(0, rect.height - paddingY);
+
+  const newCols = Math.max(2, Math.floor(availableWidth / cellWidth));
+  const newRows = Math.max(1, Math.floor(availableHeight / cellHeight));
 
   if (newCols !== terminal.cols || newRows !== terminal.rows) {
     terminal.resize(newCols, newRows);

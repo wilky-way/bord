@@ -15,9 +15,10 @@ export default function SessionList() {
 
   const activeWorkspace = () => state.workspaces.find((w) => w.id === state.activeWorkspaceId);
 
-  // Reload sessions when active workspace changes
+  // Reload sessions when active workspace or provider changes
   createEffect(async () => {
     const ws = activeWorkspace();
+    const provider = state.activeProvider;
     if (!ws) {
       setSessions([]);
       return;
@@ -25,7 +26,7 @@ export default function SessionList() {
     setLoading(true);
     setVisibleCount(DEFAULT_VISIBLE);
     try {
-      const data = await api.listSessions(ws.path);
+      const data = await api.listSessions(ws.path, provider);
       setSessions(data);
     } catch {
       setSessions([]);
@@ -39,7 +40,7 @@ export default function SessionList() {
     if (!ws) return;
     setLoading(true);
     try {
-      const data = await api.listSessions(ws.path);
+      const data = await api.listSessions(ws.path, state.activeProvider);
       setSessions(data);
     } catch {
       setSessions([]);

@@ -59,7 +59,7 @@ html, body, #root {
 }
 .terminal-container canvas {
   height: 100%;
-  padding: 6px;
+  padding: 2px;
 }
 
 /* Drop indicator for drag reorder */
