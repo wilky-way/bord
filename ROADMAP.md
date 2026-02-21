@@ -1,6 +1,27 @@
 # Bord Roadmap
 
-## Phase 1 — Core Polish (current)
+## Completed
+
+The following features have shipped and are available in the current build:
+
+- **Tiling terminal layout** with horizontal scroll, resizable panels, and auto-fit or fixed 1x–4x column density
+- **Drag-and-drop reorder** of terminal panels with visual drop indicators
+- **Terminal minimap** in the top bar for quick navigation with attention pulse indicators
+- **Stash/unstash** terminals with attention badges on new output while hidden
+- **Workspace scoping** — terminals are isolated per workspace; switching workspaces swaps terminal sets
+- **Keyboard shortcuts** — Cmd+N (new terminal), Cmd+Left/Right (navigate adjacent)
+- **Scroll sync** — parallel scroll mode syncing position across all visible terminals
+- **Claude session scanning** — discovers sessions from `~/.claude/projects/`, resume via `--resume` flag
+- **Git integration** — branch badge + dirty indicator on title bar, stage/unstage, diff viewer, commit, push/pull, branch checkout
+- **Editor integration** — open workspace in VS Code or Cursor with preference persistence
+- **Catppuccin Frappe theme** with CSS custom properties
+- **Tauri v2 desktop shell** with CSP and window configuration
+- **2-finger horizontal scroll fix** for ghostty-web canvas
+- **App rename** from "cockpit" to "bord"
+
+---
+
+## Phase 1 — Core Polish
 
 - [x] Stash terminals + notifications (badge, sound, pulse)
 - [x] Terminal sync: workspace → tab → session

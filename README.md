@@ -1,0 +1,379 @@
+# Bord
+
+A workspace-scoped terminal manager with tiling layout, git integration, and Claude session resume — built as a native desktop app.
+
+![SolidJS](https://img.shields.io/badge/SolidJS-335C88?logo=solid&logoColor=white)
+![Bun](https://img.shields.io/badge/Bun-000000?logo=bun&logoColor=white)
+![Tauri](https://img.shields.io/badge/Tauri-24C8D8?logo=tauri&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-06B6D4?logo=tailwindcss&logoColor=white)
+![SQLite](https://img.shields.io/badge/SQLite-003B57?logo=sqlite&logoColor=white)
+
+## Features
+
+### Terminal Management
+- **Tiling layout** — terminals tile side-by-side in a horizontally scrollable row
+- **Layout density** — 1x/2x/3x/4x column buttons to control how many terminals are visible at once (0 = auto-fit all)
+- **Drag-and-drop reorder** — grab a terminal title bar and drag to reposition
+- **Resizable panels** — drag panel edges to adjust width ratios
+- **Stash/unstash** — hide terminals without destroying them; stashed terminals show attention badges when new output arrives
+- **Scroll sync** — parallel scroll mode that syncs scroll position across all visible terminals (fraction-based normalization)
+- **Terminal minimap** — compact navigation strip in the top bar showing all visible terminals with attention indicators
+
+### Workspace Scoping
+- **Terminal isolation** — each workspace maintains its own set of active and stashed terminals
+- **Workspace switching** — swap entire terminal sets by selecting a different workspace
+- **Folder browser** — browse and add workspace directories via the filesystem API
+
+### Claude Session Integration
+- **Session scanning** — reads `~/.claude/projects/` to discover Claude Code sessions with title extraction from JSONL and session index files
+- **Session resume** — click a session card to open a new terminal with `claude --resume <id>`
+- **Idle detection** — terminals track `lastOutputAt` and `lastSeenAt` timestamps; attention badges pulse when unseen output arrives
+- **Attention chime** — visual pulse animation on minimap dots for terminals that need attention
+
+### Git Workflow
+- **Status** — branch name and dirty indicator on each terminal title bar
+- **Stage/unstage** — individual files or stage-all/unstage-all
+- **Diff viewer** — inline diff view for staged and unstaged changes
+- **Commit** — commit with message from the git panel
+- **Push/pull** — push button appears on title bar when commits are ahead; one-click push
+- **Branch management** — list branches, checkout/switch
+
+### Editor Integration
+- **VS Code and Cursor** — open workspace directory in either editor via CLI (`code .` / `cursor .`)
+- **Preference persistence** — last-used editor saved to `localStorage` and remembered across sessions
+- **Split button** — primary click opens preferred editor; dropdown to switch
+
+### Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `Cmd+N` / `Ctrl+N` | New terminal in active workspace |
+| `Cmd+Left` / `Ctrl+Left` | Focus previous terminal |
+| `Cmd+Right` / `Ctrl+Right` | Focus next terminal |
+
+## Architecture
+
+### System Architecture
+
+```mermaid
+graph TD
+    subgraph Desktop["Tauri Shell"]
+        WebView["WebView (SolidJS + Vite)"]
+    end
+
+    subgraph Server["Bun Server :4200"]
+        Routes["HTTP Routes"]
+        WS["WebSocket Handler"]
+        Services["Service Layer"]
+    end
+
+    subgraph Backend["System Resources"]
+        PTY["PTY Processes (zsh)"]
+        SQLite["SQLite Database"]
+        Git["Git CLI"]
+        Claude["~/.claude/projects/"]
+        FS["Filesystem"]
+        Editors["VS Code / Cursor CLI"]
+    end
+
+    WebView -->|"HTTP /api/*"| Routes
+    WebView -->|"WS /ws/pty/:id"| WS
+    Routes --> Services
+    WS --> Services
+    Services --> PTY
+    Services --> SQLite
+    Services --> Git
+    Services --> Claude
+    Services --> FS
+    Services --> Editors
+```
+
+### Component Tree
+
+```mermaid
+graph TD
+    App --> TopBar
+    App --> Sidebar
+    App --> TilingLayout
+
+    TopBar --> TerminalMinimap
+    TopBar --> LayoutDensityButtons["Layout Density (1x-4x)"]
+    TopBar --> ScrollSyncToggle["Scroll Sync Toggle"]
+
+    Sidebar --> WorkspaceList
+    Sidebar --> SessionList
+    SessionList --> SessionCard
+
+    TilingLayout --> ResizablePanel
+    ResizablePanel --> TerminalPanel
+    TerminalPanel --> TerminalView["TerminalView (ghostty-web)"]
+    TerminalPanel --> EditorButton
+    TerminalPanel --> GitBadge["Branch Badge"]
+
+    WorkspaceList --> EditorButton2["EditorButton"]
+
+    style App fill:#8caaee,color:#232634
+    style TilingLayout fill:#a6d189,color:#232634
+    style TerminalView fill:#e5c890,color:#232634
+```
+
+### State Management
+
+```mermaid
+graph LR
+    subgraph Store["SolidJS Store"]
+        Core["core.ts<br/>createStore&lt;AppState&gt;"]
+    end
+
+    subgraph Slices["Action Modules"]
+        Terminals["terminals.ts<br/>add/remove/stash/move"]
+        Workspaces["workspaces.ts<br/>load/create/delete"]
+        Sessions["sessions.ts<br/>loadSessions()"]
+        GitStore["git.ts<br/>refreshGitStatus()"]
+        UI["ui.ts<br/>toggleSidebar()"]
+    end
+
+    subgraph State["AppState Shape"]
+        S1["terminals: TerminalInstance[]"]
+        S2["activeTerminalId: string | null"]
+        S3["workspaces: Workspace[]"]
+        S4["activeWorkspaceId: string | null"]
+        S5["sidebarOpen: boolean"]
+        S6["layoutColumns: number"]
+    end
+
+    Terminals --> Core
+    Workspaces --> Core
+    Sessions -.->|"signal-based"| Sessions
+    GitStore -.->|"signal-based"| GitStore
+    UI --> Core
+    Core --> State
+```
+
+### Server Routes & Services
+
+```mermaid
+graph LR
+    subgraph Routes["HTTP Routes"]
+        R1["/api/health"]
+        R2["/api/pty"]
+        R3["/api/workspaces"]
+        R4["/api/sessions"]
+        R5["/api/git/*"]
+        R6["/api/fs/browse"]
+        R7["/api/editor/open"]
+    end
+
+    subgraph Services["Service Layer"]
+        PtyMgr["pty-manager.ts"]
+        WsSvc["workspace-service.ts"]
+        SessScan["session-scanner.ts"]
+        GitSvc["git-service.ts"]
+        EdSvc["editor-service.ts"]
+        DB["db.ts (SQLite)"]
+    end
+
+    R1 --> DB
+    R2 --> PtyMgr
+    R3 --> WsSvc
+    R3 --> DB
+    R4 --> SessScan
+    R5 --> GitSvc
+    R6 -.->|"fs/promises"| FS["Filesystem"]
+    R7 --> EdSvc
+
+    WsSvc --> DB
+```
+
+### WebSocket Data Flow
+
+```mermaid
+sequenceDiagram
+    participant Client as SolidJS Client
+    participant Server as Bun WS Handler
+    participant PTY as PTY Process
+
+    Client->>Server: WS connect /ws/pty/:id?cursor=N
+    Server->>Server: attachWs(id, ws, clientCursor)
+    Server->>Client: Binary: replay buffered data (64KB chunks)
+    Server->>Client: JSON: { type: "cursor", cursor: N }
+
+    loop Terminal I/O
+        Client->>Server: Binary: raw stdin bytes
+        Server->>PTY: terminal.write(data)
+        PTY->>Server: terminal.data callback
+        Server->>Client: Binary: raw stdout bytes
+    end
+
+    Client->>Server: JSON: { type: "resize", cols, rows }
+    Server->>PTY: terminal.resize(cols, rows)
+
+    Client->>Server: JSON: { type: "ping" }
+    Server->>Client: JSON: { type: "pong" }
+
+    Client->>Server: WS close
+    Server->>Server: detachWs(id, ws)
+```
+
+### Terminal Lifecycle
+
+```mermaid
+stateDiagram-v2
+    [*] --> Created: addTerminal()
+    Created --> Active: WebSocket attached
+    Active --> Active: I/O streaming
+    Active --> Stashed: stashTerminal()
+    Stashed --> Active: unstashTerminal()
+    Active --> Destroyed: removeTerminal()
+    Stashed --> Destroyed: removeTerminal()
+    Destroyed --> [*]
+
+    Active --> NeedsAttention: output while unfocused
+    NeedsAttention --> Active: user focuses terminal
+
+    note right of Stashed
+        PTY stays alive.
+        WS stays connected.
+        Attention badge pulses
+        on new output.
+    end note
+```
+
+## UI Layout
+
+```
+┌──────────────────────────────────────────────────────┐
+│  TopBar                                              │
+│  [bord] [3 terminals]  ··●··  [1x 2x 3x 4x] [Sync] │
+├──────────┬───────────────────────────────────────────┤
+│ Sidebar  │  TilingLayout                             │
+│          │ ┌──────────┐ ┌──────────┐ ┌──────────┐   │
+│ Workspace│ │ Terminal  │ │ Terminal  │ │ Terminal  │   │
+│ List     │ │ Panel     │ │ Panel     │ │ Panel     │   │
+│          │ │           │ │           │ │           │   │
+│──────────│ │ ghostty   │ │ ghostty   │ │ ghostty   │   │
+│          │ │ -web      │ │ -web      │ │ -web      │   │
+│ Session  │ │           │ │           │ │           │   │
+│ List     │ └──────────┘ └──────────┘ └──────────┘   │
+│          │                                    [+]    │
+└──────────┴───────────────────────────────────────────┘
+```
+
+### Color Palette (Catppuccin Frappe)
+
+| Role | Variable | Hex | Catppuccin Name |
+|------|----------|-----|-----------------|
+| Background | `--bg-primary` | `#232634` | Crust |
+| Panels | `--bg-secondary` | `#292c3c` | Mantle |
+| Buttons/Cards | `--bg-tertiary` | `#414559` | Surface0 |
+| Borders | `--border` | `#51576d` | Surface1 |
+| Text | `--text-primary` | `#c6d0f5` | Text |
+| Subtle text | `--text-secondary` | `#a5adce` | Subtext0 |
+| Accent | `--accent` | `#8caaee` | Blue |
+| Accent hover | `--accent-hover` | `#babbf1` | Lavender |
+| Danger | `--danger` | `#e78284` | Red |
+| Success | `--success` | `#a6d189` | Green |
+| Warning | `--warning` | `#e5c890` | Yellow |
+
+## Getting Started
+
+### Prerequisites
+
+- [Bun](https://bun.sh/) v1.1+
+- [Rust](https://rustup.rs/) + Cargo (for Tauri desktop builds only)
+
+### Web Mode (development)
+
+```bash
+bun install
+bun run dev
+# UI on http://localhost:1420, server on http://localhost:4200
+```
+
+### Desktop Mode (Tauri)
+
+```bash
+bun run tauri:dev
+```
+
+### Compiled Server
+
+```bash
+bun run build:server
+# Produces dist/bord-server single binary
+```
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `BORD_PORT` | `4200` | Server HTTP/WS port |
+| `BORD_CORS_ORIGIN` | `http://localhost:1420` | Allowed CORS origin |
+
+## Project Structure
+
+```
+bord/
+├── server/
+│   ├── index.ts              # Bun.serve() entry — routes + WebSocket
+│   ├── routes/
+│   │   ├── editor.ts         # POST /api/editor/open
+│   │   ├── fs.ts             # GET /api/fs/browse
+│   │   ├── git.ts            # /api/git/* (status, diff, stage, commit, push, pull, branches, checkout)
+│   │   ├── health.ts         # GET /api/health
+│   │   ├── pty.ts            # POST/GET/DELETE /api/pty
+│   │   ├── session.ts        # GET /api/sessions
+│   │   └── workspace.ts      # CRUD /api/workspaces
+│   ├── services/
+│   │   ├── db.ts             # SQLite via bun:sqlite
+│   │   ├── editor-service.ts # Spawn VS Code / Cursor CLI
+│   │   ├── git-service.ts    # Shell out to git
+│   │   ├── pty-manager.ts    # PTY lifecycle + 2MB circular buffer + WS fan-out
+│   │   ├── session-scanner.ts# Scan ~/.claude/projects/ for sessions
+│   │   └── workspace-service.ts
+│   ├── ws/
+│   │   ├── handler.ts        # WS upgrade, message routing, close
+│   │   └── protocol.ts       # Control message types (resize, ping/pong, cursor)
+│   └── schema.sql            # workspaces, session_cache, app_state tables
+├── src/
+│   ├── App.tsx               # Root layout + global keyboard shortcuts
+│   ├── index.tsx             # SolidJS render entry
+│   ├── styles.css            # CSS variables (Catppuccin Frappe) + Tailwind
+│   ├── components/
+│   │   ├── git/              # GitPanel, ChangedFilesList, CommitInput, DiffViewer
+│   │   ├── icons/            # ProviderIcons (Claude, VS Code, Cursor, etc.)
+│   │   ├── layout/           # TopBar, Sidebar, TilingLayout, ResizablePanel, TerminalMinimap
+│   │   ├── session/          # SessionList, SessionCard
+│   │   ├── shared/           # EditorButton
+│   │   ├── terminal/         # TerminalPanel, TerminalView, ParallelScroll
+│   │   └── workspace/        # WorkspaceList
+│   ├── lib/
+│   │   ├── api.ts            # Typed HTTP client for all server routes
+│   │   ├── terminal-writer.ts# Terminal data writer utility
+│   │   ├── theme.ts          # Catppuccin terminal color palette for ghostty-web
+│   │   ├── use-drag-reorder.ts# Pointer-event drag reorder hook
+│   │   └── ws.ts             # WebSocket connection manager
+│   └── store/
+│       ├── core.ts           # createStore<AppState> — single source of truth
+│       ├── types.ts          # TerminalInstance, Workspace, SessionInfo, GitStatus, AppState
+│       ├── terminals.ts      # Terminal actions (add, remove, stash, move, navigate)
+│       ├── workspaces.ts     # Workspace CRUD actions
+│       ├── sessions.ts       # Session loading (signal-based)
+│       ├── git.ts            # Git status refresh (signal-based)
+│       └── ui.ts             # UI toggles
+├── src-tauri/                # Tauri v2 Rust shell
+│   ├── tauri.conf.json       # Window config, CSP, bundle settings
+│   ├── Cargo.toml
+│   └── src/
+├── index.html                # Vite entry HTML
+├── vite.config.ts            # SolidJS + Tailwind + proxy to :4200
+├── package.json
+├── tsconfig.json
+├── bord.db                   # SQLite database (created at runtime)
+└── ROADMAP.md
+```
+
+## License
+
+Private — not yet published under an open-source license.
