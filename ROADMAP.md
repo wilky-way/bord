@@ -48,6 +48,15 @@ The following features have shipped and are available in the current build:
 - [x] Commit with message, push, branch management
 - [x] Lines changed indicators on tab + workspace sidebar
 
+## Phase 3.5 — Docker Panel (WIP)
+
+- [x] Basic Docker Compose project discovery + status display in sidebar
+- [ ] Fix: shows "No containers" + "Up" simultaneously — need to list actual containers per project
+- [ ] Start/stop/restart controls per project and per container
+- [ ] Log viewer (tail container logs inline or in a terminal panel)
+- [ ] Health/status refresh on interval
+- [ ] Container resource usage (CPU/mem) if feasible
+
 ## Phase 4 — Multi-Provider Sessions
 
 - [ ] Show sessions by CLI provider (Claude/Codex/OpenCode/Gemini) with SVG icons
