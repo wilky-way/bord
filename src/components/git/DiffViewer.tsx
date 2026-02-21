@@ -1,8 +1,10 @@
 import { For, Show } from "solid-js";
+import OpenFileButton from "../shared/OpenFileButton";
 
 interface Props {
   diff: string;
   fileName: string;
+  cwd: string;
 }
 
 export default function DiffViewer(props: Props) {
@@ -18,8 +20,9 @@ export default function DiffViewer(props: Props) {
   return (
     <Show when={props.diff}>
       <div class="border border-[var(--border)] rounded overflow-hidden">
-        <div class="px-2 py-1 bg-[var(--bg-tertiary)] border-b border-[var(--border)]">
+        <div class="px-2 py-1 bg-[var(--bg-tertiary)] border-b border-[var(--border)] flex items-center justify-between group">
           <span class="text-xs font-mono text-[var(--text-primary)]">{props.fileName}</span>
+          <OpenFileButton cwd={props.cwd} file={props.fileName} />
         </div>
         <div class="overflow-x-auto max-h-48 overflow-y-auto">
           <pre class="text-[11px] font-mono leading-relaxed">

@@ -1,5 +1,5 @@
-import { existsSync, statSync } from "fs";
-import { resolve } from "path";
+import { existsSync, statSync, readdirSync } from "fs";
+import { resolve, dirname, basename } from "path";
 
 const GIT_TIMEOUT = 30_000; // 30 seconds
 
@@ -132,6 +132,11 @@ export async function pull(cwd: string): Promise<{ ok: boolean; error?: string }
   return result.exitCode === 0 ? { ok: true } : { ok: false, error: result.stderr };
 }
 
+export async function fetchRemotes(cwd: string): Promise<{ ok: boolean; error?: string }> {
+  const result = await runGit(cwd, ["fetch", "--all", "--prune"]);
+  return result.exitCode === 0 ? { ok: true } : { ok: false, error: result.stderr };
+}
+
 export async function listBranches(cwd: string): Promise<string[]> {
   const result = await runGit(cwd, ["branch", "--format=%(refname:short)"]);
   return result.stdout.trim().split("\n").filter(Boolean);
@@ -150,4 +155,116 @@ export async function stageAll(cwd: string): Promise<boolean> {
 export async function unstageAll(cwd: string): Promise<boolean> {
   const result = await runGit(cwd, ["reset", "HEAD"]);
   return result.exitCode === 0;
+}
+
+// --- Repo hierarchy discovery ---
+
+export interface RepoInfo {
+  path: string;
+  name: string;
+  branch: string;
+}
+
+export interface RepoTree {
+  current: RepoInfo;
+  parent: RepoInfo | null;
+  siblings: RepoInfo[];
+  children: RepoInfo[];
+}
+
+export async function findGitRoot(cwd: string): Promise<string | null> {
+  const result = await runGit(cwd, ["rev-parse", "--show-toplevel"]);
+  if (result.exitCode !== 0) return null;
+  return result.stdout.trim();
+}
+
+async function getRepoBranch(repoPath: string): Promise<string> {
+  const result = await runGit(repoPath, ["branch", "--show-current"]);
+  return result.stdout.trim() || "HEAD";
+}
+
+async function toRepoInfo(repoPath: string): Promise<RepoInfo> {
+  return {
+    path: repoPath,
+    name: basename(repoPath),
+    branch: await getRepoBranch(repoPath),
+  };
+}
+
+export async function findParentRepo(gitRoot: string): Promise<RepoInfo | null> {
+  const parentDir = dirname(gitRoot);
+  const parentRoot = await findGitRoot(parentDir);
+  if (!parentRoot || parentRoot === gitRoot) return null;
+  return toRepoInfo(parentRoot);
+}
+
+function hasGitDir(dir: string): boolean {
+  return existsSync(resolve(dir, ".git"));
+}
+
+function shouldSkipDir(name: string): boolean {
+  return name.startsWith(".") || name === "node_modules" || name === "dist" || name === "build";
+}
+
+export function listSiblingRepos(gitRoot: string): string[] {
+  const parentDir = dirname(gitRoot);
+  try {
+    return readdirSync(parentDir, { withFileTypes: true })
+      .filter((e: { isDirectory(): boolean; name: string }) => e.isDirectory() && !shouldSkipDir(e.name) && resolve(parentDir, e.name) !== gitRoot)
+      .map((e: { name: string }) => resolve(parentDir, e.name))
+      .filter(hasGitDir);
+  } catch {
+    return [];
+  }
+}
+
+export function listChildRepos(gitRoot: string): string[] {
+  try {
+    return readdirSync(gitRoot, { withFileTypes: true })
+      .filter((e: { isDirectory(): boolean; name: string }) => e.isDirectory() && !shouldSkipDir(e.name))
+      .map((e: { name: string }) => resolve(gitRoot, e.name))
+      .filter(hasGitDir);
+  } catch {
+    return [];
+  }
+}
+
+export async function getRepoTree(cwd: string): Promise<RepoTree | null> {
+  const gitRoot = await findGitRoot(cwd);
+  if (!gitRoot) return null;
+
+  const [current, parent] = await Promise.all([
+    toRepoInfo(gitRoot),
+    findParentRepo(gitRoot),
+  ]);
+
+  const siblingPaths = listSiblingRepos(gitRoot);
+  const childPaths = listChildRepos(gitRoot);
+
+  const [siblings, children] = await Promise.all([
+    Promise.all(siblingPaths.map(toRepoInfo)),
+    Promise.all(childPaths.map(toRepoInfo)),
+  ]);
+
+  return { current, parent, siblings, children };
+}
+
+export async function getDiffStats(cwd: string): Promise<{ insertions: number; deletions: number }> {
+  const [unstaged, staged] = await Promise.all([
+    runGit(cwd, ["diff", "--numstat"]),
+    runGit(cwd, ["diff", "--cached", "--numstat"]),
+  ]);
+
+  let insertions = 0;
+  let deletions = 0;
+
+  for (const output of [unstaged.stdout, staged.stdout]) {
+    for (const line of output.split("\n").filter(Boolean)) {
+      const [ins, del] = line.split("\t");
+      if (ins !== "-") insertions += parseInt(ins) || 0;
+      if (del !== "-") deletions += parseInt(del) || 0;
+    }
+  }
+
+  return { insertions, deletions };
 }

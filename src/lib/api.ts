@@ -84,6 +84,10 @@ export const api = {
   },
   gitAheadBehind: (cwd: string) =>
     request<{ ahead: number; behind: number }>(`/git/ahead-behind?cwd=${encodeURIComponent(cwd)}`),
+  gitFetch: (cwd: string) =>
+    request<{ ok: boolean; error?: string }>(`/git/fetch?cwd=${encodeURIComponent(cwd)}`, {
+      method: "POST",
+    }),
   gitPush: (cwd: string) =>
     request<{ ok: boolean; error?: string }>(`/git/push?cwd=${encodeURIComponent(cwd)}`, {
       method: "POST",
@@ -107,12 +111,21 @@ export const api = {
     request<{ ok: boolean }>(`/git/unstage-all?cwd=${encodeURIComponent(cwd)}`, {
       method: "POST",
     }),
+  gitDiffStats: (cwd: string) =>
+    request<{ insertions: number; deletions: number }>(`/git/diff-stats?cwd=${encodeURIComponent(cwd)}`),
+  gitRepoTree: (cwd: string) =>
+    request<{
+      current: { path: string; name: string; branch: string };
+      parent: { path: string; name: string; branch: string } | null;
+      siblings: Array<{ path: string; name: string; branch: string }>;
+      children: Array<{ path: string; name: string; branch: string }>;
+    }>(`/git/repo-tree?cwd=${encodeURIComponent(cwd)}`),
 
   // Editor
-  openInEditor: (cwd: string, editor: "vscode" | "cursor") =>
+  openInEditor: (cwd: string, editor: "vscode" | "cursor", file?: string) =>
     request<{ ok: boolean; error?: string }>("/editor/open", {
       method: "POST",
-      body: JSON.stringify({ cwd, editor }),
+      body: JSON.stringify({ cwd, editor, ...(file && { file }) }),
     }),
 
   // Filesystem

@@ -55,6 +55,8 @@ interface GitInfo {
   dirty: boolean;
   ahead: number;
   behind: number;
+  insertions: number;
+  deletions: number;
 }
 
 export default function WorkspaceList() {
@@ -89,15 +91,18 @@ export default function WorkspaceList() {
     await Promise.all(
       state.workspaces.map(async (ws) => {
         try {
-          const [status, ab] = await Promise.all([
+          const [status, ab, stats] = await Promise.all([
             api.gitStatus(ws.path),
             api.gitAheadBehind(ws.path),
+            api.gitDiffStats(ws.path),
           ]);
           infos[ws.id] = {
             branch: status.branch,
             dirty: status.staged.length > 0 || status.unstaged.length > 0 || status.untracked.length > 0,
             ahead: ab.ahead,
             behind: ab.behind,
+            insertions: stats.insertions,
+            deletions: stats.deletions,
           };
         } catch {
           // Not a git repo or unreachable
@@ -458,6 +463,10 @@ export default function WorkspaceList() {
                     </Show>
                     <Show when={git()!.behind > 0}>
                       <span class="text-[10px] text-[var(--text-secondary)]">{git()!.behind}</span>
+                    </Show>
+                    <Show when={git()!.insertions > 0 || git()!.deletions > 0}>
+                      <span class="text-[9px] font-mono text-[var(--success)]">+{git()!.insertions}</span>
+                      <span class="text-[9px] font-mono text-[var(--danger)]">-{git()!.deletions}</span>
                     </Show>
                   </div>
                 </Show>

@@ -1,13 +1,16 @@
 import { For, Show } from "solid-js";
 import type { GitStatus } from "../../store/types";
+import OpenFileButton from "../shared/OpenFileButton";
 
 interface Props {
   status: GitStatus;
+  cwd: string;
   onViewDiff: (file: string, staged: boolean) => void;
   onStage: (file: string) => void;
   onUnstage: (file: string) => void;
   onStageAll: () => void;
   onUnstageAll: () => void;
+  onOpenFile: (file: string) => void;
 }
 
 function StatusBadge(props: { status: string }) {
@@ -40,16 +43,18 @@ export default function ChangedFilesList(props: Props) {
           </div>
           <For each={props.status.staged}>
             {(file) => (
-              <div class="flex items-center gap-1 py-0.5 group">
+              <div class="flex items-center gap-2 py-0.5 group">
                 <StatusBadge status={file.status} />
                 <button
                   class="flex-1 text-left text-xs text-[var(--text-primary)] truncate hover:text-[var(--accent)]"
                   onClick={() => props.onViewDiff(file.path, true)}
+                  onDblClick={() => props.onOpenFile(file.path)}
                 >
                   {file.path}
                 </button>
+                <OpenFileButton cwd={props.cwd} file={file.path} />
                 <button
-                  class="text-[10px] text-[var(--text-secondary)] opacity-0 group-hover:opacity-100 hover:text-[var(--danger)]"
+                  class="text-xs text-[var(--text-secondary)] opacity-0 group-hover:opacity-100 hover:text-[var(--danger)] w-5 h-5 flex items-center justify-center rounded hover:bg-[var(--bg-tertiary)]"
                   onClick={() => props.onUnstage(file.path)}
                 >
                   −
@@ -74,16 +79,18 @@ export default function ChangedFilesList(props: Props) {
           </div>
           <For each={props.status.unstaged}>
             {(file) => (
-              <div class="flex items-center gap-1 py-0.5 group">
+              <div class="flex items-center gap-2 py-0.5 group">
                 <StatusBadge status={file.status} />
                 <button
                   class="flex-1 text-left text-xs text-[var(--text-primary)] truncate hover:text-[var(--accent)]"
                   onClick={() => props.onViewDiff(file.path, false)}
+                  onDblClick={() => props.onOpenFile(file.path)}
                 >
                   {file.path}
                 </button>
+                <OpenFileButton cwd={props.cwd} file={file.path} />
                 <button
-                  class="text-[10px] text-[var(--text-secondary)] opacity-0 group-hover:opacity-100 hover:text-[var(--success)]"
+                  class="text-xs text-[var(--text-secondary)] opacity-0 group-hover:opacity-100 hover:text-[var(--success)] w-5 h-5 flex items-center justify-center rounded hover:bg-[var(--bg-tertiary)]"
                   onClick={() => props.onStage(file.path)}
                 >
                   +
@@ -108,11 +115,17 @@ export default function ChangedFilesList(props: Props) {
           </div>
           <For each={props.status.untracked}>
             {(file) => (
-              <div class="flex items-center gap-1 py-0.5 group">
+              <div class="flex items-center gap-2 py-0.5 group">
                 <span class="font-mono text-[10px] w-3 text-[var(--text-secondary)]">?</span>
-                <span class="flex-1 text-xs text-[var(--text-secondary)] truncate">{file}</span>
                 <button
-                  class="text-[10px] text-[var(--text-secondary)] opacity-0 group-hover:opacity-100 hover:text-[var(--success)]"
+                  class="flex-1 text-left text-xs text-[var(--text-secondary)] truncate hover:text-[var(--accent)]"
+                  onDblClick={() => props.onOpenFile(file)}
+                >
+                  {file}
+                </button>
+                <OpenFileButton cwd={props.cwd} file={file} />
+                <button
+                  class="text-xs text-[var(--text-secondary)] opacity-0 group-hover:opacity-100 hover:text-[var(--success)] w-5 h-5 flex items-center justify-center rounded hover:bg-[var(--bg-tertiary)]"
                   onClick={() => props.onStage(file)}
                 >
                   +

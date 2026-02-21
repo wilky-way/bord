@@ -71,6 +71,12 @@ export async function gitRoutes(req: Request, url: URL): Promise<Response | null
     return Response.json(result);
   }
 
+  // POST /api/git/fetch?cwd=...
+  if (req.method === "POST" && url.pathname === "/api/git/fetch") {
+    const result = await git.fetchRemotes(cwd);
+    return Response.json(result, { status: result.ok ? 200 : 400 });
+  }
+
   // POST /api/git/push?cwd=...
   if (req.method === "POST" && url.pathname === "/api/git/push") {
     const result = await git.push(cwd);
@@ -109,6 +115,21 @@ export async function gitRoutes(req: Request, url: URL): Promise<Response | null
   if (req.method === "POST" && url.pathname === "/api/git/unstage-all") {
     const ok = await git.unstageAll(cwd);
     return Response.json({ ok });
+  }
+
+  // GET /api/git/diff-stats?cwd=...
+  if (req.method === "GET" && url.pathname === "/api/git/diff-stats") {
+    const stats = await git.getDiffStats(cwd);
+    return Response.json(stats);
+  }
+
+  // GET /api/git/repo-tree?cwd=...
+  if (req.method === "GET" && url.pathname === "/api/git/repo-tree") {
+    const tree = await git.getRepoTree(cwd);
+    if (!tree) {
+      return Response.json({ error: "Not a git repository" }, { status: 400 });
+    }
+    return Response.json(tree);
   }
 
   return null;

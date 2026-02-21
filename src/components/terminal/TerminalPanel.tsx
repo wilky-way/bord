@@ -1,9 +1,12 @@
 import { createSignal, createEffect, onMount, onCleanup, Show } from "solid-js";
+import { Portal } from "solid-js/web";
 import TerminalView from "./TerminalView";
 import { removeTerminal, setActiveTerminal, stashTerminal, setTerminalTitle } from "../../store/terminals";
 import { state } from "../../store/core";
+import { toggleGitPanel, closeGitPanel } from "../../store/git";
 import { ClaudeIcon } from "../icons/ProviderIcons";
 import EditorButton from "../shared/EditorButton";
+import GitPanel from "../git/GitPanel";
 import { api } from "../../lib/api";
 
 interface Props {
@@ -25,20 +28,72 @@ export default function TerminalPanel(props: Props) {
   const [ahead, setAhead] = createSignal(0);
   const [pushing, setPushing] = createSignal(false);
   const [pushDone, setPushDone] = createSignal(false);
+  const [insertions, setInsertions] = createSignal(0);
+  const [deletions, setDeletions] = createSignal(0);
+  const isGitPanelOpen = () => state.gitPanelTerminalId === props.id;
+
+  let branchButtonRef: HTMLButtonElement | undefined;
+  let popoverRef: HTMLDivElement | undefined;
+  const [popoverPos, setPopoverPos] = createSignal({ top: 0, left: 0 });
+
+  function updatePopoverPosition() {
+    if (!branchButtonRef) return;
+    const rect = branchButtonRef.getBoundingClientRect();
+    let top = rect.bottom + 4;
+    let left = rect.left;
+    // Clamp to viewport edges
+    if (left + 480 > window.innerWidth - 8) left = window.innerWidth - 480 - 8;
+    if (left < 8) left = 8;
+    if (top > window.innerHeight - 100) {
+      top = rect.top - 4;
+    }
+    setPopoverPos({ top, left });
+  }
+
+  // Reposition popover when open
+  createEffect(() => {
+    if (!isGitPanelOpen()) return;
+    updatePopoverPosition();
+    const h = () => updatePopoverPosition();
+    window.addEventListener("resize", h);
+    window.addEventListener("scroll", h, true);
+    onCleanup(() => {
+      window.removeEventListener("resize", h);
+      window.removeEventListener("scroll", h, true);
+    });
+  });
+
+  // Click-outside to close
+  createEffect(() => {
+    if (!isGitPanelOpen()) return;
+    const handler = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (popoverRef && !popoverRef.contains(t) && branchButtonRef && !branchButtonRef.contains(t)) {
+        closeGitPanel();
+      }
+    };
+    requestAnimationFrame(() => document.addEventListener("mousedown", handler));
+    onCleanup(() => document.removeEventListener("mousedown", handler));
+  });
 
   async function fetchGitInfo() {
     try {
-      const [status, ab] = await Promise.all([
+      const [status, ab, stats] = await Promise.all([
         api.gitStatus(props.cwd),
         api.gitAheadBehind(props.cwd),
+        api.gitDiffStats(props.cwd),
       ]);
       setBranch(status.branch || null);
       setDirty(status.staged.length > 0 || status.unstaged.length > 0 || status.untracked.length > 0);
       setAhead(ab.ahead);
+      setInsertions(stats.insertions);
+      setDeletions(stats.deletions);
     } catch {
       setBranch(null);
       setDirty(false);
       setAhead(0);
+      setInsertions(0);
+      setDeletions(0);
     }
   }
 
@@ -90,9 +145,21 @@ export default function TerminalPanel(props: Props) {
         onPointerDown={(e) => props.onDragStart?.(e)}
       >
         <div class="flex items-center gap-2 min-w-0 overflow-hidden flex-1">
-          {/* Branch badge + dirty indicator */}
+          {/* Branch badge + dirty indicator — clickable to toggle git panel */}
           <Show when={branch()}>
-            <div class="flex items-center gap-1 shrink-0">
+            <button
+              ref={branchButtonRef}
+              class="flex items-center gap-1 shrink-0 rounded-[var(--btn-radius)] px-1 py-0.5 transition-colors"
+              classList={{
+                "bg-[color-mix(in_srgb,var(--accent)_20%,transparent)]": isGitPanelOpen(),
+                "hover:bg-[var(--bg-tertiary)]": !isGitPanelOpen(),
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleGitPanel(props.id);
+              }}
+              title="Toggle git panel"
+            >
               <span
                 class="w-1.5 h-1.5 rounded-full"
                 classList={{
@@ -101,7 +168,11 @@ export default function TerminalPanel(props: Props) {
                 }}
               />
               <span class="text-[10px] font-mono text-[var(--accent)]">{branch()}</span>
-            </div>
+              <Show when={insertions() > 0 || deletions() > 0}>
+                <span class="text-[9px] font-mono text-[var(--success)]">+{insertions()}</span>
+                <span class="text-[9px] font-mono text-[var(--danger)]">-{deletions()}</span>
+              </Show>
+            </button>
           </Show>
           <Show when={!editing()} fallback={
             <input
@@ -176,12 +247,36 @@ export default function TerminalPanel(props: Props) {
       </div>
 
       {/* Terminal */}
-      <div class="flex-1 min-h-0 overflow-hidden">
+      <div class="flex-1 min-h-0 overflow-hidden relative">
         <TerminalView
           ptyId={props.id}
           onTitleChange={setTitle}
         />
       </div>
+
+      {/* Git popover via Portal */}
+      <Show when={isGitPanelOpen()}>
+        <Portal>
+          <div
+            ref={popoverRef}
+            class="fixed z-[9999]"
+            style={{ top: `${popoverPos().top}px`, left: `${popoverPos().left}px` }}
+          >
+            <div
+              class="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-lg overflow-hidden popover-appear"
+              style={{
+                "min-width": "280px",
+                "max-width": "480px",
+                "box-shadow": "0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.05)",
+              }}
+            >
+              <div class="overflow-y-auto" style={{ "max-height": "calc(100vh - 60px)" }}>
+                <GitPanel cwd={props.cwd} onClose={() => closeGitPanel()} />
+              </div>
+            </div>
+          </div>
+        </Portal>
+      </Show>
     </div>
   );
 }

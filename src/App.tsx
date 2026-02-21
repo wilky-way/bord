@@ -4,6 +4,7 @@ import Sidebar from "./components/layout/Sidebar";
 import TilingLayout from "./components/layout/TilingLayout";
 import { addTerminal, activateAdjacentTerminal } from "./store/terminals";
 import { state } from "./store/core";
+import { toggleGitPanel } from "./store/git";
 
 export default function App() {
   onMount(() => {
@@ -22,6 +23,11 @@ export default function App() {
       if ((e.metaKey || e.ctrlKey) && e.key === "ArrowRight") {
         e.preventDefault();
         activateAdjacentTerminal("next");
+      }
+      // Cmd+G / Ctrl+G: Toggle git panel on active terminal
+      if ((e.metaKey || e.ctrlKey) && e.key === "g") {
+        e.preventDefault();
+        toggleGitPanel(state.activeTerminalId);
       }
     });
   });

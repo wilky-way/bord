@@ -8,6 +8,7 @@ const [state, setState] = createStore<AppState>({
   activeWorkspaceId: null,
   sidebarOpen: true,
   layoutColumns: 0,
+  gitPanelTerminalId: null,
 });
 
 export { state, setState };

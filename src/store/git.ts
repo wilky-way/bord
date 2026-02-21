@@ -1,4 +1,5 @@
 import { createSignal } from "solid-js";
+import { state, setState } from "./core";
 import { api } from "../lib/api";
 import type { GitStatus } from "./types";
 
@@ -17,4 +18,13 @@ export async function refreshGitStatus(cwd: string) {
   } finally {
     setGitLoading(false);
   }
+}
+
+export function toggleGitPanel(terminalId: string | null) {
+  if (!terminalId) return;
+  setState("gitPanelTerminalId", state.gitPanelTerminalId === terminalId ? null : terminalId);
+}
+
+export function closeGitPanel() {
+  setState("gitPanelTerminalId", null);
 }

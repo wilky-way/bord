@@ -43,4 +43,5 @@ export interface AppState {
   activeWorkspaceId: string | null;
   sidebarOpen: boolean;
   layoutColumns: number; // 0 = auto-fit all visible, 1–4 = fixed columns visible at once
+  gitPanelTerminalId: string | null; // which terminal's git overlay is open (null = none)
 }

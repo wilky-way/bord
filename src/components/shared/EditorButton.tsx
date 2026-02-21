@@ -1,19 +1,8 @@
 import { createSignal, Show } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import { api } from "../../lib/api";
+import { getPreferredEditor, setPreferredEditor, type Editor } from "../../lib/editor-preference";
 import { VSCodeIcon, CursorIcon } from "../icons/ProviderIcons";
-
-type Editor = "vscode" | "cursor";
-
-const STORAGE_KEY = "bord-preferred-editor";
-
-function getPreferred(): Editor {
-  return (localStorage.getItem(STORAGE_KEY) as Editor) || "cursor";
-}
-
-function setPreferred(editor: Editor) {
-  localStorage.setItem(STORAGE_KEY, editor);
-}
 
 const EDITORS: Record<Editor, { label: string; Icon: typeof VSCodeIcon }> = {
   vscode: { label: "VS Code", Icon: VSCodeIcon },
@@ -26,20 +15,14 @@ interface Props {
 }
 
 export default function EditorButton(props: Props) {
-  const [preferred, _setPreferred] = createSignal<Editor>(getPreferred());
   const [open, setOpen] = createSignal(false);
-
-  const updatePreferred = (editor: Editor) => {
-    _setPreferred(editor);
-    setPreferred(editor);
-  };
 
   const sm = () => props.size === "sm";
   const iconSize = () => sm() ? 11 : 12;
 
   const handleOpen = (e: MouseEvent) => {
     e.stopPropagation();
-    api.openInEditor(props.cwd, preferred());
+    api.openInEditor(props.cwd, getPreferredEditor());
   };
 
   const handleDropdown = (e: MouseEvent) => {
@@ -49,7 +32,7 @@ export default function EditorButton(props: Props) {
 
   const handleSelect = (editor: Editor, e: MouseEvent) => {
     e.stopPropagation();
-    updatePreferred(editor);
+    setPreferredEditor(editor);
     setOpen(false);
     api.openInEditor(props.cwd, editor);
   };
@@ -75,9 +58,9 @@ export default function EditorButton(props: Props) {
           "text-[var(--text-secondary)] hover:text-[var(--accent)] text-xs w-6 h-6 hover:bg-[var(--bg-tertiary)]": !sm(),
         }}
         onClick={handleOpen}
-        title={`Open in ${EDITORS[preferred()].label}`}
+        title={`Open in ${EDITORS[getPreferredEditor()].label}`}
       >
-        <Dynamic component={EDITORS[preferred()].Icon} size={iconSize()} />
+        <Dynamic component={EDITORS[getPreferredEditor()].Icon} size={iconSize()} />
       </button>
       <button
         class="flex items-center justify-center rounded-r-[var(--btn-radius)] transition-colors border-l border-[var(--border)]"
@@ -100,8 +83,8 @@ export default function EditorButton(props: Props) {
               <button
                 class="flex items-center gap-2 w-full px-2 py-1 text-[10px] transition-colors"
                 classList={{
-                  "text-[var(--accent)] bg-[var(--bg-tertiary)]": preferred() === key,
-                  "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]": preferred() !== key,
+                  "text-[var(--accent)] bg-[var(--bg-tertiary)]": getPreferredEditor() === key,
+                  "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]": getPreferredEditor() !== key,
                 }}
                 onClick={(e) => handleSelect(key, e)}
               >

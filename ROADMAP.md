@@ -41,10 +41,10 @@ The following features have shipped and are available in the current build:
 
 ## Phase 3 — Git Integration
 
-- [ ] Git overlay panel (same dimensions as terminal, toggle via branch button)
-- [ ] Unstaged/staged file list, diff view in-card
-- [ ] Commit with message, push, branch management
-- [ ] Lines changed indicators on tab + workspace sidebar
+- [x] Git overlay panel (same dimensions as terminal, toggle via branch button)
+- [x] Unstaged/staged file list, diff view in-card
+- [x] Commit with message, push, branch management
+- [x] Lines changed indicators on tab + workspace sidebar
 
 ## Phase 4 — Multi-Provider Sessions
 

@@ -1,3 +1,5 @@
+import { existsSync } from "fs";
+import { resolve } from "path";
 import { validateCwd } from "./git-service";
 
 export type EditorType = "vscode" | "cursor";
@@ -9,7 +11,8 @@ const EDITOR_COMMANDS: Record<EditorType, string> = {
 
 export async function openInEditor(
   cwd: string,
-  editor: EditorType
+  editor: EditorType,
+  file?: string
 ): Promise<{ ok: boolean; error?: string }> {
   const check = validateCwd(cwd);
   if (!check.valid) return { ok: false, error: check.error };
@@ -17,8 +20,13 @@ export async function openInEditor(
   const cmd = EDITOR_COMMANDS[editor];
   if (!cmd) return { ok: false, error: `Unknown editor: ${editor}` };
 
+  const target = file ? resolve(cwd, file) : ".";
+  if (file && !existsSync(target)) {
+    return { ok: false, error: `File does not exist: ${file}` };
+  }
+
   try {
-    const proc = Bun.spawn([cmd, "."], {
+    const proc = Bun.spawn([cmd, target], {
       cwd,
       stdout: "ignore",
       stderr: "pipe",
