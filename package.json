@@ -1,0 +1,28 @@
+{
+  "name": "bord",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"bun run dev:server\" \"bun run dev:ui\"",
+    "dev:server": "bun run --watch server/index.ts",
+    "dev:ui": "vite",
+    "build": "vite build",
+    "build:server": "bun build server/index.ts --compile --outfile dist/bord-server",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev"
+  },
+  "dependencies": {
+    "solid-js": "^1.9.5",
+    "ghostty-web": "^0.4.0"
+  },
+  "devDependencies": {
+    "vite": "^6.3.5",
+    "vite-plugin-solid": "^2.11.6",
+    "typescript": "^5.8.3",
+    "tailwindcss": "^4.1.8",
+    "@tailwindcss/vite": "^4.1.8",
+    "concurrently": "^9.1.2",
+    "@tauri-apps/cli": "^2.5.0"
+  }
+}

@@ -1,0 +1,88 @@
+@import "tailwindcss";
+
+:root {
+  --bg-primary:    #232634;  /* Crust - deepest bg, behind floating panels */
+  --bg-secondary:  #292c3c;  /* Mantle - sidebar, topbar */
+  --bg-tertiary:   #414559;  /* Surface0 - buttons, hovers, cards */
+  --border:        #51576d;  /* Surface1 */
+  --text-primary:  #c6d0f5;  /* Text */
+  --text-secondary:#a5adce;  /* Subtext0 */
+  --accent:        #8caaee;  /* Blue */
+  --accent-hover:  #babbf1;  /* Lavender */
+  --danger:        #e78284;  /* Red */
+  --success:       #a6d189;  /* Green */
+  --warning:       #e5c890;  /* Yellow */
+  /* Parallel-code inspired */
+  --shadow-soft:   0 14px 30px rgba(0, 0, 0, 0.28);
+  --shadow-glow:   0 0 8px color-mix(in srgb, var(--accent) 50%, transparent);
+  --panel-radius:  12px;
+  --btn-radius:    6px;
+}
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+}
+
+/* Scrollbar styling — thin, parallel-code approach */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--text-secondary) 45%, transparent) transparent;
+}
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--text-secondary) 45%, transparent);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--text-secondary) 65%, transparent);
+}
+
+/* Terminal container (ghostty-web) */
+.terminal-container {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+}
+.terminal-container canvas {
+  height: 100%;
+  padding: 6px;
+}
+
+/* Drop indicator for drag reorder */
+.drop-indicator {
+  width: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+  flex-shrink: 0;
+  align-self: stretch;
+  margin: 0 -2px;
+  z-index: 20;
+  animation: dropIndicatorPulse 0.8s ease-in-out infinite alternate;
+}
+@keyframes dropIndicatorPulse {
+  from { opacity: 0.6; }
+  to { opacity: 1; }
+}
+
+/* Panel appear animation */
+@keyframes panelAppear {
+  from { transform: scale(0.985) translateY(4px); opacity: 0.8; }
+  to { transform: scale(1) translateY(0); opacity: 1; }
+}
+.panel-appear {
+  animation: panelAppear 0.2s ease-out;
+}
