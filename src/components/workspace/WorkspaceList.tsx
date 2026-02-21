@@ -261,9 +261,8 @@ export default function WorkspaceList() {
   }
 
   return (
-    <div class="p-2">
-      <div class="flex items-center justify-between mb-2">
-        <span class="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">Workspaces</span>
+    <div class="px-2 pb-2">
+      <div class="flex items-center justify-end py-1">
         <button
           class="text-xs text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors"
           onClick={() => adding() ? resetForm() : setAdding(true)}

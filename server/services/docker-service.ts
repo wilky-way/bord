@@ -96,6 +96,36 @@ export async function composeDown(composePath: string, service?: string): Promis
   }
 }
 
+/** Restart services via docker compose restart. */
+export async function composeRestart(composePath: string, service?: string): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const args = ["docker", "compose", "-f", composePath, "restart"];
+    if (service) args.push(service);
+    const proc = Bun.spawn(args, { stdout: "pipe", stderr: "pipe" });
+    const stderr = await new Response(proc.stderr).text();
+    const code = await proc.exited;
+    if (code !== 0) return { ok: false, error: stderr.trim() };
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Unknown error" };
+  }
+}
+
+/** Pull latest images via docker compose pull. */
+export async function composePull(composePath: string, service?: string): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const args = ["docker", "compose", "-f", composePath, "pull"];
+    if (service) args.push(service);
+    const proc = Bun.spawn(args, { stdout: "pipe", stderr: "pipe" });
+    const stderr = await new Response(proc.stderr).text();
+    const code = await proc.exited;
+    if (code !== 0) return { ok: false, error: stderr.trim() };
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Unknown error" };
+  }
+}
+
 /** Get recent logs for a container. */
 export async function getContainerLogs(containerId: string, tail = 50): Promise<string> {
   try {

@@ -152,6 +152,16 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ composePath, service }),
     }),
+  dockerRestart: (composePath: string, service?: string) =>
+    request<{ ok: boolean; error?: string }>("/docker/restart", {
+      method: "POST",
+      body: JSON.stringify({ composePath, service }),
+    }),
+  dockerPull: (composePath: string, service?: string) =>
+    request<{ ok: boolean; error?: string }>("/docker/pull", {
+      method: "POST",
+      body: JSON.stringify({ composePath, service }),
+    }),
   dockerLogs: (containerId: string, tail = 50) =>
     request<{ logs: string }>(
       `/docker/logs?containerId=${encodeURIComponent(containerId)}&tail=${tail}`

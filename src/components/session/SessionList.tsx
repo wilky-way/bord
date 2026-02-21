@@ -58,7 +58,7 @@ export default function SessionList() {
   const isExpanded = () => visibleCount() > DEFAULT_VISIBLE;
 
   return (
-    <div class="p-2">
+    <div class="px-2 pb-2">
       <Show when={!activeWorkspace()}>
         <div class="text-xs text-[var(--text-secondary)] py-6 text-center">
           Select a workspace to see sessions
@@ -66,24 +66,19 @@ export default function SessionList() {
       </Show>
 
       <Show when={activeWorkspace()}>
-        <div class="flex items-center justify-between mb-2">
-          <span class="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">
-            Sessions
-          </span>
-          <div class="flex items-center gap-1.5">
-            <button
-              class="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
-              onClick={refresh}
-            >
-              Refresh
-            </button>
-            <button
-              class="text-xs text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors"
-              onClick={newSession}
-            >
-              + New
-            </button>
-          </div>
+        <div class="flex items-center justify-end py-1 gap-1.5">
+          <button
+            class="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+            onClick={refresh}
+          >
+            Refresh
+          </button>
+          <button
+            class="text-xs text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors"
+            onClick={newSession}
+          >
+            + New
+          </button>
         </div>
 
         {loading() ? (

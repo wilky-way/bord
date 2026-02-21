@@ -44,6 +44,28 @@ export async function dockerRoutes(req: Request, url: URL): Promise<Response | n
     return Response.json(result, { status: result.ok ? 200 : 500 });
   }
 
+  // POST /api/docker/restart { composePath, service? }
+  if (req.method === "POST" && url.pathname === "/api/docker/restart") {
+    const body = await req.json();
+    const { composePath, service } = body;
+    if (!composePath) {
+      return Response.json({ error: "composePath required" }, { status: 400 });
+    }
+    const result = await docker.composeRestart(composePath, service);
+    return Response.json(result, { status: result.ok ? 200 : 500 });
+  }
+
+  // POST /api/docker/pull { composePath, service? }
+  if (req.method === "POST" && url.pathname === "/api/docker/pull") {
+    const body = await req.json();
+    const { composePath, service } = body;
+    if (!composePath) {
+      return Response.json({ error: "composePath required" }, { status: 400 });
+    }
+    const result = await docker.composePull(composePath, service);
+    return Response.json(result, { status: result.ok ? 200 : 500 });
+  }
+
   // GET /api/docker/logs?containerId=...&tail=50
   if (req.method === "GET" && url.pathname === "/api/docker/logs") {
     const containerId = url.searchParams.get("containerId");

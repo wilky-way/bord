@@ -1,4 +1,4 @@
-import { Show } from "solid-js";
+import { Show, type JSX } from "solid-js";
 import { state, setState } from "../../store/core";
 import WorkspaceList from "../workspace/WorkspaceList";
 import SessionList from "../session/SessionList";
@@ -8,25 +8,33 @@ function SectionHeader(props: {
   label: string;
   collapsed: boolean;
   onToggle: () => void;
+  actions?: JSX.Element;
 }) {
   return (
-    <button
-      class="flex items-center justify-between w-full px-2 py-1.5 text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider hover:bg-[var(--bg-tertiary)] transition-colors"
-      onClick={props.onToggle}
-    >
-      <span>{props.label}</span>
-      <svg
-        class="w-3 h-3 transition-transform"
-        classList={{ "rotate-[-90deg]": props.collapsed }}
-        viewBox="0 0 12 12"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
+    <div class="flex items-center w-full px-2 py-1.5 text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider hover:bg-[var(--bg-tertiary)] transition-colors">
+      <button
+        class="flex items-center gap-1 flex-1 min-w-0"
+        onClick={props.onToggle}
       >
-        <path d="M3 4.5l3 3 3-3" />
-      </svg>
-    </button>
+        <span>{props.label}</span>
+        <svg
+          class="w-3 h-3 transition-transform shrink-0"
+          classList={{ "rotate-[-90deg]": props.collapsed }}
+          viewBox="0 0 12 12"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+        >
+          <path d="M3 4.5l3 3 3-3" />
+        </svg>
+      </button>
+      <Show when={props.actions}>
+        <div class="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+          {props.actions}
+        </div>
+      </Show>
+    </div>
   );
 }
 
