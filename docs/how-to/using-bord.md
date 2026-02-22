@@ -11,7 +11,7 @@ This is the practical operator guide for daily usage.
 
 ## Terminal Cards
 
-- Create terminal: `Cmd/Ctrl+N` or `+ Terminal`.
+- Create terminal: `Cmd/Ctrl+N` or the `+` button in the center topbar strip.
 - Switch active terminal: `Cmd/Ctrl+Left` and `Cmd/Ctrl+Right`.
 - Reorder cards with drag-and-drop.
 - Use density buttons (`1x`, `2x`, `3x`, `4x`) to change visible columns.
@@ -23,12 +23,12 @@ This is the practical operator guide for daily usage.
 - Stashed terminals keep running in the background.
 - New output on stashed terminals shows attention indicators.
 - Mute behavior:
-  - Global bell mute from top bar
-  - Per-terminal mute from terminal controls
+  - Per-terminal mute from terminal controls or stash tray
 
 ## Sessions (Claude, Codex, OpenCode, Gemini)
 
 - Choose provider tab in the sidebar.
+- Use quick-action buttons next to provider tabs: `+` to spawn a new session, terminal icon to open a plain terminal.
 - Select a session card to open a new terminal with provider-specific resume command.
 - Session list is filtered by the active workspace path.
 

@@ -172,12 +172,14 @@ export default function DockerPanel() {
 
   function openLogs(containerId: string) {
     const ws = activeWorkspace();
-    addTerminal(ws?.path, ["docker", "logs", "-f", containerId]);
+    if (!ws) return;
+    addTerminal(ws.path, ["docker", "logs", "-f", containerId]);
   }
 
   function openShell(containerId: string) {
     const ws = activeWorkspace();
-    addTerminal(ws?.path, ["docker", "exec", "-it", containerId, "sh"]);
+    if (!ws) return;
+    addTerminal(ws.path, ["docker", "exec", "-it", containerId, "sh"]);
   }
 
   function stateColor(s: string): string {

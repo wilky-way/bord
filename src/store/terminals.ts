@@ -36,8 +36,11 @@ export function getVisibleTerminals(): TerminalInstance[] {
   );
 }
 
-export async function addTerminal(cwd?: string, command?: string[], sessionTitle?: string): Promise<string> {
-  const activePath = state.workspaces.find((w) => w.id === state.activeWorkspaceId)?.path;
+export async function addTerminal(cwd?: string, command?: string[], sessionTitle?: string): Promise<string | null> {
+  const activeWorkspaceId = state.activeWorkspaceId;
+  if (!activeWorkspaceId) return null;
+
+  const activePath = state.workspaces.find((w) => w.id === activeWorkspaceId)?.path;
   const activeTerminalCwd = state.terminals.find((t) => t.id === state.activeTerminalId)?.cwd;
   const targetCwd = cwd ?? activePath ?? activeTerminalCwd ?? undefined;
 
@@ -53,7 +56,7 @@ export async function addTerminal(cwd?: string, command?: string[], sessionTitle
     wsConnected: false,
     stashed: false,
     panelSize: 1,
-    workspaceId: state.activeWorkspaceId ?? undefined,
+    workspaceId: activeWorkspaceId,
     sessionId,
     sessionTitle,
     provider,

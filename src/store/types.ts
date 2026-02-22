@@ -7,7 +7,7 @@ export interface TerminalInstance {
   wsConnected: boolean;
   stashed: boolean;
   panelSize: number; // flex ratio for tiling layout (default 1)
-  workspaceId?: string; // workspace this terminal belongs to
+  workspaceId: string; // workspace this terminal belongs to (required — no orphans)
   sessionId?: string; // provider session ID when opened from a session card
   customTitle?: string; // user-set name (overrides derived title)
   sessionTitle?: string; // session title shown in sidebar (from SessionCard click)

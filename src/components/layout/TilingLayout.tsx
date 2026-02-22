@@ -131,9 +131,14 @@ export default function TilingLayout() {
             <div class="drop-indicator" />
           </Show>
           <button
-            class="flex-none self-stretch flex items-center justify-center w-20 rounded-xl border-2 border-dashed border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors cursor-pointer opacity-40 hover:opacity-100"
-            onClick={() => addTerminal()}
-            title="Add terminal"
+            class="flex-none self-stretch flex items-center justify-center w-20 rounded-xl border-2 border-dashed transition-colors"
+            classList={{
+              "border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] cursor-pointer opacity-40 hover:opacity-100": !!state.activeWorkspaceId,
+              "border-[var(--border)] text-[var(--text-secondary)] opacity-15 cursor-not-allowed": !state.activeWorkspaceId,
+            }}
+            onClick={() => { if (state.activeWorkspaceId) addTerminal(); }}
+            disabled={!state.activeWorkspaceId}
+            title={state.activeWorkspaceId ? "Add terminal" : "Select a workspace first"}
           >
             <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M12 5v14M5 12h14" />

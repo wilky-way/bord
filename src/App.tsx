@@ -12,6 +12,7 @@ export default function App() {
       // Ctrl+N: New terminal in active workspace
       if ((e.ctrlKey || e.metaKey) && e.key === "n") {
         e.preventDefault();
+        if (!state.activeWorkspaceId) return;
         const activePath = state.workspaces.find((w) => w.id === state.activeWorkspaceId)?.path;
         addTerminal(activePath);
       }

@@ -40,9 +40,14 @@ export default function TopBar() {
         </div>
         <TerminalMinimap />
         <button
-          class="px-1.5 py-0.5 rounded-[var(--btn-radius)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] transition-colors flex items-center justify-center"
-          onClick={() => addTerminal()}
-          title="Add terminal"
+          class="px-1.5 py-0.5 rounded-[var(--btn-radius)] border border-[var(--border)] transition-colors flex items-center justify-center"
+          classList={{
+            "text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] cursor-pointer": !!state.activeWorkspaceId,
+            "text-[var(--text-secondary)] opacity-30 cursor-not-allowed": !state.activeWorkspaceId,
+          }}
+          onClick={() => { if (state.activeWorkspaceId) addTerminal(); }}
+          disabled={!state.activeWorkspaceId}
+          title={state.activeWorkspaceId ? "Add terminal" : "Select a workspace first"}
         >
           <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
             <path d="M8 3v10" />

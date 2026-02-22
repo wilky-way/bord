@@ -394,7 +394,7 @@ function clickLayoutPlusButton() {
 }
 
 function clickProviderNewTerminal(provider: "Claude" | "Codex") {
-  clickText(`+ New ${provider}`, false, true);
+  clickButton(`New ${provider} session`, true);
   wait(700);
 }
 
