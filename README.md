@@ -156,6 +156,17 @@ Shows workspace-level editor launch controls.
 
 ## Architecture
 
+### Why This Stack?
+
+These choices form a coherent stack for a desktop app that spawns PTY processes, streams real-time output to multiple panes, and needs to stay lightweight. [OpenCode](https://github.com/anomalyco/opencode) uses the same core stack (Tauri v2 + SolidJS + ghostty-web + Bun) for their desktop AI coding tool.
+
+| Choice | Over | Why |
+|--------|------|-----|
+| **ghostty-web** | xterm.js | Compiles Ghostty's battle-tested native VT100 parser to WASM instead of reimplementing terminal emulation from scratch in JavaScript. The win is correctness — proper grapheme cluster handling, complex script rendering (Devanagari, Arabic, RTL), and full XTPUSHSGR/XTPOPSGR escape sequence support that xterm.js lacks. ~400 KB WASM bundle, zero runtime dependencies, and xterm.js API-compatible so it's a drop-in swap. Performance parity with native Ghostty is still in progress (the RenderState delta-update API hasn't landed in the web build yet), but the emulation fidelity is already ahead. Created by Coder for their agentic dev tool Mux. |
+| **Bun** | Node.js | Native PTY support via `Bun.spawn({ terminal })` — no node-pty dependency (which doesn't even work under Bun). Built-in SQLite (`bun:sqlite`), native WebSocket in `Bun.serve()`, and `bun build --compile` for single-binary distribution. One runtime replaces three dependencies. |
+| **SolidJS** | React | Fine-grained reactivity without a virtual DOM. When multiple terminal panes stream output while the UI updates layout, minimap, and attention badges simultaneously, SolidJS touches only the exact DOM nodes that changed — no component-level re-renders. ~7 KB gzipped vs ~40 KB. |
+| **Tauri v2** | Electron | Uses the system WebView instead of bundling Chromium. ~30–40 MB memory at idle vs ~200–300 MB. Sub-second startup. Capability-based security (everything disabled by default) fits an app that spawns shell processes. The Bun server runs as a sidecar managed by the Rust shell. |
+
 ### System Architecture
 
 ```mermaid
@@ -351,17 +362,6 @@ stateDiagram-v2
         on new output.
     end note
 ```
-
-### Why This Stack?
-
-These choices form a coherent stack for a desktop app that spawns PTY processes, streams real-time output to multiple panes, and needs to stay lightweight. [OpenCode](https://github.com/anomalyco/opencode) uses the same core stack (Tauri v2 + SolidJS + ghostty-web + Bun) for their desktop AI coding tool.
-
-| Choice | Over | Why |
-|--------|------|-----|
-| **ghostty-web** | xterm.js | Compiles Ghostty's battle-tested native VT100 parser to WASM instead of reimplementing terminal emulation from scratch in JavaScript. The win is correctness — proper grapheme cluster handling, complex script rendering (Devanagari, Arabic, RTL), and full XTPUSHSGR/XTPOPSGR escape sequence support that xterm.js lacks. ~400 KB WASM bundle, zero runtime dependencies, and xterm.js API-compatible so it's a drop-in swap. Performance parity with native Ghostty is still in progress (the RenderState delta-update API hasn't landed in the web build yet), but the emulation fidelity is already ahead. Created by Coder for their agentic dev tool Mux. |
-| **Bun** | Node.js | Native PTY support via `Bun.spawn({ terminal })` — no node-pty dependency (which doesn't even work under Bun). Built-in SQLite (`bun:sqlite`), native WebSocket in `Bun.serve()`, and `bun build --compile` for single-binary distribution. One runtime replaces three dependencies. |
-| **SolidJS** | React | Fine-grained reactivity without a virtual DOM. When multiple terminal panes stream output while the UI updates layout, minimap, and attention badges simultaneously, SolidJS touches only the exact DOM nodes that changed — no component-level re-renders. ~7 KB gzipped vs ~40 KB. |
-| **Tauri v2** | Electron | Uses the system WebView instead of bundling Chromium. ~30–40 MB memory at idle vs ~200–300 MB. Sub-second startup. Capability-based security (everything disabled by default) fits an app that spawns shell processes. The Bun server runs as a sidecar managed by the Rust shell. |
 
 ## UI Layout
 
