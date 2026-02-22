@@ -134,7 +134,9 @@ export function createTerminalKeyHandler(
             sendToTerminal(ptyId, "\x01");
             return true;
           }
-          break;
+          // Cmd+Shift+Left: navigate terminals (handled by App.tsx global handler)
+          e.preventDefault();
+          return true;
 
         // Cmd+Right: End (Ctrl+E)
         case "ArrowRight":
@@ -143,7 +145,9 @@ export function createTerminalKeyHandler(
             sendToTerminal(ptyId, "\x05");
             return true;
           }
-          break;
+          // Cmd+Shift+Right: navigate terminals (handled by App.tsx global handler)
+          e.preventDefault();
+          return true;
 
         // Cmd+Backspace: Kill line (Ctrl+U)
         case "Backspace":

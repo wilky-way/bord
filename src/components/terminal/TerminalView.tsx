@@ -5,7 +5,7 @@ import { createTerminalWriter } from "../../lib/terminal-writer";
 import { setTerminalConnected } from "../../store/terminals";
 import { terminalTheme } from "../../lib/theme";
 import { createTerminalKeyHandler } from "../../lib/terminal-shortcuts";
-import { fontSize } from "../../store/settings";
+import { fontSize, fontFamily } from "../../store/settings";
 // Theme is read at terminal creation time — changing themes applies to new terminals only
 
 interface Props {
@@ -50,6 +50,7 @@ export default function TerminalView(props: Props) {
 
     terminal = new Terminal({
       fontSize: fontSize(),
+      fontFamily: fontFamily(),
       cursorStyle: "block",
       cursorBlink: false,
       theme: terminalTheme(),
@@ -136,6 +137,15 @@ export default function TerminalView(props: Props) {
       }
     });
 
+    // Reactive font family: update all terminals when fontFamily signal changes
+    createEffect(() => {
+      const family = fontFamily();
+      if (terminal && !disposed) {
+        (terminal as any).options.fontFamily = family;
+        fitTerminal(terminal, containerRef, props.ptyId);
+      }
+    });
+
     onCleanup(() => {
       disposed = true;
       clearTimeout(replayIdleTimer);
@@ -152,16 +162,17 @@ export default function TerminalView(props: Props) {
 
 const LINE_HEIGHT = 1.2;
 
-let cachedMetrics: { cellWidth: number; cellHeight: number; fontSize: number } | null = null;
+let cachedMetrics: { cellWidth: number; cellHeight: number; fontSize: number; fontFamily: string } | null = null;
 
-function measureFontMetrics(fontSize: number): { cellWidth: number; cellHeight: number } {
-  if (cachedMetrics && cachedMetrics.fontSize === fontSize) {
+function measureFontMetrics(fontSize: number, fontFam?: string): { cellWidth: number; cellHeight: number } {
+  const family = fontFam || "monospace";
+  if (cachedMetrics && cachedMetrics.fontSize === fontSize && cachedMetrics.fontFamily === family) {
     return cachedMetrics;
   }
 
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d")!;
-  ctx.font = `${fontSize}px monospace`;
+  ctx.font = `${fontSize}px ${family}`;
 
   const testString = "MMMMMMMMMM";
   const metrics = ctx.measureText(testString);
@@ -173,7 +184,7 @@ function measureFontMetrics(fontSize: number): { cellWidth: number; cellHeight: 
       : fontSize * LINE_HEIGHT
   );
 
-  cachedMetrics = { cellWidth, cellHeight, fontSize };
+  cachedMetrics = { cellWidth, cellHeight, fontSize, fontFamily: family };
   return cachedMetrics;
 }
 
@@ -193,7 +204,7 @@ function fitTerminal(terminal: Terminal, container: HTMLElement, ptyId: string) 
   if (rect.width === 0 || rect.height === 0) return;
 
   const rendererMetrics = (terminal as any).renderer?.getMetrics?.();
-  const fallbackMetrics = measureFontMetrics(fontSize());
+  const fallbackMetrics = measureFontMetrics(fontSize(), fontFamily());
   const cellWidth = rendererMetrics?.width ?? fallbackMetrics.cellWidth;
   const cellHeight = rendererMetrics?.height ?? fallbackMetrics.cellHeight;
 

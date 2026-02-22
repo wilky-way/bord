@@ -3,6 +3,7 @@ import { themes } from "../../lib/themes";
 import { activeTheme, setTheme } from "../../lib/theme";
 import { getSettings, updateSettings, requestOsNotificationPermission } from "../../lib/notifications/store";
 import { sendConfigureToAll } from "../../lib/ws";
+import { fontFamily, setFontFamily, FONT_PRESETS } from "../../store/settings";
 import type { BordTheme } from "../../lib/themes";
 
 interface Props {
@@ -93,6 +94,9 @@ export default function SettingsPanel(props: Props) {
                   )}
                 </For>
               </div>
+
+              <label class="text-xs font-medium text-[var(--text-secondary)] mt-5 mb-2 block">Terminal Font</label>
+              <FontPicker />
             </Show>
 
             <Show when={section() === "notifications"}>
@@ -210,6 +214,45 @@ function NotificationSettings() {
           How long a terminal must be silent before triggering a notification
         </p>
       </div>
+    </div>
+  );
+}
+
+function FontPicker() {
+  const [custom, setCustom] = createSignal(false);
+  const isPreset = () => FONT_PRESETS.some((p) => p.value === fontFamily());
+
+  return (
+    <div class="space-y-2">
+      <select
+        class="w-full bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs rounded-md px-2 py-1.5 border border-[var(--border)] outline-none focus:border-[var(--accent)]"
+        value={isPreset() && !custom() ? fontFamily() : "__custom__"}
+        onChange={(e) => {
+          const val = e.currentTarget.value;
+          if (val === "__custom__") {
+            setCustom(true);
+          } else {
+            setCustom(false);
+            setFontFamily(val);
+          }
+        }}
+      >
+        <For each={FONT_PRESETS}>
+          {(preset) => <option value={preset.value}>{preset.label}</option>}
+        </For>
+        <option value="__custom__">Custom...</option>
+      </select>
+      <Show when={custom() || !isPreset()}>
+        <input
+          class="w-full bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs rounded-md px-2 py-1.5 border border-[var(--border)] outline-none focus:border-[var(--accent)]"
+          placeholder='e.g. "My Font", monospace'
+          value={fontFamily()}
+          onInput={(e) => setFontFamily(e.currentTarget.value)}
+        />
+      </Show>
+      <p class="text-[10px] text-[var(--text-secondary)]">
+        Install a <a href="https://www.nerdfonts.com/" target="_blank" class="text-[var(--accent)] hover:underline">Nerd Font</a> for powerlevel10k icons
+      </p>
     </div>
   );
 }
