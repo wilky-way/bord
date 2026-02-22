@@ -7,7 +7,7 @@
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",
     "beforeDevCommand": "",
-    "beforeBuildCommand": "bun run build && bun run build:server && mkdir -p src-tauri/resources && cp dist/bord-server src-tauri/resources/bord-server && cp server/schema.sql src-tauri/resources/schema.sql"
+    "beforeBuildCommand": "bun run build && bun run build:server && bun run scripts/prepare-resources.ts"
   },
   "app": {
     "withGlobalTauri": true,
