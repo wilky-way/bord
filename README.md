@@ -1,6 +1,6 @@
 # Bord
 
-A workspace-scoped terminal manager with tiling layout, git integration, and Claude session resume — built as a native desktop app.
+A workspace-scoped terminal manager with tiling layout, git integration, docker controls, and multi-provider session resume — built as a native desktop app.
 
 ![SolidJS](https://img.shields.io/badge/SolidJS-335C88?logo=solid&logoColor=white)
 ![Bun](https://img.shields.io/badge/Bun-000000?logo=bun&logoColor=white)
@@ -8,6 +8,77 @@ A workspace-scoped terminal manager with tiling layout, git integration, and Cla
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-06B6D4?logo=tailwindcss&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-003B57?logo=sqlite&logoColor=white)
+
+## Status
+
+- **Execution plan:** `docs/plan.md`
+- **Roadmap:** `ROADMAP.md`
+- **Fixture lab guide:** `docs/how-to/fixture-lab.md`
+- **Operator guide:** `docs/how-to/using-bord.md`
+
+## Demo Media
+
+Media generated from fixture automation (`bun run qa:capture-media`):
+
+### Provider Sessions (Claude + Codex)
+
+![Claude sessions in fixture workspace](./docs/media/sessions-claude.png)
+
+Shows seeded Claude sessions in the same fixture workspace used for capture.
+
+![Codex sessions in fixture workspace](./docs/media/sessions-codex.png)
+
+Shows seeded Codex sessions for the same workspace so provider switching is visible and comparable.
+
+### Terminal Provider Icons + Mixed Session Tabs
+
+![Mixed Claude and Codex terminals](./docs/media/terminals-provider-icons.png)
+
+Shows active terminal cards with mixed provider icons after launching terminals from both session providers.
+
+### Layout Density: 1x vs 4x
+
+![Single-column 1x density](./docs/media/layout-1x.png)
+
+1x mode emphasizes one terminal at a time for focus workflows.
+
+![Four-column 4x density](./docs/media/layout-4x.png)
+
+4x mode shows multi-terminal parallel workflows in the same viewport.
+
+### Minimap Hover Tooltip
+
+![Minimap hover with provider context](./docs/media/minimap-hover-provider-tooltip.png)
+
+Shows minimap hover behavior with provider-aware terminal context.
+
+### Git Diff View (In-Panel)
+
+![Git panel with selected file diff](./docs/media/git-panel-diff-selected.png)
+
+Shows staged/changed lists and an active diff render inside the git panel.
+
+### Stash Tray Popover
+
+![Stash tray popover](./docs/media/stash-sidebar-popover.png)
+
+Shows workspace stash tray behavior with active/stashed terminal states.
+
+### Docker Section Expanded
+
+![Expanded Docker section](./docs/media/docker-panel-expanded.png)
+
+Shows Docker section expanded in sidebar for compose discovery and controls.
+
+### Editor Controls
+
+![Open in editor controls](./docs/media/open-in-editor-controls.png)
+
+Shows workspace-level editor launch controls.
+
+### Showcase Video
+
+- `./docs/media/showcase-workflow.webm` — 4x -> 3x -> 2x -> 1x transitions, horizontal scrolling, minimap hover, and add-terminal flow.
 
 ## Features
 
@@ -17,19 +88,23 @@ A workspace-scoped terminal manager with tiling layout, git integration, and Cla
 - **Drag-and-drop reorder** — grab a terminal title bar and drag to reposition
 - **Resizable panels** — drag panel edges to adjust width ratios
 - **Stash/unstash** — hide terminals without destroying them; stashed terminals show attention badges when new output arrives
+- **Notification controls** — global bell mute plus per-terminal mute controls
 - **Scroll sync** — parallel scroll mode that syncs scroll position across all visible terminals (fraction-based normalization)
 - **Terminal minimap** — compact navigation strip in the top bar showing all visible terminals with attention indicators
 
 ### Workspace Scoping
 - **Terminal isolation** — each workspace maintains its own set of active and stashed terminals
 - **Workspace switching** — swap entire terminal sets by selecting a different workspace
+- **Ownership persistence** — terminals remain owned by their workspace even after `cd` to other paths
 - **Folder browser** — browse and add workspace directories via the filesystem API
 
-### Claude Session Integration
-- **Session scanning** — reads `~/.claude/projects/` to discover Claude Code sessions with title extraction from JSONL and session index files
-- **Session resume** — click a session card to open a new terminal with `claude --resume <id>`
+### Session Integration (Multi-Provider)
+- **Provider tabs** — switch session lists between Claude, Codex, OpenCode, and Gemini modes
+- **Session scanning** — reads provider-specific session stores (`~/.claude/projects/`, `~/.codex/sessions/`, OpenCode storage dirs)
+- **Session resume** — click a session card to open a new terminal with provider-specific resume command mapping
 - **Idle detection** — terminals track `lastOutputAt` and `lastSeenAt` timestamps; attention badges pulse when unseen output arrives
 - **Attention chime** — visual pulse animation on minimap dots for terminals that need attention
+- **Current gap** — Gemini scan/resume discovery is still placeholder-only
 
 ### Git Workflow
 - **Status** — branch name and dirty indicator on each terminal title bar
@@ -38,6 +113,13 @@ A workspace-scoped terminal manager with tiling layout, git integration, and Cla
 - **Commit** — commit with message from the git panel
 - **Push/pull** — push button appears on title bar when commits are ahead; one-click push
 - **Branch management** — list branches, checkout/switch
+- **Repo navigation** — jump to parent/sibling/child git repos from inside the panel
+
+### Docker Panel
+- **Compose discovery** — scans workspace for compose files
+- **Container controls** — start/stop/restart/pull at project or service level
+- **Logs and shell** — open `docker logs -f` and `docker exec -it ... sh` in new terminals
+- **Live refresh** — container status polling refreshes panel state
 
 ### Editor Integration
 - **VS Code and Cursor** — open workspace directory in either editor via CLI (`code .` / `cursor .`)
@@ -51,6 +133,7 @@ A workspace-scoped terminal manager with tiling layout, git integration, and Cla
 | `Cmd+N` / `Ctrl+N` | New terminal in active workspace |
 | `Cmd+Left` / `Ctrl+Left` | Focus previous terminal |
 | `Cmd+Right` / `Ctrl+Right` | Focus next terminal |
+| `Cmd+G` / `Ctrl+G` | Toggle git panel for active terminal |
 
 ## Architecture
 
@@ -72,7 +155,7 @@ graph TD
         PTY["PTY Processes (zsh)"]
         SQLite["SQLite Database"]
         Git["Git CLI"]
-        Claude["~/.claude/projects/"]
+        SessionStores["Provider session stores"]
         FS["Filesystem"]
         Editors["VS Code / Cursor CLI"]
     end
@@ -84,7 +167,7 @@ graph TD
     Services --> PTY
     Services --> SQLite
     Services --> Git
-    Services --> Claude
+    Services --> SessionStores
     Services --> FS
     Services --> Editors
 ```
@@ -102,7 +185,9 @@ graph TD
     TopBar --> ScrollSyncToggle["Scroll Sync Toggle"]
 
     Sidebar --> WorkspaceList
+    Sidebar --> ProviderTabs
     Sidebar --> SessionList
+    Sidebar --> DockerPanel
     SessionList --> SessionCard
 
     TilingLayout --> ResizablePanel
@@ -141,6 +226,10 @@ graph LR
         S4["activeWorkspaceId: string | null"]
         S5["sidebarOpen: boolean"]
         S6["layoutColumns: number"]
+        S7["gitPanelTerminalId: string | null"]
+        S8["bellMuted: boolean"]
+        S9["activeProvider: Provider"]
+        S10["sidebarCollapsed: object"]
     end
 
     Terminals --> Core
@@ -163,6 +252,7 @@ graph LR
         R5["/api/git/*"]
         R6["/api/fs/browse"]
         R7["/api/editor/open"]
+        R8["/api/docker/*"]
     end
 
     subgraph Services["Service Layer"]
@@ -171,6 +261,7 @@ graph LR
         SessScan["session-scanner.ts"]
         GitSvc["git-service.ts"]
         EdSvc["editor-service.ts"]
+        DockerSvc["docker-service.ts"]
         DB["db.ts (SQLite)"]
     end
 
@@ -182,6 +273,7 @@ graph LR
     R5 --> GitSvc
     R6 -.->|"fs/promises"| FS["Filesystem"]
     R7 --> EdSvc
+    R8 --> DockerSvc
 
     WsSvc --> DB
 ```
@@ -234,7 +326,8 @@ stateDiagram-v2
 
     note right of Stashed
         PTY stays alive.
-        WS stays connected.
+        WS reconnects when
+        the panel is visible.
         Attention badge pulses
         on new output.
     end note
@@ -311,6 +404,36 @@ bun run build:server
 | `BORD_PORT` | `4200` | Server HTTP/WS port |
 | `BORD_CORS_ORIGIN` | `http://localhost:1420` | Allowed CORS origin |
 
+## Testing
+
+### Automated
+
+- Run current unit tests: `bun test src/lib/providers.test.ts`
+- Note: broad app-level unit and Playwright suites are planned but not fully implemented yet.
+
+### Fixture lab + media automation
+
+```bash
+bun run fixtures:setup
+bun run fixtures:register
+bun run qa:capture-media
+```
+
+- Setup details: `docs/how-to/fixture-lab.md`
+- Automation details: `docs/testing/automation.md`
+- Manual matrix: `docs/testing/manual-matrix.md`
+- Evidence template: `docs/testing/evidence.md`
+
+### Manual verification checklist
+
+1. `bun run dev` and confirm UI/server boot (`:1420` + `:4200`)
+2. Add at least two workspaces and verify terminal sets are isolated per workspace
+3. Stash terminal(s), produce output, verify attention indicators and mute controls
+4. Resume a provider session from SessionList and verify linked terminal behavior
+5. Open git panel (`Cmd+G`) and test stage/diff/commit/push flow
+6. Open Docker panel and verify compose discovery and start/stop/logs actions
+7. Verify 1x/2x/3x/4x density controls, drag reorder, and minimap navigation
+
 ## Project Structure
 
 ```
@@ -318,6 +441,7 @@ bord/
 ├── server/
 │   ├── index.ts              # Bun.serve() entry — routes + WebSocket
 │   ├── routes/
+│   │   ├── docker.ts         # /api/docker/* (discover, containers, up/down/restart/pull, logs)
 │   │   ├── editor.ts         # POST /api/editor/open
 │   │   ├── fs.ts             # GET /api/fs/browse
 │   │   ├── git.ts            # /api/git/* (status, diff, stage, commit, push, pull, branches, checkout)
@@ -327,10 +451,11 @@ bord/
 │   │   └── workspace.ts      # CRUD /api/workspaces
 │   ├── services/
 │   │   ├── db.ts             # SQLite via bun:sqlite
+│   │   ├── docker-service.ts # Docker compose discovery + container controls
 │   │   ├── editor-service.ts # Spawn VS Code / Cursor CLI
 │   │   ├── git-service.ts    # Shell out to git
 │   │   ├── pty-manager.ts    # PTY lifecycle + 2MB circular buffer + WS fan-out
-│   │   ├── session-scanner.ts# Scan ~/.claude/projects/ for sessions
+│   │   ├── session-scanner.ts# Scan provider session stores (Claude/Codex/OpenCode/Gemini)
 │   │   └── workspace-service.ts
 │   ├── ws/
 │   │   ├── handler.ts        # WS upgrade, message routing, close
@@ -341,10 +466,11 @@ bord/
 │   ├── index.tsx             # SolidJS render entry
 │   ├── styles.css            # CSS variables (Catppuccin Frappe) + Tailwind
 │   ├── components/
+│   │   ├── docker/           # DockerPanel
 │   │   ├── git/              # GitPanel, ChangedFilesList, CommitInput, DiffViewer
 │   │   ├── icons/            # ProviderIcons (Claude, VS Code, Cursor, etc.)
 │   │   ├── layout/           # TopBar, Sidebar, TilingLayout, ResizablePanel, TerminalMinimap
-│   │   ├── session/          # SessionList, SessionCard
+│   │   ├── session/          # ProviderTabs, SessionList, SessionCard
 │   │   ├── shared/           # EditorButton
 │   │   ├── terminal/         # TerminalPanel, TerminalView, ParallelScroll
 │   │   └── workspace/        # WorkspaceList
@@ -366,6 +492,13 @@ bord/
 │   ├── tauri.conf.json       # Window config, CSP, bundle settings
 │   ├── Cargo.toml
 │   └── src/
+├── scripts/
+│   ├── fixtures/             # fixture setup/register/cleanup automation
+│   └── qa/                   # agent-browser media capture automation
+├── docs/
+│   ├── how-to/               # operator and fixture guides
+│   ├── testing/              # matrix, evidence, automation docs
+│   └── media/                # screenshots and videos for README/docs
 ├── index.html                # Vite entry HTML
 ├── vite.config.ts            # SolidJS + Tailwind + proxy to :4200
 ├── package.json

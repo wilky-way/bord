@@ -9,6 +9,10 @@
     "dev:ui": "vite",
     "build": "vite build",
     "build:server": "bun build server/index.ts --compile --outfile dist/bord-server",
+    "fixtures:setup": "bun run scripts/fixtures/setup-demo.ts",
+    "fixtures:register": "bun run scripts/fixtures/register-workspaces.ts",
+    "fixtures:cleanup": "bun run scripts/fixtures/cleanup-demo.ts",
+    "qa:capture-media": "bun run scripts/qa/capture-media.ts",
     "tauri": "tauri",
     "tauri:dev": "tauri dev"
   },

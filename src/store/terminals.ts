@@ -1,7 +1,7 @@
 import { state, setState } from "./core";
 import { api } from "../lib/api";
 import type { TerminalInstance } from "./types";
-import { getProviderFromCommand } from "../lib/providers";
+import { getProviderFromCommand, getResumeSessionId } from "../lib/providers";
 
 export function setTerminalTitle(id: string, title: string) {
   setState("terminals", (t) => t.id === id, "customTitle", title || undefined);
@@ -43,15 +43,7 @@ export async function addTerminal(cwd?: string, command?: string[], sessionTitle
 
   const result = await api.createPty(targetCwd, command);
 
-  // Extract sessionId if this is a --resume command
-  let sessionId: string | undefined;
-  if (command) {
-    const idx = command.indexOf("--resume");
-    if (idx !== -1 && idx + 1 < command.length) {
-      sessionId = command[idx + 1];
-    }
-  }
-
+  const sessionId = getResumeSessionId(command);
   const provider = getProviderFromCommand(command);
 
   const terminal: TerminalInstance = {

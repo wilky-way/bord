@@ -38,7 +38,7 @@ export const api = {
   deleteWorkspace: (id: string) => request<{ ok: boolean }>(`/workspaces/${id}`, { method: "DELETE" }),
 
   // Sessions
-  listSessions: (project?: string, provider?: string) => {
+  listSessions: (project?: string, provider?: Provider) => {
     const params = new URLSearchParams();
     if (project) params.set("project", project);
     if (provider) params.set("provider", provider);

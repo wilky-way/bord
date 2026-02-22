@@ -1,4 +1,4 @@
-import { onMount } from "solid-js";
+import { onCleanup, onMount } from "solid-js";
 import TopBar from "./components/layout/TopBar";
 import Sidebar from "./components/layout/Sidebar";
 import TilingLayout from "./components/layout/TilingLayout";
@@ -8,7 +8,7 @@ import { toggleGitPanel } from "./store/git";
 
 export default function App() {
   onMount(() => {
-    window.addEventListener("keydown", (e) => {
+    const onKeyDown = (e: KeyboardEvent) => {
       // Ctrl+N: New terminal in active workspace
       if ((e.ctrlKey || e.metaKey) && e.key === "n") {
         e.preventDefault();
@@ -29,7 +29,10 @@ export default function App() {
         e.preventDefault();
         toggleGitPanel(state.activeTerminalId);
       }
-    });
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    onCleanup(() => window.removeEventListener("keydown", onKeyDown));
   });
 
   return (

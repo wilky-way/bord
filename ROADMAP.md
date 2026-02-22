@@ -1,76 +1,75 @@
 # Bord Roadmap
 
-## Completed
+Last updated: 2026-02-21
 
-The following features have shipped and are available in the current build:
+This roadmap reflects actual implementation status in the repo today. For execution details and acceptance criteria, see `docs/plan.md`.
 
-- **Tiling terminal layout** with horizontal scroll, resizable panels, and auto-fit or fixed 1x–4x column density
-- **Drag-and-drop reorder** of terminal panels with visual drop indicators
-- **Terminal minimap** in the top bar for quick navigation with attention pulse indicators
-- **Stash/unstash** terminals with attention badges on new output while hidden
-- **Workspace scoping** — terminals are isolated per workspace; switching workspaces swaps terminal sets
-- **Keyboard shortcuts** — Cmd+N (new terminal), Cmd+Left/Right (navigate adjacent)
-- **Scroll sync** — parallel scroll mode syncing position across all visible terminals
-- **Claude session scanning** — discovers sessions from `~/.claude/projects/`, resume via `--resume` flag
-- **Git integration** — branch badge + dirty indicator on title bar, stage/unstage, diff viewer, commit, push/pull, branch checkout
-- **Editor integration** — open workspace in VS Code or Cursor with preference persistence
-- **Per-terminal notification mute** with global override — bell toggle in terminal header and stash popover, idle detection skips muted terminals entirely
-- **Catppuccin Frappe theme** with CSS custom properties
-- **Tauri v2 desktop shell** with CSP and window configuration
-- **2-finger horizontal scroll fix** for ghostty-web canvas
-- **App rename** from "cockpit" to "bord"
+## Shipped
 
----
+- [x] Tiling terminal layout with horizontal scroll, resizable panels, and 1x/2x/3x/4x density controls
+- [x] Drag-and-drop reorder of terminal panels
+- [x] Terminal minimap with provider color coding and attention pulse
+- [x] Workspace-scoped terminals (active + stashed)
+- [x] Terminal ownership stays with workspace even if shell cwd changes
+- [x] Session resume linking for Claude/Codex/OpenCode via provider-aware commands
+- [x] Provider tabs (Claude, Codex, OpenCode, Gemini)
+- [x] Keyboard navigation: Cmd/Ctrl+N, Cmd/Ctrl+Left/Right, Cmd/Ctrl+G
+- [x] Stash/unstash workflow with attention badges and tray popover
+- [x] Global bell mute + per-terminal mute
+- [x] Git panel operations: stage/unstage, diff, commit, push/pull, branches
+- [x] Git stats badges on terminal headers and workspace tiles
+- [x] Repo tree navigation in git panel (parent/sibling/child repos)
+- [x] Docker compose discovery + per-project/per-service controls
+- [x] Docker logs/shell spawn into terminals
+- [x] Open workspace/file in VS Code or Cursor
+- [x] App rename from cockpit to bord
 
-## Phase 1 — Core Polish
+## Partial / Needs Polish
 
-- [x] Stash terminals + notifications (badge, sound, pulse)
-- [x] Terminal sync: workspace → tab → session
-- [x] 2-finger horizontal scroll fix
-- [x] Terminal minimap navigation
-- [x] Navigation hotkeys (Cmd+Arrow to snap next/prev terminal)
-- [x] Drag + drop reorder terminals
-- [x] Layout density buttons (1x/2x/3x/4x columns in TopBar)
-- [x] Per-terminal mute toggle (mitigates spurious notifications until root cause is fixed)
-- [ ] Investigate spurious terminal focus notifications (external file changes triggering attention badges)
-- [x] Open in VS Code / Cursor buttons (workspace context, via CLI)
+- [ ] Git panel is still a floating popover; target is a true in-card overlay swap
+- [ ] Gemini provider scanner is placeholder (no session discovery yet)
+- [ ] Sidebar collapse is section-based; compact icon rail + hover/flyout UX still pending
+- [ ] Navigation buttons in chrome (`<` `>`) still pending (hotkeys already shipped)
+- [ ] Native desktop notifications are not fully wired (current model is in-app + chime)
+- [ ] Layout density semantics need final polish for strict "resize all to chosen density" behavior in edge cases
 
-## Phase 2 — Workspace Scoping
+## Active Phases
 
-- [x] Scope terminals per workspace (active + stashed kept per workspace)
-- [x] Switching workspaces swaps terminal sets
-- [ ] Return-to-workspace button if you `cd` away (requires live cwd tracking via OSC sequences)
+### Phase 0 - Documentation Alignment (In Progress)
 
-## Phase 3 — Git Integration
+- [x] Create living execution plan (`docs/plan.md`)
+- [x] Update README to match shipped/partial features and current shortcuts
+- [x] Add fixture-lab/how-to/testing documentation and media capture workflow
+- [ ] Keep roadmap synced to code after each phase
 
-- [x] Git overlay panel (same dimensions as terminal, toggle via branch button)
-- [x] Unstaged/staged file list, diff view in-card
-- [x] Commit with message, push, branch management
-- [x] Lines changed indicators on tab + workspace sidebar
+### Phase 1 - Core UX Parity
 
-## Phase 3.5 — Docker Panel (WIP)
+- [ ] Sidebar rail mode: move hide/show into sidebar and support compact icon-only rail
+- [ ] Hover tooltips + fast provider/session switching in collapsed mode
+- [ ] Add explicit prev/next nav buttons in top chrome
+- [ ] Convert git panel from popover to in-card overlay with same dimensions as terminal
+- [ ] Add return-to-workspace action when cwd drifts from workspace root (requires live cwd tracking)
 
-- [x] Basic Docker Compose project discovery + status display in sidebar
-- [ ] Fix: shows "No containers" + "Up" simultaneously — need to list actual containers per project
-- [ ] Start/stop/restart controls per project and per container
-- [ ] Log viewer (tail container logs inline or in a terminal panel)
-- [ ] Health/status refresh on interval
-- [ ] Container resource usage (CPU/mem) if feasible
+### Phase 2 - Sessions and Composer
 
-## Phase 4 — Multi-Provider Sessions
+- [ ] Complete multi-provider parity (Gemini discovery + clear empty-state behavior)
+- [ ] Add optional prompt composer (WYSIWYG-style) piping to active terminal
+- [ ] Add session grouping/visibility improvements and straggler terminal indicators
 
-- [ ] Show sessions by CLI provider (Claude/Codex/OpenCode/Gemini) with SVG icons
-- [ ] WYSIWYG prompt editor that pipes to active CLI terminal
-- [ ] Provider mode tabs
+### Phase 3 - Settings and Themes
 
-## Phase 5 — Theming + Settings
+- [ ] Add settings surface for theme/composer/notification toggles
+- [ ] Add theme selector (Catppuccin variants, Gruvbox, One Dark baseline)
+- [ ] Keep terminal palette and app chrome synchronized per theme
 
-- [ ] Theme selector (Catppuccin, Gruvbox, One Dark, Ghostty themes)
-- [ ] Settings menu (toggle WYSIWYG editor, theme, etc.)
-- [x] App rename from "cockpit" to "bord"
+### Phase 4 - Distribution and Quality
 
-## Phase 6 — Distribution + Quality
+- [ ] Auto-update checks from GitHub releases with user prompt/flow
+- [ ] Playwright smoke tests for core app flows
+- [ ] Unit tests for provider parsing, store behavior, and notification transitions
 
-- [ ] Auto-update from GitHub releases (polling + prompt)
-- [ ] Playwright E2E tests
-- [ ] Unit tests
+## Deferred / Low Priority
+
+- [ ] Full rename sweeps inside third-party mirror directories (for example `tmp-opencode/`)
+- [ ] SSH/Tailscale remote workspace helper UX
+- [ ] Docker resource metrics (CPU/memory) and deeper health diagnostics

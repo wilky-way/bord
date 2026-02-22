@@ -1,4 +1,4 @@
-import { createSignal, Show } from "solid-js";
+import { createSignal, onCleanup, onMount, Show } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import { api } from "../../lib/api";
 import { getPreferredEditor, setPreferredEditor, type Editor } from "../../lib/editor-preference";
@@ -45,9 +45,11 @@ export default function EditorButton(props: Props) {
     }
   };
 
-  if (typeof document !== "undefined") {
+  onMount(() => {
+    if (typeof document === "undefined") return;
     document.addEventListener("click", handleClickOutside);
-  }
+    onCleanup(() => document.removeEventListener("click", handleClickOutside));
+  });
 
   return (
     <div ref={containerRef} class="relative flex items-center shrink-0">

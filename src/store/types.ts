@@ -8,9 +8,9 @@ export interface TerminalInstance {
   stashed: boolean;
   panelSize: number; // flex ratio for tiling layout (default 1)
   workspaceId?: string; // workspace this terminal belongs to
-  sessionId?: string; // Claude session ID when resuming via --resume
+  sessionId?: string; // provider session ID when opened from a session card
   customTitle?: string; // user-set name (overrides derived title)
-  sessionTitle?: string; // Claude session summary (from SessionCard click)
+  sessionTitle?: string; // session title shown in sidebar (from SessionCard click)
   lastOutputAt?: number; // Date.now() of last PTY data received
   lastSeenAt?: number; // Date.now() when user last viewed this terminal
   needsAttention?: boolean; // notification flag — set when idle, cleared on focus

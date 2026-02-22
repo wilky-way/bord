@@ -2,7 +2,7 @@ import { createMemo } from "solid-js";
 import { state, setState } from "../../store/core";
 import { addTerminal, unstashTerminal } from "../../store/terminals";
 import type { SessionInfo } from "../../store/types";
-import { PROVIDER_COMMANDS } from "../../lib/providers";
+import { buildResumeCommand } from "../../lib/providers";
 
 interface Props {
   session: SessionInfo;
@@ -35,8 +35,8 @@ export default function SessionCard(props: Props) {
       const projectPath = props.session.projectPath;
       const sessionId = props.session.id;
       selectMatchingWorkspace(projectPath);
-      const cli = PROVIDER_COMMANDS[props.session.provider] ?? "claude";
-      addTerminal(projectPath, [cli, "--resume", sessionId], props.session.title);
+      const resumeCommand = buildResumeCommand(props.session.provider, sessionId);
+      addTerminal(projectPath, resumeCommand, props.session.title);
     }
   }
 
