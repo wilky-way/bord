@@ -23,7 +23,7 @@ Download the `.dmg` from the [latest release](https://github.com/wilky-way/bord/
 
 Download the installer from the [latest release](https://github.com/wilky-way/bord/releases/latest):
 - **Windows:** `.msi` or `.exe` installer
-- **Linux:** `.deb`, `.rpm`, or `.AppImage`
+- **Linux:** `.deb` or `.rpm`
 - Stash Active Terminals
     - Receive Notifications when you are needed
 - Workspaces Own Terminals
