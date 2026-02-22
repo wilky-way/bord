@@ -30,6 +30,8 @@ A workspace-scoped terminal manager with tiling layout, git integration, docker 
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-06B6D4?logo=tailwindcss&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-003B57?logo=sqlite&logoColor=white)
 
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=flat-square&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/wilkyway90e)
+
 ![Bord workflow showcase](./docs/media/showcase-workflow.gif)
 
 [Full workflow video (WebM)](./docs/media/showcase-workflow.webm)
@@ -600,6 +602,14 @@ bord/
 ├── bord.db                   # SQLite database (created at runtime)
 └── ROADMAP.md
 ```
+
+## Support
+
+If you find bord useful, consider buying me a coffee!
+
+<a href="https://buymeacoffee.com/wilkyway90e" target="_blank">
+  <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" >
+</a>
 
 ## License
 
