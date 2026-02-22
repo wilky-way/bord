@@ -124,6 +124,12 @@ Shows Docker section expanded in sidebar for compose discovery and controls.
 
 Shows workspace-level editor launch controls.
 
+### Auto-Updates (Settings → About)
+
+![Settings About panel with update check](./docs/media/settings-about-updates.png)
+
+Shows current version and a "Check for updates" button. When a new version is available, an accent-colored banner appears at the top of the app with one-click install and relaunch.
+
 ### Theme Picker (Settings Panel)
 
 ![Settings panel with 15 theme swatches](./docs/media/settings-theme-picker.png)
@@ -639,12 +645,6 @@ bord/
 ├── bord.db                   # SQLite database (created at runtime)
 └── ROADMAP.md
 ```
-
-### Auto-Updates (Settings → About)
-
-![Settings About panel with update check](./docs/media/settings-about-updates.png)
-
-Settings panel shows current version and a manual "Check for updates" button. When a new version is available, an accent-colored banner appears at the top of the app with a one-click "Update now" button that downloads, installs, and relaunches.
 
 ## Releasing & Auto-Updates
 
