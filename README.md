@@ -1,4 +1,4 @@
-# Bord
+# bord
 
 A workspace-scoped terminal manager with tiling layout, git integration, docker controls, and multi-provider session resume — built as a native desktop app.
 
