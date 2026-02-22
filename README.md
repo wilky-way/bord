@@ -5,6 +5,8 @@
 
 A workspace-scoped terminal manager with tiling layout, git integration, docker controls, and multi-provider session resume — built as a native desktop app.
 
+New to terminal internals? Read the [Terminal Ecosystem Primer](docs/how-to/terminal-ecosystem-primer.md) for a practical explanation of TTY vs PTY, how terminal emulators differ, and where Bord fits.
+
 ## Install
 
 ### macOS (Homebrew)
