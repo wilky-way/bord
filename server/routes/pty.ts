@@ -42,7 +42,7 @@ export async function ptyRoutes(req: Request, url: URL): Promise<Response | null
   const deleteMatch = url.pathname.match(/^\/api\/pty\/(.+)$/);
   if (req.method === "DELETE" && deleteMatch) {
     const id = deleteMatch[1];
-    const destroyed = destroyPty(id);
+    const destroyed = await destroyPty(id);
     if (!destroyed) {
       return Response.json({ error: "PTY session not found" }, { status: 404 });
     }

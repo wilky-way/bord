@@ -188,7 +188,30 @@ export function resizePty(id: string, cols: number, rows: number): boolean {
   return true;
 }
 
-export function destroyPty(id: string): boolean {
+async function killProcessTree(proc: ReturnType<typeof Bun.spawn>): Promise<void> {
+  const pid = proc.pid;
+  if (!pid) return;
+
+  try {
+    // Kill the entire process group (negative PID)
+    process.kill(-pid, "SIGTERM");
+  } catch {
+    // Process group kill failed — fall back to direct kill
+    proc.kill("SIGTERM");
+  }
+
+  // Give processes 200ms to clean up, then SIGKILL survivors
+  await Bun.sleep(200);
+
+  try {
+    process.kill(-pid, "SIGKILL");
+  } catch {
+    // Already dead or group doesn't exist — try direct kill
+    try { proc.kill("SIGKILL"); } catch {}
+  }
+}
+
+export async function destroyPty(id: string): Promise<boolean> {
   const session = sessions.get(id);
   if (!session) return false;
 
@@ -200,7 +223,7 @@ export function destroyPty(id: string): boolean {
   if (session.proc.terminal && !session.proc.terminal.closed) {
     session.proc.terminal.close();
   }
-  session.proc.kill();
+  await killProcessTree(session.proc);
   sessions.delete(id);
   return true;
 }
