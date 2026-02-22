@@ -35,7 +35,7 @@ A workspace-scoped terminal manager with tiling layout, git integration, docker 
 
 Workspace switching, session launches, density transitions, stash/unstash, minimap navigation, and git diff — all from one tiling terminal manager.
 
-### Snap-scroll between full-width terminals
+### Snap-scroll between full-width 1x terminals
 
 ![Horizontal scrolling at 1x density](./docs/media/horizontal-scroll-1x.gif)
 
