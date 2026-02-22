@@ -88,17 +88,16 @@ export default function SessionList(props: Props) {
       <Show when={activeWorkspace()}>
         <div class="flex items-center py-1 gap-1.5">
           <button
-            class="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+            class="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors flex items-center justify-center"
             onClick={refresh}
+            title="Refresh sessions"
           >
-            Refresh
-          </button>
-          <button
-            class="text-xs text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors"
-            onClick={newSession}
-            title={`Start new ${PROVIDER_LABELS[state.activeProvider]} terminal`}
-          >
-            + New {PROVIDER_LABELS[state.activeProvider]}
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+              <path d="M2.5 8a5.5 5.5 0 019.3-4" />
+              <path d="M13.5 8a5.5 5.5 0 01-9.3 4" />
+              <path d="M11.5 1.5V4H14" />
+              <path d="M4.5 14.5V12H2" />
+            </svg>
           </button>
         </div>
 

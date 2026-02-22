@@ -36,6 +36,7 @@ fn wait_for_server(port: u16) -> bool {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .manage(Mutex::new(SidecarState { child: None }))
         .setup(|app| {
             if cfg!(debug_assertions) {
@@ -76,7 +77,10 @@ pub fn run() {
                             state.lock().unwrap().child = Some(child);
 
                             if !wait_for_server(sidecar_port) {
-                                log::error!("Sidecar server failed to start on port {}", sidecar_port);
+                                log::error!(
+                                    "Sidecar server failed to start on port {}",
+                                    sidecar_port
+                                );
                             }
                         }
                     }

@@ -266,7 +266,7 @@ function ensureVisibleTerminalCount(target: number) {
   for (let i = 0; i < 10; i++) {
     const count = visibleTerminalCount();
     if (count >= target) return;
-    clickButton("+ Terminal", true);
+    clickButton("Add terminal", true);
     wait(350);
   }
 }
@@ -523,7 +523,7 @@ async function buildGifFromFrames(
       "-frames:v",
       String(frameLimit),
       "-vf",
-      "fps=8,scale=1320:-1:flags=lanczos",
+      "fps=10,scale=1320:-1:flags=lanczos",
       outputPath,
     ],
     { timeout: 120_000 },
@@ -678,116 +678,126 @@ async function main() {
       }
     };
 
+    // --- Showcase sequence: open sessions, explore features ---
+
     ensureProvider("Claude");
     refreshSessions();
     openSessionByToken(claudeTokens[0]);
-    hold(3, 240);
+    hold(4, 240);
 
     ensureProvider("Codex");
     refreshSessions();
     openSessionByToken(codexTokens[0]);
-    hold(3, 240);
+    hold(4, 240);
 
-    selectWorkspace(fixtureDocker.name);
-    hold(2, 220);
-    selectWorkspace(fixtureWeb.name);
-    hold(2, 220);
-
-    hoverExpandedWorkspacePreview(fixtureWeb.name);
-    clickPreviewTab("all");
-    hold(2, 220);
-    clickPreviewTab("active");
-    hold(2, 220);
-    clickPreviewTab("stashed");
-    hold(2, 220);
-    clickPreviewTab("sessions");
-    hold(2, 220);
+    // Minimap hover with provider tooltip
+    revealMinimapProviderTooltip();
+    hold(3, 200);
     moveMouseToMainArea();
 
+    // Layout density cycling
+    clickButton("4x", true);
+    wait(400);
+    hold(3, 200);
+
+    clickButton("2x", true);
+    wait(400);
+    hold(3, 200);
+
+    clickButton("1x", true);
+    wait(500);
+    hold(3, 200);
+
+    // Scroll through terminals in 1x
+    horizontalScrollRight();
+    wait(900);
+    hold(3, 200);
+
+    horizontalScrollLeft();
+    wait(900);
+    hold(3, 200);
+
+    // Back to multi-column
+    clickButton("3x", true);
+    wait(400);
+    hold(3, 200);
+
+    // Switch to Docker workspace, peek Docker panel
+    selectWorkspace(fixtureDocker.name);
+    ensureDockerPanelVisible();
+    hold(4, 240);
+
+    // Switch back
+    selectWorkspace(fixtureWeb.name);
+    hold(3, 220);
+
+    // Workspace hover preview card
+    hoverExpandedWorkspacePreview(fixtureWeb.name);
+    clickPreviewTab("sessions");
+    hold(3, 220);
+    clickPreviewTab("all");
+    hold(3, 220);
+    clickPreviewTab("active");
+    hold(3, 220);
+    clickPreviewTab("stashed");
+    hold(3, 220);
+    moveMouseToMainArea();
+
+    // New session + stash cycle
     ensureProvider("Claude");
     clickProviderNewTerminal("Claude");
-    hold(2, 220);
+    hold(3, 220);
 
     stashTerminalByProvider("claude");
-    hold(2, 220);
+    hold(3, 220);
 
     if (claudeTokens[1]) {
       ensureProvider("Claude");
       openSessionByToken(claudeTokens[1]);
-      hold(3, 220);
+      hold(4, 220);
     }
 
+    // Collapsed flyout
     ensureSidebarFlyoutVisible();
-    hold(2, 220);
+    hold(3, 220);
 
+    // Stash tray
     openWorkspaceStashTray();
-    hold(3, 240);
+    hold(4, 240);
 
     unstashFirstStashedTerminal();
     hold(3, 240);
 
-    clickButton("4x", true);
-    wait(360);
-    hold(2, 180);
-
-    clickButton("3x", true);
-    wait(360);
-    hold(2, 180);
-
-    clickButton("2x", true);
-    wait(360);
-    hold(2, 180);
-
-    clickButton("1x", true);
-    wait(620);
-    hold(2, 180);
-
-    horizontalScrollRight();
-    wait(880);
-    hold(3, 180);
-
-    horizontalScrollLeft();
-    wait(880);
-    hold(3, 180);
-
-    clickButton("4x", true);
-    wait(500);
-    hold(2, 180);
-
-    horizontalScrollRight();
-    wait(900);
-    hold(2, 180);
-
+    // Add terminal via + button
     clickLayoutPlusButton();
     wait(900);
-    hold(2, 220);
+    hold(3, 220);
 
     closeExtraTerminals();
     wait(560);
-    hold(2, 220);
+    hold(3, 220);
 
+    // Multi-provider terminals side by side
     ensureProvider("Claude");
     openSessionByToken(claudeTokens[0]);
     wait(420);
     ensureProvider("Codex");
     openSessionByToken(codexTokens[0]);
     wait(420);
-    hold(2, 220);
+    hold(3, 220);
 
-    ensureSidebarFlyoutVisible();
-    hold(2, 220);
-
+    // Git panel
     openGitDiff();
-    hold(3, 240);
+    hold(4, 240);
 
     const totalFrames = frame - 1;
-    const preferredStart = 9;
-    const preferredCount = 36;
+    const preferredStart = 1;
+    const preferredCount = 80;
     const gifStart = Math.max(1, Math.min(preferredStart, totalFrames));
     const gifCount = Math.max(1, Math.min(preferredCount, totalFrames - gifStart + 1));
 
-    await buildWebmFromFrames(frameDir, showcaseTempPath, 2);
-    await buildGifFromFrames(frameDir, showcaseGifTempPath, 2, gifStart, gifCount);
+    await buildWebmFromFrames(frameDir, showcaseTempPath, 3);
+    await buildGifFromFrames(frameDir, showcaseGifTempPath, 3, gifStart, gifCount);
     await rename(showcaseTempPath, showcasePath);
     await rename(showcaseGifTempPath, showcaseGifPath);
 

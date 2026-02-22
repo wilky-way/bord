@@ -5,9 +5,11 @@ import ProviderTabs from "../session/ProviderTabs";
 import DockerPanel from "../docker/DockerPanel";
 import WorkspaceList from "../workspace/WorkspaceList";
 import EditorButton from "../shared/EditorButton";
-import { buildResumeCommand, PROVIDER_ICONS, PROVIDER_LABELS } from "../../lib/providers";
+import { buildNewSessionCommand, buildResumeCommand, PROVIDER_ICONS, PROVIDER_LABELS } from "../../lib/providers";
 import { addTerminal, setActiveTerminal, setTerminalMuted, unstashTerminal } from "../../store/terminals";
+import { createWorkspace } from "../../store/workspaces";
 import { api } from "../../lib/api";
+import { isTauriRuntime, pickWorkspaceDirectory } from "../../lib/workspace-picker";
 import type { Provider, SessionInfo, TerminalInstance } from "../../store/types";
 
 function SectionHeader(props: {
@@ -47,6 +49,7 @@ function SectionHeader(props: {
 export default function Sidebar() {
   let sidebarRef: HTMLDivElement | undefined;
   const previewProviders: Provider[] = ["claude", "codex", "opencode", "gemini"];
+  const tauriRuntime = isTauriRuntime();
 
   const [hovering, setHovering] = createSignal(false);
   const [previewWorkspaceId, setPreviewWorkspaceId] = createSignal<string | null>(null);
@@ -58,6 +61,8 @@ export default function Sidebar() {
   const [expandedHoverSessions, setExpandedHoverSessions] = createSignal<SessionInfo[]>([]);
   const [expandedHoverLoading, setExpandedHoverLoading] = createSignal(false);
   const [stashOpen, setStashOpen] = createSignal(false);
+  const [addingWorkspace, setAddingWorkspace] = createSignal(false);
+  const [addWorkspaceError, setAddWorkspaceError] = createSignal<string | null>(null);
   const previewSessionCache = new Map<string, SessionInfo[]>();
   let leaveTimer: ReturnType<typeof setTimeout> | undefined;
   let expandedHoverLeaveTimer: ReturnType<typeof setTimeout> | undefined;
@@ -219,10 +224,75 @@ export default function Sidebar() {
   const panelStashedAttentionCount = () => panelStashedTerminals().filter((terminal) => !!terminal.needsAttention).length;
   const sidebarShortcut = () => (typeof navigator !== "undefined" && navigator.platform.includes("Mac") ? "Cmd" : "Ctrl");
 
+  const normalizeWorkspacePath = (value: string) => value.replace(/\/+$/, "") || "/";
+
+  function suggestedWorkspaceName(path: string) {
+    const segment = normalizeWorkspacePath(path).split("/").pop() || "workspace";
+    if (!state.workspaces.some((workspace) => workspace.name === segment)) return segment;
+
+    for (let suffix = 2; suffix < 1000; suffix++) {
+      const candidate = `${segment}-${suffix}`;
+      if (!state.workspaces.some((workspace) => workspace.name === candidate)) return candidate;
+    }
+
+    return `${segment}-${Date.now()}`;
+  }
+
+  function activateWorkspace(workspaceId: string) {
+    setState("activeWorkspaceId", workspaceId);
+    setPreviewWorkspaceId(workspaceId);
+    setExpandedHoverWorkspaceId(null);
+
+    const visible = state.terminals.filter((terminal) => terminal.workspaceId === workspaceId && !terminal.stashed);
+    setState("activeTerminalId", visible[0]?.id ?? null);
+  }
+
+  async function addWorkspaceFromPicker() {
+    if (addingWorkspace()) return;
+
+    setAddWorkspaceError(null);
+    setAddingWorkspace(true);
+    try {
+      const initialPath = panelWorkspace()?.path ?? undefined;
+      let pickedPath = await pickWorkspaceDirectory(initialPath);
+
+      if (!pickedPath && !tauriRuntime) {
+        const entered = window.prompt(
+          "Enter the full local project path (desktop app supports native folder picker):",
+          initialPath ?? "",
+        );
+        if (entered) pickedPath = entered.trim();
+      }
+
+      if (!pickedPath) return;
+
+      const normalizedPicked = normalizeWorkspacePath(pickedPath);
+      const existing = state.workspaces.find(
+        (workspace) => normalizeWorkspacePath(workspace.path) === normalizedPicked,
+      );
+
+      if (existing) {
+        activateWorkspace(existing.id);
+        return;
+      }
+
+      const name = suggestedWorkspaceName(normalizedPicked);
+      const createdId = await createWorkspace(name, normalizedPicked);
+      activateWorkspace(createdId);
+      setState("sidebarOpen", true);
+    } catch (error) {
+      console.error("Failed to add workspace from folder picker", error);
+      const message = error instanceof Error ? error.message : "Failed to add workspace";
+      setAddWorkspaceError(message);
+    } finally {
+      setAddingWorkspace(false);
+    }
+  }
+
   function activatePanelTerminal(terminal: TerminalInstance) {
     const workspaceId = panelWorkspaceId();
     if (workspaceId && workspaceId !== state.activeWorkspaceId) {
-      setState("activeWorkspaceId", workspaceId);
+      activateWorkspace(workspaceId);
     }
 
     if (terminal.stashed) {
@@ -237,8 +307,7 @@ export default function Sidebar() {
     const workspaceId = expandedHoverWorkspaceId();
     if (!workspaceId) return;
     if (workspaceId !== state.activeWorkspaceId) {
-      setState("activeWorkspaceId", workspaceId);
-      setPreviewWorkspaceId(workspaceId);
+      activateWorkspace(workspaceId);
     }
 
     if (terminal.stashed) {
@@ -254,8 +323,7 @@ export default function Sidebar() {
     if (!workspace) return;
 
     if (workspace.id !== state.activeWorkspaceId) {
-      setState("activeWorkspaceId", workspace.id);
-      setPreviewWorkspaceId(workspace.id);
+      activateWorkspace(workspace.id);
     }
 
     const linkedTerminal = state.terminals.find((terminal) => terminal.sessionId === session.id);
@@ -310,6 +378,16 @@ export default function Sidebar() {
             </div>
           </Show>
         </div>
+
+        <button
+          class="mt-2 w-full px-2.5 py-1.5 text-xs border border-[var(--border)] rounded-[var(--btn-radius)] text-[var(--text-primary)] hover:border-[var(--accent)] hover:bg-[color-mix(in_srgb,var(--accent)_10%,var(--bg-tertiary))] transition-colors"
+          classList={{ "opacity-60 cursor-wait": addingWorkspace() }}
+          onClick={() => void addWorkspaceFromPicker()}
+          disabled={addingWorkspace()}
+          title="Open project folder"
+        >
+          {addingWorkspace() ? "Opening..." : "+ Open project"}
+        </button>
 
         <Show when={stashOpen() && panelWorkspace()}>
           <div
@@ -408,7 +486,42 @@ export default function Sidebar() {
         </Show>
       </div>
 
-      <ProviderTabs />
+      <ProviderTabs
+        actions={
+          <>
+            <button
+              class="w-7 h-7 rounded-[var(--btn-radius)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--bg-tertiary)] transition-colors"
+              onClick={() => {
+                const ws = panelWorkspace();
+                if (!ws) return;
+                activateWorkspace(ws.id);
+                addTerminal(ws.path, buildNewSessionCommand(state.activeProvider));
+              }}
+              title={`New ${PROVIDER_LABELS[state.activeProvider]} session`}
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                <path d="M8 3v10" />
+                <path d="M3 8h10" />
+              </svg>
+            </button>
+            <button
+              class="w-7 h-7 rounded-[var(--btn-radius)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--bg-tertiary)] transition-colors"
+              onClick={() => {
+                const ws = panelWorkspace();
+                if (!ws) return;
+                activateWorkspace(ws.id);
+                addTerminal(ws.path);
+              }}
+              title="New terminal"
+            >
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                <path d="M3 4l4 4-4 4" />
+                <path d="M9 12h4" />
+              </svg>
+            </button>
+          </>
+        }
+      />
 
       <div class="flex-1 min-h-0 flex flex-col">
         <SectionHeader
@@ -417,7 +530,7 @@ export default function Sidebar() {
           onToggle={() => setState("sidebarCollapsed", "sessions", (v) => !v)}
         />
         <Show when={!state.sidebarCollapsed.sessions}>
-          <div class="px-2 py-1.5 border-b border-[var(--border)] flex items-center gap-1">
+          <div class="px-2 py-1.5 border-b border-[var(--border)] flex items-center justify-center gap-1">
             <button
               data-panel-session-tab="sessions"
               class="px-2 py-1 text-[10px] rounded-[var(--btn-radius)] transition-colors"
@@ -669,11 +782,7 @@ export default function Sidebar() {
                     onMouseLeave={closeExpandedHoverPreviewSoon}
                     onClick={(e) => {
                       e.stopPropagation();
-                      setState("activeWorkspaceId", workspace.id);
-                      setPreviewWorkspaceId(workspace.id);
-                      setExpandedHoverWorkspaceId(null);
-                      const visible = state.terminals.filter((terminal) => terminal.workspaceId === workspace.id && !terminal.stashed);
-                      setState("activeTerminalId", visible[0]?.id ?? null);
+                      activateWorkspace(workspace.id);
                     }}
                     >
                     {workspace.name.charAt(0).toUpperCase()}
@@ -697,15 +806,34 @@ export default function Sidebar() {
 
           <button
             class="w-10 h-10 rounded-lg text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--bg-tertiary)] transition-colors flex items-center justify-center"
-            title="Expand sidebar"
+            classList={{ "opacity-60 cursor-wait": addingWorkspace() }}
+            title="Open project"
             onClick={(e) => {
               e.stopPropagation();
-              setState("sidebarOpen", true);
+              void addWorkspaceFromPicker();
+            }}
+            disabled={addingWorkspace()}
+          >
+            <Show
+              when={!addingWorkspace()}
+              fallback={<span class="text-[10px] font-medium">...</span>}
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                <path d="M8 3v10" />
+                <path d="M3 8h10" />
+              </svg>
+            </Show>
+          </button>
+          <button
+            class="w-10 h-10 mt-1 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors flex items-center justify-center"
+            title="Settings"
+            onClick={() => {
+              // Future: open settings panel
             }}
           >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-              <path d="M8 3v10" />
-              <path d="M3 8h10" />
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="8" cy="8" r="2.5" />
+              <path d="M8 1v1.5M8 13.5V15M1 8h1.5M13.5 8H15M2.8 2.8l1.1 1.1M12.1 12.1l1.1 1.1M13.2 2.8l-1.1 1.1M3.9 12.1l-1.1 1.1" />
             </svg>
           </button>
         </div>
@@ -736,9 +864,7 @@ export default function Sidebar() {
                   class="ml-auto px-2 py-1 text-[10px] rounded-[var(--btn-radius)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
                   onClick={() => {
                     const workspaceId = expandedHoverWorkspace()!.id;
-                    setState("activeWorkspaceId", workspaceId);
-                    setPreviewWorkspaceId(workspaceId);
-                    setExpandedHoverWorkspaceId(null);
+                    activateWorkspace(workspaceId);
                   }}
                 >
                   Open
@@ -747,83 +873,114 @@ export default function Sidebar() {
             </div>
           </div>
 
-          <div class="px-2 py-1.5 border-b border-[var(--border)] flex items-center gap-1">
-            <button
-              data-preview-tab="sessions"
-              class="px-2 py-1 text-[10px] rounded-[var(--btn-radius)] transition-colors"
-              classList={{
-                "bg-[color-mix(in_srgb,var(--accent)_18%,var(--bg-tertiary))] text-[var(--text-primary)]": expandedHoverTab() === "sessions",
-                "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]": expandedHoverTab() !== "sessions",
-              }}
-              onClick={() => setExpandedHoverTab("sessions")}
-            >
-              Sessions
-            </button>
-            <button
-              data-preview-tab="all"
-              class="px-2 py-1 text-[10px] rounded-[var(--btn-radius)] transition-colors inline-flex items-center gap-1"
-              classList={{
-                "bg-[color-mix(in_srgb,var(--accent)_18%,var(--bg-tertiary))] text-[var(--text-primary)]": expandedHoverTab() === "all",
-                "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]": expandedHoverTab() !== "all",
-              }}
-              onClick={() => setExpandedHoverTab("all")}
-            >
-              <span>All {expandedHoverAllTerminals().length}</span>
-              <Show when={expandedHoverAllAttentionCount() > 0}>
-                <span class="w-1.5 h-1.5 rounded-full bg-[var(--warning)] animate-pulse" />
-              </Show>
-            </button>
-            <button
-              data-preview-tab="active"
-              class="px-2 py-1 text-[10px] rounded-[var(--btn-radius)] transition-colors inline-flex items-center gap-1"
-              classList={{
-                "bg-[color-mix(in_srgb,var(--accent)_18%,var(--bg-tertiary))] text-[var(--text-primary)]": expandedHoverTab() === "active",
-                "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]": expandedHoverTab() !== "active",
-              }}
-              onClick={() => setExpandedHoverTab("active")}
-            >
-              <span>Active {expandedHoverActiveTerminals().length}</span>
-              <Show when={expandedHoverActiveAttentionCount() > 0}>
-                <span class="w-1.5 h-1.5 rounded-full bg-[var(--warning)] animate-pulse" />
-              </Show>
-            </button>
-            <button
-              data-preview-tab="stashed"
-              class="px-2 py-1 text-[10px] rounded-[var(--btn-radius)] transition-colors inline-flex items-center gap-1"
-              classList={{
-                "bg-[color-mix(in_srgb,var(--accent)_18%,var(--bg-tertiary))] text-[var(--text-primary)]": expandedHoverTab() === "stashed",
-                "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]": expandedHoverTab() !== "stashed",
-              }}
-              onClick={() => setExpandedHoverTab("stashed")}
-            >
-              <span>Stashed {expandedHoverStashedTerminals().length}</span>
-              <Show when={expandedHoverStashedAttentionCount() > 0}>
-                <span class="w-1.5 h-1.5 rounded-full bg-[var(--warning)] animate-pulse" />
-              </Show>
-            </button>
-
-            <Show when={expandedHoverTab() === "sessions"}>
-              <div class="ml-auto flex items-center gap-1">
-                <For each={previewProviders}>
-                  {(provider) => {
-                    const Icon = PROVIDER_ICONS[provider];
-                    return (
-                      <button
-                        class="w-6 h-6 rounded-[var(--btn-radius)] flex items-center justify-center transition-colors"
-                        classList={{
-                          "bg-[color-mix(in_srgb,var(--accent)_20%,var(--bg-tertiary))] text-[var(--accent)]": expandedHoverProvider() === provider,
-                          "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]": expandedHoverProvider() !== provider,
-                        }}
-                        title={PROVIDER_LABELS[provider]}
-                        onClick={() => setExpandedHoverProvider(provider)}
-                      >
-                        <Icon size={12} />
-                      </button>
-                    );
-                  }}
-                </For>
-              </div>
-            </Show>
+          <div class="px-2 py-1.5 border-b border-[var(--border)]">
+            <div class="flex items-center justify-center gap-1">
+              <For each={previewProviders}>
+                {(provider) => {
+                  const Icon = PROVIDER_ICONS[provider];
+                  return (
+                    <button
+                      class="w-6 h-6 rounded-[var(--btn-radius)] flex items-center justify-center transition-colors"
+                      classList={{
+                        "bg-[color-mix(in_srgb,var(--accent)_20%,var(--bg-tertiary))] text-[var(--accent)]": expandedHoverProvider() === provider,
+                        "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]": expandedHoverProvider() !== provider,
+                      }}
+                      title={PROVIDER_LABELS[provider]}
+                      onClick={() => setExpandedHoverProvider(provider)}
+                    >
+                      <Icon size={12} />
+                    </button>
+                  );
+                }}
+              </For>
+              <button
+                class="w-6 h-6 rounded-[var(--btn-radius)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                onClick={() => {
+                  const ws = expandedHoverWorkspace();
+                  if (!ws) return;
+                  activateWorkspace(ws.id);
+                  addTerminal(ws.path, buildNewSessionCommand(expandedHoverProvider()));
+                  setExpandedHoverWorkspaceId(null);
+                }}
+                title={`New ${PROVIDER_LABELS[expandedHoverProvider()]} session`}
+              >
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                  <path d="M8 3v10" />
+                  <path d="M3 8h10" />
+                </svg>
+              </button>
+              <button
+                class="w-6 h-6 rounded-[var(--btn-radius)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                onClick={() => {
+                  const ws = expandedHoverWorkspace();
+                  if (!ws) return;
+                  if (ws.id !== state.activeWorkspaceId) activateWorkspace(ws.id);
+                  addTerminal(ws.path);
+                  setExpandedHoverWorkspaceId(null);
+                }}
+                title="New terminal"
+              >
+                <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                  <path d="M3 4l4 4-4 4" />
+                  <path d="M9 12h4" />
+                </svg>
+              </button>
+            </div>
+            <div class="flex items-center justify-center gap-1 mt-1">
+              <button
+                data-preview-tab="sessions"
+                class="px-2 py-1 text-[10px] rounded-[var(--btn-radius)] transition-colors"
+                classList={{
+                  "bg-[color-mix(in_srgb,var(--accent)_18%,var(--bg-tertiary))] text-[var(--text-primary)]": expandedHoverTab() === "sessions",
+                  "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]": expandedHoverTab() !== "sessions",
+                }}
+                onClick={() => setExpandedHoverTab("sessions")}
+              >
+                Sessions
+              </button>
+              <button
+                data-preview-tab="all"
+                class="px-2 py-1 text-[10px] rounded-[var(--btn-radius)] transition-colors inline-flex items-center gap-1"
+                classList={{
+                  "bg-[color-mix(in_srgb,var(--accent)_18%,var(--bg-tertiary))] text-[var(--text-primary)]": expandedHoverTab() === "all",
+                  "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]": expandedHoverTab() !== "all",
+                }}
+                onClick={() => setExpandedHoverTab("all")}
+              >
+                <span>All {expandedHoverAllTerminals().length}</span>
+                <Show when={expandedHoverAllAttentionCount() > 0}>
+                  <span class="w-1.5 h-1.5 rounded-full bg-[var(--warning)] animate-pulse" />
+                </Show>
+              </button>
+              <button
+                data-preview-tab="active"
+                class="px-2 py-1 text-[10px] rounded-[var(--btn-radius)] transition-colors inline-flex items-center gap-1"
+                classList={{
+                  "bg-[color-mix(in_srgb,var(--accent)_18%,var(--bg-tertiary))] text-[var(--text-primary)]": expandedHoverTab() === "active",
+                  "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]": expandedHoverTab() !== "active",
+                }}
+                onClick={() => setExpandedHoverTab("active")}
+              >
+                <span>Active {expandedHoverActiveTerminals().length}</span>
+                <Show when={expandedHoverActiveAttentionCount() > 0}>
+                  <span class="w-1.5 h-1.5 rounded-full bg-[var(--warning)] animate-pulse" />
+                </Show>
+              </button>
+              <button
+                data-preview-tab="stashed"
+                class="px-2 py-1 text-[10px] rounded-[var(--btn-radius)] transition-colors inline-flex items-center gap-1"
+                classList={{
+                  "bg-[color-mix(in_srgb,var(--accent)_18%,var(--bg-tertiary))] text-[var(--text-primary)]": expandedHoverTab() === "stashed",
+                  "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]": expandedHoverTab() !== "stashed",
+                }}
+                onClick={() => setExpandedHoverTab("stashed")}
+              >
+                <span>Stashed {expandedHoverStashedTerminals().length}</span>
+                <Show when={expandedHoverStashedAttentionCount() > 0}>
+                  <span class="w-1.5 h-1.5 rounded-full bg-[var(--warning)] animate-pulse" />
+                </Show>
+              </button>
+            </div>
           </div>
 
           <div class="px-2 py-2 max-h-56 overflow-y-auto">

@@ -15,7 +15,7 @@ export default function TerminalMinimap() {
             return (
               <div class="relative group">
                 <button
-                  class="h-2 rounded-sm transition-all"
+                  class="h-3.5 rounded transition-all"
                   classList={{
                     "w-6": isActive(),
                     "w-4": !isActive(),

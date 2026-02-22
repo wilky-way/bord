@@ -1,11 +1,15 @@
-import { For } from "solid-js";
+import { For, Show, type JSX } from "solid-js";
 import { state, setState } from "../../store/core";
 import { PROVIDER_COLORS, PROVIDER_ICONS, PROVIDER_LABELS } from "../../lib/providers";
 import type { Provider } from "../../store/types";
 
 const PROVIDERS: Provider[] = ["claude", "codex", "opencode", "gemini"];
 
-export default function ProviderTabs() {
+interface Props {
+  actions?: JSX.Element;
+}
+
+export default function ProviderTabs(props: Props) {
   return (
     <div class="flex items-center justify-center gap-3 py-1.5">
       <For each={PROVIDERS}>
@@ -35,6 +39,7 @@ export default function ProviderTabs() {
           );
         }}
       </For>
+      <Show when={props.actions}>{props.actions}</Show>
     </div>
   );
 }
