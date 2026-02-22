@@ -54,7 +54,7 @@ Resets manual resize.
 
 Shows minimap hover behavior with provider-aware terminal context.
 
-### Git Diff View (In-Panel)
+### Git Diff View (In-Panel) - Double Click to Open in Cursor/VS Code
 
 ![Git panel with selected file diff](./docs/media/git-panel-diff-selected.png)
 
