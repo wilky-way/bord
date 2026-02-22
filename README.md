@@ -44,7 +44,9 @@ Shows active terminal cards with mixed provider icons after launching terminals 
 
 ![Four-column 4x density](./docs/media/layout-4x.png)
 
-4x mode shows multi-terminal parallel workflows in the same viewport. 5 terminals in x4 means you have 1 overflow to the right to scroll to
+4x mode shows multi-terminal parallel workflows in the same viewport. 
+5 terminals in 4x mode means you have 1 terminal overflowing to the right to scroll to. 
+Resets manual resize.
 
 ### Minimap Hover Tooltip
 
