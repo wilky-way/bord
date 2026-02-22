@@ -8,7 +8,7 @@ import EditorButton from "../shared/EditorButton";
 import SettingsPanel from "../settings/SettingsPanel";
 import { buildNewSessionCommand, buildResumeCommand, PROVIDER_ICONS, PROVIDER_LABELS } from "../../lib/providers";
 import { addTerminal, setActiveTerminal, setTerminalMuted, unstashTerminal } from "../../store/terminals";
-import { createWorkspace } from "../../store/workspaces";
+import { createWorkspace, deleteWorkspace } from "../../store/workspaces";
 import { api } from "../../lib/api";
 import { isTauriRuntime, pickWorkspaceDirectory } from "../../lib/workspace-picker";
 import type { Provider, SessionInfo, TerminalInstance } from "../../store/types";
@@ -65,11 +65,35 @@ export default function Sidebar() {
   const [settingsOpen, setSettingsOpen] = createSignal(false);
   const [addingWorkspace, setAddingWorkspace] = createSignal(false);
   const [addWorkspaceError, setAddWorkspaceError] = createSignal<string | null>(null);
+  const [ctxMenu, setCtxMenu] = createSignal<{ x: number; y: number; workspaceId: string } | null>(null);
   const previewSessionCache = new Map<string, SessionInfo[]>();
   let leaveTimer: ReturnType<typeof setTimeout> | undefined;
   let expandedHoverLeaveTimer: ReturnType<typeof setTimeout> | undefined;
   let expandedHoverRequestId = 0;
   let lastPointerDownInStashZone = false;
+
+  // Close context menu on any click outside
+  const dismissCtxMenu = () => setCtxMenu(null);
+  onMount(() => {
+    document.addEventListener("click", dismissCtxMenu);
+    onCleanup(() => document.removeEventListener("click", dismissCtxMenu));
+  });
+
+  async function handleDeleteWorkspace(id: string) {
+    setCtxMenu(null);
+    const ws = state.workspaces.find((w) => w.id === id);
+    if (!ws) return;
+    if (!confirm(`Remove workspace "${ws.name}"?`)) return;
+    try {
+      await deleteWorkspace(id);
+      if (state.activeWorkspaceId === id) {
+        const remaining = state.workspaces;
+        setState("activeWorkspaceId", remaining[0]?.id ?? null);
+      }
+    } catch (err) {
+      console.error("[bord] Failed to delete workspace:", err);
+    }
+  }
 
   const openFlyout = () => {
     if (state.sidebarOpen) return;
@@ -783,6 +807,11 @@ export default function Sidebar() {
                       e.stopPropagation();
                       activateWorkspace(workspace.id);
                     }}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setCtxMenu({ x: e.clientX, y: e.clientY, workspaceId: workspace.id });
+                    }}
                     >
                     {workspace.name.charAt(0).toUpperCase()}
 
@@ -1139,6 +1168,24 @@ export default function Sidebar() {
       </Show>
 
       <SettingsPanel open={settingsOpen()} onClose={() => setSettingsOpen(false)} />
+
+      {/* Workspace context menu */}
+      <Show when={ctxMenu()}>
+        {(menu) => (
+          <div
+            class="fixed z-[9999] min-w-[160px] py-1 rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] shadow-[0_8px_24px_rgba(0,0,0,0.4)]"
+            style={{ left: `${menu().x}px`, top: `${menu().y}px` }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              class="w-full px-3 py-1.5 text-left text-xs text-red-400 hover:bg-[var(--bg-tertiary)] transition-colors"
+              onClick={() => handleDeleteWorkspace(menu().workspaceId)}
+            >
+              Remove workspace
+            </button>
+          </div>
+        )}
+      </Show>
     </div>
   );
 }
