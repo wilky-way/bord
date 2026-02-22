@@ -37,13 +37,13 @@ const OPENCODE_SESSIONS_DIRS = [
   join(homedir(), "Library", "Application Support", "opencode", "storage", "session"),
 ];
 
-function normalizeSessionTitle(title: string, maxLength: number = 80): string {
+export function normalizeSessionTitle(title: string, maxLength: number = 80): string {
   const normalized = title.replace(/\s+/g, " ").trim();
   if (!normalized) return "Untitled Session";
   return normalized.slice(0, maxLength);
 }
 
-function normalizeSessionTime(raw: unknown, fallback: string): string {
+export function normalizeSessionTime(raw: unknown, fallback: string): string {
   if (typeof raw !== "string" || !raw.trim()) return fallback;
   const parsed = new Date(raw);
   return Number.isNaN(parsed.getTime()) ? fallback : parsed.toISOString();
@@ -61,7 +61,7 @@ async function existingOpenCodeSessionDirs(): Promise<string[]> {
 }
 
 /** Decode Claude project dir name back to an absolute path */
-function decodeDirToPath(dir: string): string {
+export function decodeDirToPath(dir: string): string {
   // Dir names use `-` as separator. A leading `-` encodes the root `/`,
   // so naive "/ " + dir.replace(/-/g, "/") produces "//Users/..." — collapse it.
   return ("/" + dir.replace(/-/g, "/")).replace(/\/+/g, "/");

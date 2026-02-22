@@ -73,9 +73,9 @@ test.describe("Settings & themes", () => {
       getComputedStyle(document.documentElement).getPropertyValue("--bg-primary").trim(),
     );
 
-    // Theme might or might not differ depending on which was already active
-    // At minimum, verify we got a valid value
+    // Verify the theme actually changed
     expect(newBg).toBeTruthy();
+    expect(newBg).not.toBe(initialBg);
   });
 
   test("font picker dropdown lists preset options", async ({ page, settings }) => {
@@ -182,8 +182,8 @@ test.describe("Settings & themes", () => {
     await fontSelect.selectOption({ label: "Custom..." });
     await page.waitForTimeout(300);
 
-    // Verify a custom font input field appears
-    const customInput = settings.modal.locator('input[type="text"][placeholder*="font"], input[type="text"]');
+    // Verify a custom font input field appears (input with font placeholder)
+    const customInput = settings.modal.locator('input[placeholder*="Font"], input[placeholder*="font"]');
     await expect(customInput.first()).toBeVisible();
   });
 

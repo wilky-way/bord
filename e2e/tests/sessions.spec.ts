@@ -17,7 +17,7 @@ test.describe("Sessions (S1-S5)", () => {
     await page.waitForTimeout(300);
   });
 
-  test("S1: Claude tab shows sessions or empty state", async ({ page, sessionList }) => {
+  test("S1: Claude tab shows sessions or empty state (XOR)", async ({ page, sessionList }) => {
     // Click Claude provider tab
     const claudeTab = page.locator('button[title="Claude"]').first();
     if (await claudeTab.isVisible()) {
@@ -25,16 +25,17 @@ test.describe("Sessions (S1-S5)", () => {
       await page.waitForTimeout(1000);
     }
 
-    // Either session cards exist or "No sessions" message shows
+    // Exactly one of: session cards or "No sessions" message
     const cards = sessionList.sessionCards();
     const noSessions = sessionList.noSessionsMessage();
     const hasCards = (await cards.count()) > 0;
     const hasEmptyState = await noSessions.isVisible();
 
-    expect(hasCards || hasEmptyState).toBe(true);
+    // XOR: exactly one must be true
+    expect(hasCards !== hasEmptyState).toBe(true);
   });
 
-  test("S2: Codex tab shows sessions or empty state", async ({ page, sessionList }) => {
+  test("S2: Codex tab shows sessions or empty state (XOR)", async ({ page, sessionList }) => {
     // Click Codex provider tab
     const codexTab = page.locator('button[title="Codex"]').first();
     if (await codexTab.isVisible()) {
@@ -42,12 +43,14 @@ test.describe("Sessions (S1-S5)", () => {
       await page.waitForTimeout(1000);
     }
 
+    // Exactly one of: session cards or "No sessions" message
     const cards = sessionList.sessionCards();
     const noSessions = sessionList.noSessionsMessage();
     const hasCards = (await cards.count()) > 0;
     const hasEmptyState = await noSessions.isVisible();
 
-    expect(hasCards || hasEmptyState).toBe(true);
+    // XOR: exactly one must be true
+    expect(hasCards !== hasEmptyState).toBe(true);
   });
 
   test("S3: clicking session card spawns terminal", async ({
@@ -96,8 +99,11 @@ test.describe("Sessions (S1-S5)", () => {
     await codexTab.click();
     await page.waitForTimeout(1000);
 
-    // Just verify both tabs are clickable and don't crash
-    expect(await codexTab.isVisible()).toBe(true);
+    // Verify Codex tab is now the active/selected tab (has opacity-100 class)
+    const codexClasses = await codexTab.getAttribute("class");
+    const claudeClasses = await claudeTab.getAttribute("class");
+    // The active tab should have different styling than the inactive one
+    expect(codexClasses).not.toBe(claudeClasses);
   });
 
   test("S-opencode: OpenCode provider tab", async ({ page, sessionList }) => {

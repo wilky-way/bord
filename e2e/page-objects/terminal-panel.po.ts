@@ -85,6 +85,31 @@ export class TerminalPanelPO {
     return first.getAttribute("data-terminal-id");
   }
 
+  /** Get the terminal ID of the active (fully opaque) panel. */
+  async activeTerminalId(): Promise<string | null> {
+    const panels = this.allPanels();
+    const count = await panels.count();
+    for (let i = 0; i < count; i++) {
+      const panel = panels.nth(i);
+      // Check inline style first (SolidJS sets opacity as inline style)
+      const inlineOpacity = await panel.evaluate((el) => (el as HTMLElement).style.opacity);
+      if (inlineOpacity === "1") {
+        return panel.getAttribute("data-terminal-id");
+      }
+    }
+    // Fallback: check via box-shadow (active has --shadow-glow)
+    for (let i = 0; i < count; i++) {
+      const panel = panels.nth(i);
+      const shadow = await panel.evaluate((el) => (el as HTMLElement).style.boxShadow);
+      if (shadow && shadow.includes("glow")) {
+        return panel.getAttribute("data-terminal-id");
+      }
+    }
+    // Last fallback: return the first panel
+    if (count > 0) return panels.first().getAttribute("data-terminal-id");
+    return null;
+  }
+
   /** Get all terminal IDs. */
   async allTerminalIds(): Promise<string[]> {
     const panels = this.allPanels();

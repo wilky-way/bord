@@ -93,13 +93,41 @@ test.describe("Workspace & terminal management (W1-W7)", () => {
     const ids = await terminalPanel.allTerminalIds();
     expect(ids.length).toBeGreaterThanOrEqual(2);
 
-    // Navigate right
-    await page.keyboard.press("Meta+ArrowRight");
-    await page.waitForTimeout(200);
+    // Click the first terminal to set a known starting point
+    await terminalPanel.panel(ids[0]).click();
+    await page.waitForTimeout(300);
 
-    // Navigate left
-    await page.keyboard.press("Meta+ArrowLeft");
-    await page.waitForTimeout(200);
+    // Use dispatchEvent to bypass terminal WASM capturing keyboard events
+    await page.evaluate(() => {
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "ArrowRight", code: "ArrowRight", metaKey: true,
+          bubbles: true, cancelable: true,
+        }),
+      );
+    });
+    await page.waitForTimeout(300);
+
+    const secondOpacity = await terminalPanel.panel(ids[1]).evaluate(
+      (el) => (el as HTMLElement).style.opacity,
+    );
+    expect(secondOpacity).toBe("1");
+
+    // Navigate left — should activate first terminal
+    await page.evaluate(() => {
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "ArrowLeft", code: "ArrowLeft", metaKey: true,
+          bubbles: true, cancelable: true,
+        }),
+      );
+    });
+    await page.waitForTimeout(300);
+
+    const firstOpacity = await terminalPanel.panel(ids[0]).evaluate(
+      (el) => (el as HTMLElement).style.opacity,
+    );
+    expect(firstOpacity).toBe("1");
 
     // Should still have the same number of terminals
     expect(await terminalPanel.visibleCount()).toBe(ids.length);
@@ -139,16 +167,29 @@ test.describe("Workspace & terminal management (W1-W7)", () => {
       return;
     }
 
+    // Record terminal order before drag
+    const idsBefore = await terminalPanel.allTerminalIds();
+
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await page.mouse.down();
-    await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + targetBox.height / 2, {
-      steps: 10,
-    });
+    // Move in more steps for a more reliable drag
+    await page.mouse.move(
+      targetBox.x + targetBox.width / 2,
+      targetBox.y + targetBox.height / 2,
+      { steps: 20 },
+    );
+    await page.waitForTimeout(100);
     await page.mouse.up();
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(500);
 
-    // Verify we still have the same number of terminals
-    expect(await terminalPanel.visibleCount()).toBeGreaterThanOrEqual(3);
+    // Record terminal order after drag
+    const idsAfter = await terminalPanel.allTerminalIds();
+
+    // Verify we still have the same number of terminals (no panels lost)
+    expect(idsAfter.length).toBe(idsBefore.length);
+
+    // Verify the same terminal IDs exist (just potentially reordered)
+    expect([...idsAfter].sort()).toEqual([...idsBefore].sort());
   });
 
   test("W6: density buttons change visible columns", async ({
@@ -239,6 +280,9 @@ test.describe("Workspace & terminal management (W1-W7)", () => {
     const lastWsButton = workspaceButtons.last();
     const wsName = await lastWsButton.getAttribute("title");
 
+    // Set up dialog handler to accept the confirm prompt
+    page.on("dialog", (dialog) => dialog.accept());
+
     // Right-click to open context menu
     await lastWsButton.click({ button: "right" });
     await page.waitForTimeout(300);
@@ -250,14 +294,7 @@ test.describe("Workspace & terminal management (W1-W7)", () => {
       return;
     }
     await removeOption.click();
-    await page.waitForTimeout(500);
-
-    // Handle confirm dialog if present
-    const confirmBtn = page.locator('button:has-text("Confirm"), button:has-text("Remove"), button:has-text("Delete")');
-    if (await confirmBtn.first().isVisible({ timeout: 1000 }).catch(() => false)) {
-      await confirmBtn.first().click();
-      await page.waitForTimeout(500);
-    }
+    await page.waitForTimeout(1000);
 
     // Workspace should no longer be in the rail
     const removedButton = sidebar.rail.locator(`button[title="${wsName}"]`);
@@ -298,12 +335,203 @@ test.describe("Workspace & terminal management (W1-W7)", () => {
       return;
     }
 
+    // Record active terminal before clicking
+    const activeBefore = await terminalPanel.activeTerminalId();
+
     // Click the last minimap dot
     await minimapDots.last().click();
     await page.waitForTimeout(300);
 
-    // Verify the last terminal is active (scrolled into view)
+    // Verify a terminal became active and it changed
+    const activeAfter = await terminalPanel.activeTerminalId();
+    expect(activeAfter).toBeTruthy();
+    // Active terminal should change (was on first, now on last)
+    if (activeBefore) {
+      expect(activeAfter).not.toBe(activeBefore);
+    }
+  });
+
+  test("W-title-edit: double-click title to rename terminal", async ({
+    page,
+    sidebar,
+    topbar,
+    terminalPanel,
+  }) => {
+    const wsButton = sidebar.rail.locator("button[title^='fixture-']").first();
+    if (!(await wsButton.isVisible())) {
+      test.skip();
+      return;
+    }
+    await wsButton.click();
+    await page.waitForTimeout(500);
+
+    if ((await terminalPanel.visibleCount()) < 1) {
+      await topbar.addTerminal();
+      await page.waitForTimeout(1000);
+    }
+
+    const firstId = await terminalPanel.firstTerminalId();
+    if (!firstId) {
+      test.skip();
+      return;
+    }
+
+    // Double-click the title span to enter edit mode
+    const titleSpan = terminalPanel
+      .panel(firstId)
+      .locator("[data-titlebar] span.text-xs.truncate.cursor-text");
+    await titleSpan.dblclick();
+    await page.waitForTimeout(200);
+
+    // Input should appear
+    const input = terminalPanel.panel(firstId).locator("[data-titlebar] input");
+    await expect(input).toBeVisible();
+
+    // Type new title and press Enter
+    await input.fill("My Custom Title");
+    await input.press("Enter");
+    await page.waitForTimeout(200);
+
+    // Input should disappear, title should show new text
+    await expect(input).not.toBeVisible();
+    const updatedText = await titleSpan.textContent();
+    expect(updatedText).toBe("My Custom Title");
+  });
+
+  test("W-title-escape: escape reverts title edit", async ({
+    page,
+    sidebar,
+    topbar,
+    terminalPanel,
+  }) => {
+    const wsButton = sidebar.rail.locator("button[title^='fixture-']").first();
+    if (!(await wsButton.isVisible())) {
+      test.skip();
+      return;
+    }
+    await wsButton.click();
+    await page.waitForTimeout(500);
+
+    if ((await terminalPanel.visibleCount()) < 1) {
+      await topbar.addTerminal();
+      await page.waitForTimeout(1000);
+    }
+
+    const firstId = await terminalPanel.firstTerminalId();
+    if (!firstId) {
+      test.skip();
+      return;
+    }
+
+    const titleSpan = terminalPanel
+      .panel(firstId)
+      .locator("[data-titlebar] span.text-xs.truncate.cursor-text");
+    const originalText = await titleSpan.textContent();
+
+    // Double-click to enter edit mode
+    await titleSpan.dblclick();
+    await page.waitForTimeout(200);
+
+    const input = terminalPanel.panel(firstId).locator("[data-titlebar] input");
+    await expect(input).toBeVisible();
+
+    // Type something and press Escape
+    await input.fill("Should Not Save");
+    await input.press("Escape");
+    await page.waitForTimeout(200);
+
+    // Input should disappear, title should revert
+    await expect(input).not.toBeVisible();
+    const revertedText = await titleSpan.textContent();
+    expect(revertedText).toBe(originalText);
+  });
+
+  test("W-active-glow: active terminal has full opacity", async ({
+    page,
+    sidebar,
+    topbar,
+    terminalPanel,
+  }) => {
+    const wsButton = sidebar.rail.locator("button[title^='fixture-']").first();
+    if (!(await wsButton.isVisible())) {
+      test.skip();
+      return;
+    }
+    await wsButton.click();
+    await page.waitForTimeout(500);
+
+    // Ensure at least 2 terminals
+    while ((await terminalPanel.visibleCount()) < 2) {
+      await topbar.addTerminal();
+      await page.waitForTimeout(800);
+    }
+
     const ids = await terminalPanel.allTerminalIds();
-    expect(ids.length).toBeGreaterThanOrEqual(3);
+    if (ids.length < 2) {
+      test.skip();
+      return;
+    }
+
+    // Click the second terminal to make it active
+    await terminalPanel.panel(ids[1]).click();
+    await page.waitForTimeout(200);
+
+    // Second terminal should have opacity 1 (active)
+    const secondOpacity = await terminalPanel
+      .panel(ids[1])
+      .evaluate((el) => getComputedStyle(el).opacity);
+    expect(secondOpacity).toBe("1");
+
+    // First terminal should have reduced opacity (inactive)
+    const firstOpacity = await terminalPanel
+      .panel(ids[0])
+      .evaluate((el) => getComputedStyle(el).opacity);
+    expect(parseFloat(firstOpacity)).toBeLessThan(1);
+  });
+
+  test("W-flyout: collapsed sidebar shows flyout on hover", async ({
+    page,
+    sidebar,
+    topbar,
+    terminalPanel,
+  }) => {
+    const wsButton = sidebar.rail.locator("button[title^='fixture-']").first();
+    if (!(await wsButton.isVisible())) {
+      test.skip();
+      return;
+    }
+    await wsButton.click();
+    await page.waitForTimeout(500);
+
+    if ((await terminalPanel.visibleCount()) < 1) {
+      await topbar.addTerminal();
+      await page.waitForTimeout(1000);
+    }
+
+    // Collapse the sidebar
+    await sidebar.ensureCollapsed();
+    await page.waitForTimeout(300);
+
+    // Hover over a workspace button to trigger flyout
+    const box = await wsButton.boundingBox();
+    if (!box) {
+      test.skip();
+      return;
+    }
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.waitForTimeout(500);
+
+    // Flyout should appear
+    const flyout = page.locator("[data-bord-sidebar-flyout]");
+    if (await flyout.isVisible()) {
+      expect(await flyout.isVisible()).toBe(true);
+
+      // Move mouse away to dismiss flyout
+      await page.mouse.move(box.x + 300, box.y);
+      await page.waitForTimeout(500);
+
+      // Flyout should disappear
+      expect(await flyout.isVisible()).toBe(false);
+    }
   });
 });

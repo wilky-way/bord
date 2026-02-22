@@ -69,13 +69,43 @@ test.describe("Keyboard shortcuts", () => {
       await page.waitForTimeout(800);
     }
 
-    // Navigate right
-    await page.keyboard.press("Meta+ArrowRight");
-    await page.waitForTimeout(200);
+    // Click the first terminal to ensure a known starting point
+    const ids = await terminalPanel.allTerminalIds();
+    await terminalPanel.panel(ids[0]).click();
+    await page.waitForTimeout(300);
+
+    // Use dispatchEvent to bypass terminal WASM capturing keyboard events
+    await page.evaluate(() => {
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "ArrowRight", code: "ArrowRight", metaKey: true,
+          bubbles: true, cancelable: true,
+        }),
+      );
+    });
+    await page.waitForTimeout(300);
+
+    // Check that the second panel now has active styling (opacity: 1)
+    const secondOpacity = await terminalPanel.panel(ids[1]).evaluate(
+      (el) => (el as HTMLElement).style.opacity,
+    );
+    expect(secondOpacity).toBe("1");
 
     // Navigate left
-    await page.keyboard.press("Meta+ArrowLeft");
-    await page.waitForTimeout(200);
+    await page.evaluate(() => {
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "ArrowLeft", code: "ArrowLeft", metaKey: true,
+          bubbles: true, cancelable: true,
+        }),
+      );
+    });
+    await page.waitForTimeout(300);
+
+    const firstOpacity = await terminalPanel.panel(ids[0]).evaluate(
+      (el) => (el as HTMLElement).style.opacity,
+    );
+    expect(firstOpacity).toBe("1");
 
     // Terminal count should be unchanged
     expect(await terminalPanel.visibleCount()).toBeGreaterThanOrEqual(2);
@@ -91,11 +121,43 @@ test.describe("Keyboard shortcuts", () => {
       await page.waitForTimeout(800);
     }
 
-    await page.keyboard.press("Meta+Shift+ArrowRight");
-    await page.waitForTimeout(200);
+    // Click the first terminal to ensure a known starting point
+    const ids = await terminalPanel.allTerminalIds();
+    await terminalPanel.panel(ids[0]).click();
+    await page.waitForTimeout(300);
 
-    await page.keyboard.press("Meta+Shift+ArrowLeft");
-    await page.waitForTimeout(200);
+    // Use dispatchEvent to bypass terminal WASM
+    await page.evaluate(() => {
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "ArrowRight", code: "ArrowRight", metaKey: true, shiftKey: true,
+          bubbles: true, cancelable: true,
+        }),
+      );
+    });
+    await page.waitForTimeout(300);
+
+    // Second panel should now be active
+    const secondOpacity = await terminalPanel.panel(ids[1]).evaluate(
+      (el) => (el as HTMLElement).style.opacity,
+    );
+    expect(secondOpacity).toBe("1");
+
+    await page.evaluate(() => {
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "ArrowLeft", code: "ArrowLeft", metaKey: true, shiftKey: true,
+          bubbles: true, cancelable: true,
+        }),
+      );
+    });
+    await page.waitForTimeout(300);
+
+    // First panel should be active again
+    const firstOpacity = await terminalPanel.panel(ids[0]).evaluate(
+      (el) => (el as HTMLElement).style.opacity,
+    );
+    expect(firstOpacity).toBe("1");
 
     expect(await terminalPanel.visibleCount()).toBeGreaterThanOrEqual(2);
   });
@@ -149,17 +211,32 @@ test.describe("Keyboard shortcuts", () => {
     const branchBadge = page.locator(sel.toggleGitPanel).first();
     await branchBadge.waitFor({ state: "visible", timeout: 10_000 });
 
-    // Open git panel with Cmd+G
-    await page.keyboard.press("Meta+g");
-    await page.waitForTimeout(500);
+    // Click the terminal panel to ensure it's active (sets activeTerminalId in store)
+    const firstPanel = terminalPanel.allPanels().first();
+    await firstPanel.click();
+    await page.waitForTimeout(300);
+
+    // Ensure git panel is closed first
+    if (await gitPanel.isVisible()) {
+      await branchBadge.click();
+      await page.waitForTimeout(300);
+    }
+
+    // Open git panel with Cmd+G via dispatchEvent (bypasses terminal WASM)
+    await page.evaluate(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "g", code: "KeyG", metaKey: true, bubbles: true, cancelable: true }));
+    });
+    await page.waitForTimeout(800);
 
     // Verify git panel portal is actually visible
     expect(await gitPanel.isVisible()).toBe(true);
     await expect(gitPanel.sourceControlHeading()).toBeVisible();
 
     // Close with Cmd+G
-    await page.keyboard.press("Meta+g");
-    await page.waitForTimeout(300);
+    await page.evaluate(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "g", code: "KeyG", metaKey: true, bubbles: true, cancelable: true }));
+    });
+    await page.waitForTimeout(500);
     expect(await gitPanel.isVisible()).toBe(false);
   });
 

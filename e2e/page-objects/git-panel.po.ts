@@ -69,17 +69,17 @@ export class GitPanelPO {
 
   /** Get staged files section. */
   stagedSection(): Locator {
-    return this.root.locator("text=Staged");
+    return this.root.locator("text=/Staged/i");
   }
 
   /** Get unstaged/changed files section. */
   unstagedSection(): Locator {
-    return this.root.locator("text=Changes");
+    return this.root.locator("text=/Changed/i");
   }
 
   /** Get untracked files section. */
   untrackedSection(): Locator {
-    return this.root.locator("text=Untracked");
+    return this.root.locator("text=/Untracked/i");
   }
 
   /** Get the "Stage All" button. */
@@ -99,7 +99,7 @@ export class GitPanelPO {
 
   /** Get the current repo name button in RepoNavigator (the accented button with dropdown arrow). */
   repoDropdown(): Locator {
-    return this.root.locator("button").filter({ hasText: "▾" });
+    return this.root.locator("button").filter({ hasText: "▾" }).first();
   }
 
   /** Get the "Return to terminal's repo" reset button. */

@@ -224,7 +224,7 @@ export default function TerminalPanel(props: Props) {
               onInput={(e) => setEditValue(e.currentTarget.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") { setTerminalTitle(props.id, editValue()); setEditing(false); }
-                if (e.key === "Escape") setEditing(false);
+                if (e.key === "Escape") { setEditValue(displayTitle()); setEditing(false); }
               }}
               onBlur={() => { setTerminalTitle(props.id, editValue()); setEditing(false); }}
               autofocus

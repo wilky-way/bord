@@ -93,6 +93,9 @@ test.describe("Layout & resize", () => {
       const handle = resizeHandles.first();
       const handleBox = await handle.boundingBox();
       if (handleBox) {
+        // Capture width before drag
+        const widthBefore = (await firstPanel.boundingBox())!.width;
+
         // Drag handle to the right by 50px
         await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
         await page.mouse.down();
@@ -101,6 +104,12 @@ test.describe("Layout & resize", () => {
         });
         await page.mouse.up();
         await page.waitForTimeout(300);
+
+        // Capture width after drag
+        const widthAfter = (await firstPanel.boundingBox())!.width;
+
+        // First panel should have grown
+        expect(widthAfter).toBeGreaterThan(widthBefore);
 
         // Verify panels still exist
         expect(await terminalPanel.visibleCount()).toBeGreaterThanOrEqual(2);

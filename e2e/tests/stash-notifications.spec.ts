@@ -140,9 +140,12 @@ test.describe("Stash & notifications (N1-N5)", () => {
     const firstItemText = await stashedItems.first().textContent();
     expect(firstItemText).toContain("↑");
 
-    // Check for italic class on the stash item
+    // Check for italic class on the stash item (on span or parent)
     const hasItalic = await stashedItems.first().locator(".italic").count();
-    expect(hasItalic).toBeGreaterThanOrEqual(0); // italic may be on span or parent
+    const parentHasItalic = await stashedItems.first().evaluate(
+      (el) => el.classList.contains("italic") || el.querySelector(".italic") !== null,
+    );
+    expect(hasItalic > 0 || parentHasItalic).toBe(true);
   });
 
   test("N-attention-badge: workspace button shows attention badge for stashed terminals", async ({
@@ -171,13 +174,18 @@ test.describe("Stash & notifications (N1-N5)", () => {
     await terminalPanel.stashFirst();
     await page.waitForTimeout(500);
 
-    // Check for attention badge on workspace button
-    // The badge is a small span with bg-[var(--warning)] inside the workspace button
-    if (wsName) {
-      const badge = sidebar.workspaceAttentionBadge(wsName);
-      // Badge should be visible when there are stashed terminals
-      const badgeCount = await badge.count();
-      expect(badgeCount).toBeGreaterThanOrEqual(0);
+    // Verify stash tray count increased (at least 1 stashed terminal)
+    await sidebar.ensureExpanded();
+    await page.waitForTimeout(300);
+
+    const trayButton = page
+      .locator('[data-bord-sidebar-panel="expanded"] [data-stash-tray-button]');
+    if (await trayButton.isVisible()) {
+      const trayText = await trayButton.textContent();
+      // Tray should show a count > 0
+      const match = trayText?.match(/(\d+)/);
+      expect(match).not.toBeNull();
+      expect(parseInt(match![1])).toBeGreaterThan(0);
     }
   });
 
@@ -225,5 +233,57 @@ test.describe("Stash & notifications (N1-N5)", () => {
     await page.waitForTimeout(200);
     const restoredTitle = await muteBtn.getAttribute("title");
     expect(restoredTitle).toBe(initialTitle);
+  });
+
+  test("N-multi-stash: stash 2 terminals, verify count, unstash one", async ({
+    page,
+    topbar,
+    terminalPanel,
+    sidebar,
+  }) => {
+    // Ensure at least 3 terminals (so stashing 2 leaves 1)
+    while ((await terminalPanel.visibleCount()) < 3) {
+      await topbar.addTerminal();
+      await page.waitForTimeout(800);
+    }
+    const before = await terminalPanel.visibleCount();
+
+    // Stash two terminals
+    await terminalPanel.stashFirst();
+    await page.waitForTimeout(500);
+    await terminalPanel.stashFirst();
+    await page.waitForTimeout(500);
+
+    expect(await terminalPanel.visibleCount()).toBe(before - 2);
+
+    // Open sidebar and stash tray
+    await sidebar.ensureExpanded();
+    await page.waitForTimeout(300);
+
+    const trayButton = page
+      .locator('[data-bord-sidebar-panel="expanded"] [data-stash-tray-button]');
+    if (!(await trayButton.isVisible())) {
+      test.skip();
+      return;
+    }
+    await trayButton.click();
+    await page.waitForTimeout(300);
+
+    // Verify 2 stashed items with "↑" prefix
+    const stashedItems = page.locator("[data-sidebar-stash-zone] button.flex-1");
+    const stashedCount = await stashedItems.count();
+    expect(stashedCount).toBeGreaterThanOrEqual(2);
+
+    for (let i = 0; i < Math.min(stashedCount, 2); i++) {
+      const text = await stashedItems.nth(i).textContent();
+      expect(text).toContain("↑");
+    }
+
+    // Unstash one
+    await stashedItems.first().click();
+    await page.waitForTimeout(500);
+
+    // Count should decrease by 1
+    expect(await terminalPanel.visibleCount()).toBe(before - 1);
   });
 });

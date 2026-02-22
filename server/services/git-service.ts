@@ -44,18 +44,13 @@ export interface GitFileChange {
   status: string; // M, A, D, R, etc.
 }
 
-export async function getStatus(cwd: string): Promise<GitStatus> {
-  const [branchResult, statusResult] = await Promise.all([
-    runGit(cwd, ["branch", "--show-current"]),
-    runGit(cwd, ["status", "--porcelain=v1"]),
-  ]);
-
-  const branch = branchResult.stdout.trim();
+/** Parse `git status --porcelain=v1` output into staged, unstaged, and untracked lists. */
+export function parseStatusPorcelain(output: string): { staged: GitFileChange[]; unstaged: GitFileChange[]; untracked: string[] } {
   const staged: GitFileChange[] = [];
   const unstaged: GitFileChange[] = [];
   const untracked: string[] = [];
 
-  for (const line of statusResult.stdout.split("\n").filter(Boolean)) {
+  for (const line of output.split("\n").filter(Boolean)) {
     const indexStatus = line[0];
     const workStatus = line[1];
     const filePath = line.slice(3);
@@ -71,6 +66,18 @@ export async function getStatus(cwd: string): Promise<GitStatus> {
       }
     }
   }
+
+  return { staged, unstaged, untracked };
+}
+
+export async function getStatus(cwd: string): Promise<GitStatus> {
+  const [branchResult, statusResult] = await Promise.all([
+    runGit(cwd, ["branch", "--show-current"]),
+    runGit(cwd, ["status", "--porcelain=v1"]),
+  ]);
+
+  const branch = branchResult.stdout.trim();
+  const { staged, unstaged, untracked } = parseStatusPorcelain(statusResult.stdout);
 
   return { branch, staged, unstaged, untracked };
 }
@@ -110,11 +117,18 @@ export async function getLog(cwd: string, count: number = 20): Promise<string> {
   return result.stdout;
 }
 
+/** Parse `git rev-list --left-right --count` output into ahead/behind counts. */
+export function parseAheadBehindOutput(stdout: string): { ahead: number; behind: number } {
+  const trimmed = stdout.trim();
+  if (!trimmed) return { ahead: 0, behind: 0 };
+  const [behind, ahead] = trimmed.split("\t").map(Number);
+  return { ahead: ahead || 0, behind: behind || 0 };
+}
+
 export async function getAheadBehind(cwd: string): Promise<{ ahead: number; behind: number }> {
   const result = await runGit(cwd, ["rev-list", "--left-right", "--count", "@{u}...HEAD"]);
   if (result.exitCode !== 0) return { ahead: 0, behind: 0 };
-  const [behind, ahead] = result.stdout.trim().split("\t").map(Number);
-  return { ahead: ahead || 0, behind: behind || 0 };
+  return parseAheadBehindOutput(result.stdout);
 }
 
 export async function push(cwd: string): Promise<{ ok: boolean; error?: string }> {
@@ -249,6 +263,17 @@ export async function getRepoTree(cwd: string): Promise<RepoTree | null> {
   return { current, parent, siblings, children };
 }
 
+/** Parse `git diff --numstat` output into per-file insertion/deletion counts. */
+export function parseNumstatOutput(output: string): Record<string, { insertions: number; deletions: number }> {
+  const result: Record<string, { insertions: number; deletions: number }> = {};
+  for (const line of output.split("\n").filter(Boolean)) {
+    const [ins, del, ...pathParts] = line.split("\t");
+    if (ins === "-" || del === "-") continue; // binary
+    result[pathParts.join("\t")] = { insertions: parseInt(ins) || 0, deletions: parseInt(del) || 0 };
+  }
+  return result;
+}
+
 export async function getDiffStatsPerFile(cwd: string): Promise<{
   staged: Record<string, { insertions: number; deletions: number }>;
   unstaged: Record<string, { insertions: number; deletions: number }>;
@@ -257,16 +282,7 @@ export async function getDiffStatsPerFile(cwd: string): Promise<{
     runGit(cwd, ["diff", "--numstat"]),
     runGit(cwd, ["diff", "--cached", "--numstat"]),
   ]);
-  function parseNumstat(output: string) {
-    const result: Record<string, { insertions: number; deletions: number }> = {};
-    for (const line of output.split("\n").filter(Boolean)) {
-      const [ins, del, ...pathParts] = line.split("\t");
-      if (ins === "-" || del === "-") continue; // binary
-      result[pathParts.join("\t")] = { insertions: parseInt(ins) || 0, deletions: parseInt(del) || 0 };
-    }
-    return result;
-  }
-  return { unstaged: parseNumstat(unstaged.stdout), staged: parseNumstat(staged.stdout) };
+  return { unstaged: parseNumstatOutput(unstaged.stdout), staged: parseNumstatOutput(staged.stdout) };
 }
 
 export async function getDiffStats(cwd: string): Promise<{ insertions: number; deletions: number }> {

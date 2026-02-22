@@ -11,9 +11,11 @@ test.describe("API health checks", () => {
 
   test("workspace list includes fixture workspaces", async () => {
     const workspaces = await apiClient.listWorkspaces();
-    expect(workspaces.length).toBeGreaterThan(0);
+    expect(workspaces.length).toBeGreaterThanOrEqual(5);
 
     const names = workspaces.map((w) => w.name);
+    // fixture-web must exist (set up by demo fixtures)
+    expect(names).toContain("fixture-web");
     // At least one fixture workspace should be registered
     const hasFixture = names.some((n) => n.startsWith("fixture-"));
     expect(hasFixture).toBe(true);
