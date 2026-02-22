@@ -8,6 +8,12 @@ export function setTerminalTitle(id: string, title: string) {
   setState("terminals", (t) => t.id === id, "customTitle", title || undefined);
 }
 
+export function setTerminalOscTitle(id: string, title: string) {
+  setState("terminals", (t) => t.id === id, "title", title);
+  // OSC title from the running program supersedes the initial session label
+  setState("terminals", (t) => t.id === id, "sessionTitle", undefined);
+}
+
 export function setTerminalLastOutput(id: string) {
   setState("terminals", (t) => t.id === id, "lastOutputAt", Date.now());
 }

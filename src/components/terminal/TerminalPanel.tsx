@@ -1,7 +1,7 @@
 import { createSignal, createEffect, onMount, onCleanup, Show } from "solid-js";
 import { Portal, Dynamic } from "solid-js/web";
 import TerminalView from "./TerminalView";
-import { removeTerminal, setActiveTerminal, stashTerminal, setTerminalTitle, setTerminalMuted } from "../../store/terminals";
+import { removeTerminal, setActiveTerminal, stashTerminal, setTerminalTitle, setTerminalMuted, setTerminalOscTitle } from "../../store/terminals";
 import { state } from "../../store/core";
 import { toggleGitPanel, closeGitPanel } from "../../store/git";
 import { PROVIDER_ICONS } from "../../lib/providers";
@@ -322,7 +322,11 @@ export default function TerminalPanel(props: Props) {
       <div class="flex-1 min-h-0 overflow-hidden relative">
         <TerminalView
           ptyId={props.id}
-          onTitleChange={setTitle}
+          onTitleChange={(newTitle: string) => {
+            console.log("[OSC title]", props.id, newTitle);
+            setTitle(newTitle);
+            setTerminalOscTitle(props.id, newTitle);
+          }}
         />
       </div>
 

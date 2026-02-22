@@ -13,6 +13,24 @@ interface Props {
   onTitleChange?: (title: string) => void;
 }
 
+/** Scan binary PTY data for OSC 0/2 title sequences (ESC ] 0; <title> BEL) */
+function extractOscTitle(data: Uint8Array): string | null {
+  for (let i = 0; i < data.length - 4; i++) {
+    // ESC ]
+    if (data[i] !== 0x1b || data[i + 1] !== 0x5d) continue;
+    const type = data[i + 2];
+    // OSC 0 or 2, followed by ;
+    if ((type !== 0x30 && type !== 0x32) || data[i + 3] !== 0x3b) continue;
+    // Find terminator: BEL (0x07) or ST (ESC \)
+    for (let j = i + 4; j < data.length; j++) {
+      if (data[j] === 0x07 || (data[j] === 0x1b && data[j + 1] === 0x5c)) {
+        return j > i + 4 ? new TextDecoder().decode(data.subarray(i + 4, j)) : null;
+      }
+    }
+  }
+  return null;
+}
+
 // WASM init is async and must happen once before any Terminal is created
 let wasmReady: Promise<void>;
 function ensureWasm(): Promise<void> {
@@ -59,7 +77,13 @@ export default function TerminalView(props: Props) {
       props.ptyId,
       (data) => {
         if (data instanceof ArrayBuffer) {
-          writer.write(new Uint8Array(data));
+          const bytes = new Uint8Array(data);
+          writer.write(bytes);
+          // ghostty-web only scans strings for OSC titles, so scan binary ourselves
+          if (props.onTitleChange) {
+            const title = extractOscTitle(bytes);
+            if (title) props.onTitleChange(title);
+          }
         } else if (typeof data === "string") {
           writer.write(data);
         }
