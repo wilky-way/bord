@@ -9,7 +9,8 @@ A workspace-scoped terminal manager with tiling layout, git integration, docker 
 - Workspaces Own Terminals
     - Terminals can have CLI sessions linked or not
     - 1 active workspace at a time
-    - 1 active terminal at a time
+    - Many active/stashed terminals across workspaces.
+    - 0 or 1 focused terminal at a time in workspace.
     - No stray terminals
     - Snap to fit active terminal to view.
     - Open workspace in Editor
