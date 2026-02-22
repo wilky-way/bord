@@ -381,16 +381,6 @@ export default function Sidebar() {
           </Show>
         </div>
 
-        <button
-          class="mt-2 w-full px-2.5 py-1.5 text-xs border border-[var(--border)] rounded-[var(--btn-radius)] text-[var(--text-primary)] hover:border-[var(--accent)] hover:bg-[color-mix(in_srgb,var(--accent)_10%,var(--bg-tertiary))] transition-colors"
-          classList={{ "opacity-60 cursor-wait": addingWorkspace() }}
-          onClick={() => void addWorkspaceFromPicker()}
-          disabled={addingWorkspace()}
-          title="Open project folder"
-        >
-          {addingWorkspace() ? "Opening..." : "+ Open project"}
-        </button>
-
         <Show when={stashOpen() && panelWorkspace()}>
           <div
             data-stash-zone
