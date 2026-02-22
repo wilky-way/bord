@@ -68,6 +68,10 @@ export default function TerminalView(props: Props) {
       },
       (connected) => {
         setTerminalConnected(props.ptyId, connected);
+        // Send correct dimensions as soon as WS opens
+        if (connected && terminal) {
+          fitTerminal(terminal, containerRef, props.ptyId);
+        }
       },
     );
 
