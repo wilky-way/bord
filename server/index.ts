@@ -7,6 +7,7 @@ import { gitRoutes } from "./routes/git";
 import { fsRoutes } from "./routes/fs";
 import { editorRoutes } from "./routes/editor";
 import { dockerRoutes } from "./routes/docker";
+import { clipboardRoutes } from "./routes/clipboard";
 import { initDb } from "./services/db";
 
 const PORT = parseInt(process.env.BORD_PORT ?? "4200");
@@ -65,6 +66,8 @@ const server = Bun.serve({
       response = await editorRoutes(req, url);
     } else if (url.pathname.startsWith("/api/docker")) {
       response = await dockerRoutes(req, url);
+    } else if (url.pathname.startsWith("/api/clipboard")) {
+      response = await clipboardRoutes(req, url);
     }
 
     if (response) {

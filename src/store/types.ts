@@ -13,7 +13,6 @@ export interface TerminalInstance {
   sessionTitle?: string; // session title shown in sidebar (from SessionCard click)
   lastOutputAt?: number; // Date.now() of last PTY data received
   lastSeenAt?: number; // Date.now() when user last viewed this terminal
-  needsAttention?: boolean; // notification flag — set when idle, cleared on focus
   muted?: boolean; // per-terminal mute — skips idle detection entirely
   provider?: Provider; // which AI provider spawned this terminal
 }

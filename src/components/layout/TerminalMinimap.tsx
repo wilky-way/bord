@@ -1,6 +1,7 @@
 import { For, Show } from "solid-js";
 import { state } from "../../store/core";
 import { setActiveTerminal, getVisibleTerminals } from "../../store/terminals";
+import { notificationIndex } from "../../lib/notifications/index";
 import { PROVIDER_COLORS, PROVIDER_ICONS } from "../../lib/providers";
 
 export default function TerminalMinimap() {
@@ -12,6 +13,7 @@ export default function TerminalMinimap() {
         <For each={visible()}>
           {(term) => {
             const isActive = () => term.id === state.activeTerminalId;
+            const hasNotif = () => (notificationIndex().byTerminal.get(term.id)?.unseen ?? 0) > 0;
             return (
               <div class="relative group">
                 <button
@@ -19,12 +21,12 @@ export default function TerminalMinimap() {
                   classList={{
                     "w-6": isActive(),
                     "w-4": !isActive(),
-                    "opacity-40 hover:opacity-70": !isActive() && !term.needsAttention && !!term.provider,
-                    "opacity-30 hover:opacity-60": !isActive() && !term.needsAttention && !term.provider,
-                    "animate-pulse": !!term.needsAttention,
+                    "opacity-40 hover:opacity-70": !isActive() && !hasNotif() && !!term.provider,
+                    "opacity-30 hover:opacity-60": !isActive() && !hasNotif() && !term.provider,
+                    "animate-pulse": hasNotif(),
                   }}
                   style={{
-                    "background-color": term.needsAttention
+                    "background-color": hasNotif()
                       ? "var(--warning)"
                       : term.provider
                         ? PROVIDER_COLORS[term.provider]

@@ -11,19 +11,23 @@ Bord is a workspace-scoped terminal manager with tiling layout, git integration,
 | Path | Purpose |
 |------|---------|
 | `server/index.ts` | Bun.serve() entry — HTTP routes + WebSocket |
-| `server/services/pty-manager.ts` | PTY lifecycle, 2MB circular buffer, WS subscriber fan-out |
+| `server/services/pty-manager.ts` | PTY lifecycle, 2MB circular buffer, WS subscriber fan-out, server-side idle detection |
 | `server/services/session-scanner.ts` | Scans `~/.claude/projects/` for Claude sessions |
 | `server/services/git-service.ts` | Shells out to `git` for status, diff, stage, commit, push, pull |
 | `server/services/editor-service.ts` | Spawns `code .` or `cursor .` |
-| `server/ws/protocol.ts` | WebSocket control message types |
+| `server/ws/protocol.ts` | WebSocket control message types (resize, ping/pong, cursor, idle/active, configure) |
 | `server/ws/handler.ts` | WS upgrade, message dispatch, close handling |
 | `server/schema.sql` | SQLite schema — workspaces, session_cache, app_state |
 | `src/App.tsx` | Root layout + global keyboard shortcuts (Cmd+N, Cmd+Arrow) |
 | `src/store/core.ts` | `createStore<AppState>` — single source of truth |
 | `src/store/types.ts` | All TypeScript interfaces: TerminalInstance, Workspace, SessionInfo, GitStatus, AppState |
 | `src/store/terminals.ts` | Terminal actions: add, remove, stash, unstash, move, navigate |
+| `src/store/settings.ts` | Font size signal (persisted, clamped 8–24), global settingsOpen state |
 | `src/lib/api.ts` | Typed HTTP client wrapping all `/api/*` routes |
-| `src/lib/ws.ts` | WebSocket connection manager |
+| `src/lib/terminal-shortcuts.ts` | Terminal key handler — Cmd+C/V/K/A, Option+arrows, font size, bracketed paste, image paste |
+| `src/lib/ws.ts` | WebSocket connection manager, idle/active event handling, output volume tracking |
+| `src/lib/notifications/` | Notification store (localStorage-persisted), types, dual-indexed reactive index, sound system |
+| `src/lib/debounce.ts` | Burst coalescer + keyed batch coalescer for WS event batching |
 | `src/styles.css` | CSS variable defaults + Tailwind import (overridden at runtime by active theme) |
 | `src/lib/theme.ts` | Reactive theme manager — signals, localStorage persistence, CSS var application |
 | `src/lib/themes/index.ts` | 15 curated theme definitions (chrome + terminal palettes) |
@@ -82,7 +86,7 @@ No automated test suite yet. Manual verification:
 
 1. `bun run dev` — confirm both server and UI start
 2. Add a workspace, verify terminals spawn in that workspace scope
-3. Stash a terminal, confirm it moves to stash and attention badge appears on new output
+3. Stash a terminal, confirm it moves to stash and notification badge appears when agent goes idle
 4. Open git panel on a repo with changes, verify status/diff/stage/commit flow
 5. Click a Claude session card, confirm `--resume` terminal opens
 6. Test Cmd+N (new terminal), Cmd+Arrow (navigate), drag reorder, layout density buttons

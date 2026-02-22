@@ -9,8 +9,10 @@ import SettingsPanel from "../settings/SettingsPanel";
 import { buildNewSessionCommand, buildResumeCommand, PROVIDER_ICONS, PROVIDER_LABELS } from "../../lib/providers";
 import { addTerminal, setActiveTerminal, setTerminalMuted, unstashTerminal } from "../../store/terminals";
 import { createWorkspace, deleteWorkspace } from "../../store/workspaces";
+import { notificationIndex } from "../../lib/notifications/index";
 import { api } from "../../lib/api";
 import { isTauriRuntime, pickWorkspaceDirectory } from "../../lib/workspace-picker";
+import { settingsOpen, setSettingsOpen } from "../../store/settings";
 import type { Provider, SessionInfo, TerminalInstance } from "../../store/types";
 
 function SectionHeader(props: {
@@ -62,7 +64,6 @@ export default function Sidebar() {
   const [expandedHoverSessions, setExpandedHoverSessions] = createSignal<SessionInfo[]>([]);
   const [expandedHoverLoading, setExpandedHoverLoading] = createSignal(false);
   const [stashOpen, setStashOpen] = createSignal(false);
-  const [settingsOpen, setSettingsOpen] = createSignal(false);
   const [addingWorkspace, setAddingWorkspace] = createSignal(false);
   const [addWorkspaceError, setAddWorkspaceError] = createSignal<string | null>(null);
   const [ctxMenu, setCtxMenu] = createSignal<{ x: number; y: number; workspaceId: string } | null>(null);
@@ -225,7 +226,7 @@ export default function Sidebar() {
   });
 
   const attentionCount = (workspaceId: string) =>
-    state.terminals.filter((terminal) => terminal.workspaceId === workspaceId && !!terminal.needsAttention).length;
+    notificationIndex().byWorkspace.get(workspaceId)?.unseen ?? 0;
 
   const panelWorkspaceId = () => (state.sidebarOpen ? state.activeWorkspaceId : previewWorkspaceId() ?? state.activeWorkspaceId);
   const panelWorkspace = () => state.workspaces.find((workspace) => workspace.id === panelWorkspaceId());
@@ -237,17 +238,18 @@ export default function Sidebar() {
     expandedHoverWorkspaceTerminals().filter((terminal) => !terminal.stashed);
   const expandedHoverStashedTerminals = () =>
     expandedHoverWorkspaceTerminals().filter((terminal) => terminal.stashed);
-  const expandedHoverAllAttentionCount = () => expandedHoverAllTerminals().filter((terminal) => !!terminal.needsAttention).length;
-  const expandedHoverActiveAttentionCount = () => expandedHoverActiveTerminals().filter((terminal) => !!terminal.needsAttention).length;
-  const expandedHoverStashedAttentionCount = () => expandedHoverStashedTerminals().filter((terminal) => !!terminal.needsAttention).length;
+  const termHasNotif = (id: string) => (notificationIndex().byTerminal.get(id)?.unseen ?? 0) > 0;
+  const expandedHoverAllAttentionCount = () => expandedHoverAllTerminals().filter((terminal) => termHasNotif(terminal.id)).length;
+  const expandedHoverActiveAttentionCount = () => expandedHoverActiveTerminals().filter((terminal) => termHasNotif(terminal.id)).length;
+  const expandedHoverStashedAttentionCount = () => expandedHoverStashedTerminals().filter((terminal) => termHasNotif(terminal.id)).length;
   const workspaceTerminals = () =>
     state.terminals.filter((terminal) => terminal.workspaceId === panelWorkspaceId());
   const panelAllTerminals = () => workspaceTerminals();
   const panelActiveTerminals = () => workspaceTerminals().filter((terminal) => !terminal.stashed);
   const panelStashedTerminals = () => workspaceTerminals().filter((terminal) => terminal.stashed);
-  const panelAllAttentionCount = () => panelAllTerminals().filter((terminal) => !!terminal.needsAttention).length;
-  const panelActiveAttentionCount = () => panelActiveTerminals().filter((terminal) => !!terminal.needsAttention).length;
-  const panelStashedAttentionCount = () => panelStashedTerminals().filter((terminal) => !!terminal.needsAttention).length;
+  const panelAllAttentionCount = () => panelAllTerminals().filter((terminal) => termHasNotif(terminal.id)).length;
+  const panelActiveAttentionCount = () => panelActiveTerminals().filter((terminal) => termHasNotif(terminal.id)).length;
+  const panelStashedAttentionCount = () => panelStashedTerminals().filter((terminal) => termHasNotif(terminal.id)).length;
   const sidebarShortcut = () => (typeof navigator !== "undefined" && navigator.platform.includes("Mac") ? "Cmd" : "Ctrl");
 
   const normalizeWorkspacePath = (value: string) => value.replace(/\/+$/, "") || "/";
@@ -270,7 +272,12 @@ export default function Sidebar() {
     setExpandedHoverWorkspaceId(null);
 
     const visible = state.terminals.filter((terminal) => terminal.workspaceId === workspaceId && !terminal.stashed);
-    setState("activeTerminalId", visible[0]?.id ?? null);
+    const firstId = visible[0]?.id ?? null;
+    if (firstId) {
+      setActiveTerminal(firstId); // calls markViewed → clears notification badge
+    } else {
+      setState("activeTerminalId", null);
+    }
   }
 
   async function addWorkspaceFromPicker() {
@@ -429,9 +436,9 @@ export default function Sidebar() {
                   data-sidebar-stash-zone
                   class="flex items-center px-2 py-1.5 text-xs hover:bg-[var(--bg-tertiary)] transition-colors gap-1.5"
                   classList={{
-                    "bg-[var(--bg-tertiary)]": term.id === state.activeTerminalId && !term.stashed && !term.needsAttention,
-                    "opacity-50": term.stashed && !term.needsAttention,
-                    "bg-[color-mix(in_srgb,var(--warning)_10%,transparent)]": !!term.needsAttention,
+                    "bg-[var(--bg-tertiary)]": term.id === state.activeTerminalId && !term.stashed && !termHasNotif(term.id),
+                    "opacity-50": term.stashed && !termHasNotif(term.id),
+                    "bg-[color-mix(in_srgb,var(--warning)_10%,transparent)]": termHasNotif(term.id),
                   }}
                 >
                   <button
@@ -452,9 +459,9 @@ export default function Sidebar() {
                     <span
                       class="w-1.5 h-1.5 rounded-full shrink-0"
                       classList={{
-                        "bg-[var(--warning)] animate-pulse": !!term.needsAttention,
-                        "bg-[var(--success)]": !term.needsAttention && term.wsConnected && !term.stashed,
-                        "bg-[var(--text-secondary)] opacity-40": !term.needsAttention && (!term.wsConnected || term.stashed),
+                        "bg-[var(--warning)] animate-pulse": termHasNotif(term.id),
+                        "bg-[var(--success)]": !termHasNotif(term.id) && term.wsConnected && !term.stashed,
+                        "bg-[var(--text-secondary)] opacity-40": !termHasNotif(term.id) && (!term.wsConnected || term.stashed),
                       }}
                     />
                     <Show when={term.provider}>
@@ -466,9 +473,9 @@ export default function Sidebar() {
                     <span
                       class="truncate"
                       classList={{
-                        "text-[var(--warning)]": !!term.needsAttention,
-                        "text-[var(--text-primary)]": !term.needsAttention && !term.stashed,
-                        "text-[var(--text-secondary)] italic": !term.needsAttention && term.stashed,
+                        "text-[var(--warning)]": termHasNotif(term.id),
+                        "text-[var(--text-primary)]": !termHasNotif(term.id) && !term.stashed,
+                        "text-[var(--text-secondary)] italic": !termHasNotif(term.id) && term.stashed,
                       }}
                     >
                       {term.stashed ? "↑ " : ""}
@@ -622,9 +629,9 @@ export default function Sidebar() {
                       <button
                         class="w-full text-left px-2 py-1.5 rounded-[var(--btn-radius)] text-xs mb-0.5 transition-colors hover:bg-[color-mix(in_srgb,var(--accent)_10%,var(--bg-tertiary))]"
                         classList={{
-                          "bg-[var(--bg-tertiary)]": terminal.id === state.activeTerminalId && !terminal.stashed && !terminal.needsAttention,
-                          "opacity-50": terminal.stashed && !terminal.needsAttention,
-                          "bg-[color-mix(in_srgb,var(--warning)_10%,transparent)]": !!terminal.needsAttention,
+                          "bg-[var(--bg-tertiary)]": terminal.id === state.activeTerminalId && !terminal.stashed && !termHasNotif(terminal.id),
+                          "opacity-50": terminal.stashed && !termHasNotif(terminal.id),
+                          "bg-[color-mix(in_srgb,var(--warning)_10%,transparent)]": termHasNotif(terminal.id),
                         }}
                         onClick={() => activatePanelTerminal(terminal)}
                       >
@@ -632,18 +639,18 @@ export default function Sidebar() {
                           <span
                             class="w-1.5 h-1.5 rounded-full shrink-0"
                             classList={{
-                              "bg-[var(--warning)] animate-pulse": !!terminal.needsAttention,
-                              "bg-[var(--success)]": !terminal.needsAttention && terminal.wsConnected && !terminal.stashed,
-                              "bg-[var(--text-secondary)] opacity-40": !terminal.needsAttention && (!terminal.wsConnected || terminal.stashed),
+                              "bg-[var(--warning)] animate-pulse": termHasNotif(terminal.id),
+                              "bg-[var(--success)]": !termHasNotif(terminal.id) && terminal.wsConnected && !terminal.stashed,
+                              "bg-[var(--text-secondary)] opacity-40": !termHasNotif(terminal.id) && (!terminal.wsConnected || terminal.stashed),
                             }}
                           />
                           {Icon ? <Icon size={11} /> : null}
                           <span
                             class="truncate"
                             classList={{
-                              "text-[var(--warning)]": !!terminal.needsAttention,
-                              "text-[var(--text-primary)]": !terminal.needsAttention && !terminal.stashed,
-                              "text-[var(--text-secondary)] italic": !terminal.needsAttention && terminal.stashed,
+                              "text-[var(--warning)]": termHasNotif(terminal.id),
+                              "text-[var(--text-primary)]": !termHasNotif(terminal.id) && !terminal.stashed,
+                              "text-[var(--text-secondary)] italic": !termHasNotif(terminal.id) && terminal.stashed,
                             }}
                           >
                             {terminal.stashed ? "↑ " : ""}
@@ -673,7 +680,7 @@ export default function Sidebar() {
                       <button
                         class="w-full text-left px-2 py-1.5 rounded-[var(--btn-radius)] text-xs mb-0.5 transition-colors hover:bg-[color-mix(in_srgb,var(--accent)_10%,var(--bg-tertiary))]"
                         classList={{
-                          "bg-[color-mix(in_srgb,var(--warning)_10%,transparent)]": !!terminal.needsAttention,
+                          "bg-[color-mix(in_srgb,var(--warning)_10%,transparent)]": termHasNotif(terminal.id),
                         }}
                         onClick={() => activatePanelTerminal(terminal)}
                       >
@@ -681,8 +688,8 @@ export default function Sidebar() {
                           <span
                             class="w-1.5 h-1.5 rounded-full shrink-0"
                             classList={{
-                              "bg-[var(--warning)] animate-pulse": !!terminal.needsAttention,
-                              "bg-[var(--success)]": !terminal.needsAttention,
+                              "bg-[var(--warning)] animate-pulse": termHasNotif(terminal.id),
+                              "bg-[var(--success)]": !termHasNotif(terminal.id),
                             }}
                           />
                           {Icon ? <Icon size={11} /> : null}
@@ -707,7 +714,7 @@ export default function Sidebar() {
                       <button
                         class="w-full text-left px-2 py-1.5 rounded-[var(--btn-radius)] text-xs mb-0.5 transition-colors hover:bg-[color-mix(in_srgb,var(--accent)_10%,var(--bg-tertiary))]"
                         classList={{
-                          "bg-[color-mix(in_srgb,var(--warning)_10%,transparent)]": !!terminal.needsAttention,
+                          "bg-[color-mix(in_srgb,var(--warning)_10%,transparent)]": termHasNotif(terminal.id),
                         }}
                         onClick={() => activatePanelTerminal(terminal)}
                       >
@@ -715,8 +722,8 @@ export default function Sidebar() {
                           <span
                             class="w-1.5 h-1.5 rounded-full shrink-0"
                             classList={{
-                              "bg-[var(--warning)] animate-pulse": !!terminal.needsAttention,
-                              "bg-[var(--warning)]": !terminal.needsAttention,
+                              "bg-[var(--warning)] animate-pulse": termHasNotif(terminal.id),
+                              "bg-[var(--warning)]": !termHasNotif(terminal.id),
                             }}
                           />
                           {Icon ? <Icon size={11} /> : null}
@@ -1030,9 +1037,9 @@ export default function Sidebar() {
                     <button
                       class="w-full text-left px-2 py-1.5 rounded-[var(--btn-radius)] text-xs mb-0.5 transition-colors hover:bg-[color-mix(in_srgb,var(--accent)_10%,var(--bg-tertiary))]"
                       classList={{
-                        "bg-[var(--bg-tertiary)]": terminal.id === state.activeTerminalId && !terminal.stashed && !terminal.needsAttention,
-                        "opacity-50": terminal.stashed && !terminal.needsAttention,
-                        "bg-[color-mix(in_srgb,var(--warning)_10%,transparent)]": !!terminal.needsAttention,
+                        "bg-[var(--bg-tertiary)]": terminal.id === state.activeTerminalId && !terminal.stashed && !termHasNotif(terminal.id),
+                        "opacity-50": terminal.stashed && !termHasNotif(terminal.id),
+                        "bg-[color-mix(in_srgb,var(--warning)_10%,transparent)]": termHasNotif(terminal.id),
                       }}
                       onClick={() => activatePreviewTerminal(terminal)}
                     >
@@ -1040,18 +1047,18 @@ export default function Sidebar() {
                         <span
                           class="w-1.5 h-1.5 rounded-full shrink-0"
                           classList={{
-                            "bg-[var(--warning)] animate-pulse": !!terminal.needsAttention,
-                            "bg-[var(--success)]": !terminal.needsAttention && terminal.wsConnected && !terminal.stashed,
-                            "bg-[var(--text-secondary)] opacity-40": !terminal.needsAttention && (!terminal.wsConnected || terminal.stashed),
+                            "bg-[var(--warning)] animate-pulse": termHasNotif(terminal.id),
+                            "bg-[var(--success)]": !termHasNotif(terminal.id) && terminal.wsConnected && !terminal.stashed,
+                            "bg-[var(--text-secondary)] opacity-40": !termHasNotif(terminal.id) && (!terminal.wsConnected || terminal.stashed),
                           }}
                         />
                         {Icon ? <Icon size={11} /> : null}
                         <span
                           class="truncate"
                           classList={{
-                            "text-[var(--warning)]": !!terminal.needsAttention,
-                            "text-[var(--text-primary)]": !terminal.needsAttention && !terminal.stashed,
-                            "text-[var(--text-secondary)] italic": !terminal.needsAttention && terminal.stashed,
+                            "text-[var(--warning)]": termHasNotif(terminal.id),
+                            "text-[var(--text-primary)]": !termHasNotif(terminal.id) && !terminal.stashed,
+                            "text-[var(--text-secondary)] italic": !termHasNotif(terminal.id) && terminal.stashed,
                           }}
                         >
                           {terminal.stashed ? "↑ " : ""}
@@ -1075,11 +1082,15 @@ export default function Sidebar() {
                 >
                   {(session) => {
                     const linkedTerminal = () => state.terminals.find((terminal) => terminal.sessionId === session.id);
+                    const linkedHasNotif = () => {
+                      const lt = linkedTerminal();
+                      return lt ? termHasNotif(lt.id) : false;
+                    };
                     return (
                       <button
                         class="w-full text-left px-2 py-1.5 rounded-[var(--btn-radius)] text-xs mb-0.5 transition-colors hover:bg-[color-mix(in_srgb,var(--accent)_10%,var(--bg-tertiary))]"
                         classList={{
-                          "bg-[color-mix(in_srgb,var(--warning)_10%,transparent)]": !!linkedTerminal()?.needsAttention,
+                          "bg-[color-mix(in_srgb,var(--warning)_10%,transparent)]": linkedHasNotif(),
                         }}
                         onClick={() => openPreviewSession(session)}
                       >
@@ -1088,9 +1099,9 @@ export default function Sidebar() {
                             <span
                               class="w-1.5 h-1.5 rounded-full shrink-0"
                               classList={{
-                                "bg-[var(--warning)] animate-pulse": !!linkedTerminal()!.needsAttention,
-                                "bg-[var(--warning)]": !linkedTerminal()!.needsAttention && linkedTerminal()!.stashed,
-                                "bg-[var(--success)]": !linkedTerminal()!.needsAttention && !linkedTerminal()!.stashed,
+                                "bg-[var(--warning)] animate-pulse": linkedHasNotif(),
+                                "bg-[var(--warning)]": !linkedHasNotif() && linkedTerminal()!.stashed,
+                                "bg-[var(--success)]": !linkedHasNotif() && !linkedTerminal()!.stashed,
                               }}
                             />
                           </Show>
@@ -1115,7 +1126,7 @@ export default function Sidebar() {
                     <button
                       class="w-full text-left px-2 py-1.5 rounded-[var(--btn-radius)] text-xs mb-0.5 transition-colors hover:bg-[color-mix(in_srgb,var(--accent)_10%,var(--bg-tertiary))]"
                       classList={{
-                        "bg-[color-mix(in_srgb,var(--warning)_10%,transparent)]": !!terminal.needsAttention,
+                        "bg-[color-mix(in_srgb,var(--warning)_10%,transparent)]": termHasNotif(terminal.id),
                       }}
                       onClick={() => activatePreviewTerminal(terminal)}
                     >

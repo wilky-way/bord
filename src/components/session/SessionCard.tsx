@@ -1,6 +1,7 @@
 import { createMemo } from "solid-js";
 import { state, setState } from "../../store/core";
 import { addTerminal, unstashTerminal } from "../../store/terminals";
+import { notificationIndex } from "../../lib/notifications/index";
 import type { SessionInfo } from "../../store/types";
 import { buildResumeCommand } from "../../lib/providers";
 
@@ -12,6 +13,11 @@ export default function SessionCard(props: Props) {
   const linkedTerminal = createMemo(() =>
     state.terminals.find((t) => t.sessionId === props.session.id)
   );
+
+  const hasNotif = () => {
+    const lt = linkedTerminal();
+    return lt ? (notificationIndex().byTerminal.get(lt.id)?.unseen ?? 0) > 0 : false;
+  };
 
   function selectMatchingWorkspace(path: string) {
     const ws = state.workspaces.find(
@@ -54,7 +60,7 @@ export default function SessionCard(props: Props) {
     <button
       class="w-full text-left px-2 py-1.5 rounded-[var(--btn-radius)] text-xs mb-0.5 transition-colors cursor-pointer hover:bg-[color-mix(in_srgb,var(--accent)_10%,var(--bg-tertiary))]"
       classList={{
-        "bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] animate-pulse": !!linkedTerminal()?.needsAttention,
+        "bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] animate-pulse": hasNotif(),
       }}
       onClick={handleClick}
     >
@@ -63,15 +69,15 @@ export default function SessionCard(props: Props) {
           <span
             class="w-1.5 h-1.5 rounded-full shrink-0"
             classList={{
-              "bg-[var(--warning)] animate-pulse": !!linkedTerminal()!.needsAttention,
-              "bg-[var(--warning)]": !linkedTerminal()!.needsAttention && linkedTerminal()!.stashed,
-              "bg-[var(--success)]": !linkedTerminal()!.needsAttention && !linkedTerminal()!.stashed,
+              "bg-[var(--warning)] animate-pulse": hasNotif(),
+              "bg-[var(--warning)]": !hasNotif() && linkedTerminal()!.stashed,
+              "bg-[var(--success)]": !hasNotif() && !linkedTerminal()!.stashed,
             }}
           />
         )}
         <span classList={{
-          "text-[var(--warning)]": !!linkedTerminal()?.needsAttention,
-          "text-[var(--text-primary)]": !linkedTerminal()?.needsAttention,
+          "text-[var(--warning)]": hasNotif(),
+          "text-[var(--text-primary)]": !hasNotif(),
         }} class="truncate flex-1">
           –&nbsp;&nbsp;{props.session.title}
         </span>

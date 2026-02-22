@@ -1,6 +1,8 @@
 import { For, Show, createSignal, onMount, onCleanup } from "solid-js";
 import { themes } from "../../lib/themes";
 import { activeTheme, setTheme } from "../../lib/theme";
+import { getSettings, updateSettings, requestOsNotificationPermission } from "../../lib/notifications/store";
+import { sendConfigureToAll } from "../../lib/ws";
 import type { BordTheme } from "../../lib/themes";
 
 interface Props {
@@ -8,7 +10,7 @@ interface Props {
   onClose: () => void;
 }
 
-type Section = "appearance";
+type Section = "appearance" | "notifications";
 
 export default function SettingsPanel(props: Props) {
   const [section, setSection] = createSignal<Section>("appearance");
@@ -48,12 +50,25 @@ export default function SettingsPanel(props: Props) {
                 </svg>
               }
             />
+            <NavItem
+              label="Notifications"
+              active={section() === "notifications"}
+              onClick={() => setSection("notifications")}
+              icon={
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                  <path d="M8 2C6 2 4.5 3.5 4.5 5v3L3 10.5V12h10v-1.5L11.5 8V5c0-1.5-1.5-3-3.5-3z" />
+                  <path d="M6.5 12a1.5 1.5 0 003 0" />
+                </svg>
+              }
+            />
           </div>
 
           {/* Content area */}
           <div class="flex-1 overflow-y-auto p-5">
             <div class="flex items-center justify-between mb-5">
-              <h3 class="text-sm font-semibold text-[var(--text-primary)]">Appearance</h3>
+              <h3 class="text-sm font-semibold text-[var(--text-primary)]">
+                {section() === "appearance" ? "Appearance" : "Notifications"}
+              </h3>
               <button
                 class="w-7 h-7 rounded-md flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
                 onClick={props.onClose}
@@ -65,18 +80,24 @@ export default function SettingsPanel(props: Props) {
               </button>
             </div>
 
-            <label class="text-xs font-medium text-[var(--text-secondary)] mb-3 block">Theme</label>
-            <div class="grid grid-cols-3 gap-3">
-              <For each={themes}>
-                {(theme) => (
-                  <ThemeSwatch
-                    theme={theme}
-                    active={activeTheme().id === theme.id}
-                    onClick={() => setTheme(theme.id)}
-                  />
-                )}
-              </For>
-            </div>
+            <Show when={section() === "appearance"}>
+              <label class="text-xs font-medium text-[var(--text-secondary)] mb-3 block">Theme</label>
+              <div class="grid grid-cols-3 gap-3">
+                <For each={themes}>
+                  {(theme) => (
+                    <ThemeSwatch
+                      theme={theme}
+                      active={activeTheme().id === theme.id}
+                      onClick={() => setTheme(theme.id)}
+                    />
+                  )}
+                </For>
+              </div>
+            </Show>
+
+            <Show when={section() === "notifications"}>
+              <NotificationSettings />
+            </Show>
           </div>
         </div>
       </div>
@@ -98,6 +119,98 @@ function NavItem(props: { label: string; active: boolean; onClick: () => void; i
       {props.icon}
       {props.label}
     </button>
+  );
+}
+
+function ToggleRow(props: { label: string; description: string; checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label class="flex items-center justify-between py-2 cursor-pointer group">
+      <div>
+        <div class="text-xs font-medium text-[var(--text-primary)]">{props.label}</div>
+        <div class="text-[11px] text-[var(--text-secondary)] mt-0.5">{props.description}</div>
+      </div>
+      <button
+        class="relative w-8 h-[18px] rounded-full transition-colors shrink-0 ml-3"
+        style={{
+          background: props.checked
+            ? "var(--accent)"
+            : "var(--bg-tertiary)",
+        }}
+        onClick={() => props.onChange(!props.checked)}
+      >
+        <span
+          class="absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow transition-transform"
+          style={{
+            transform: props.checked ? "translateX(16px)" : "translateX(2px)",
+          }}
+        />
+      </button>
+    </label>
+  );
+}
+
+function NotificationSettings() {
+  const s = () => getSettings();
+
+  return (
+    <div class="space-y-4">
+      <div>
+        <label class="text-xs font-medium text-[var(--text-secondary)] mb-2 block">Sounds</label>
+        <div class="space-y-1">
+          <ToggleRow
+            label="Agent done"
+            description="Play a chime when an agent finishes (goes idle)"
+            checked={s().soundEnabled}
+            onChange={(v) => updateSettings({ soundEnabled: v })}
+          />
+          <ToggleRow
+            label="Error alert"
+            description="Play a distinct sound on error notifications"
+            checked={s().errorSoundEnabled}
+            onChange={(v) => updateSettings({ errorSoundEnabled: v })}
+          />
+        </div>
+      </div>
+
+      <div>
+        <label class="text-xs font-medium text-[var(--text-secondary)] mb-2 block">OS Notifications</label>
+        <ToggleRow
+          label="Desktop notifications"
+          description="Show OS notifications when the app is not focused"
+          checked={s().osNotificationsEnabled}
+          onChange={(v) => {
+            if (v) requestOsNotificationPermission();
+            updateSettings({ osNotificationsEnabled: v });
+          }}
+        />
+      </div>
+
+      <div>
+        <label class="text-xs font-medium text-[var(--text-secondary)] mb-2 block">
+          Idle threshold: {(s().idleThresholdMs / 1000).toFixed(0)}s
+        </label>
+        <div class="flex items-center gap-3">
+          <span class="text-[10px] text-[var(--text-secondary)]">5s</span>
+          <input
+            type="range"
+            min="5000"
+            max="30000"
+            step="1000"
+            value={s().idleThresholdMs}
+            class="flex-1 accent-[var(--accent)]"
+            onInput={(e) => {
+              const val = parseInt(e.currentTarget.value, 10);
+              updateSettings({ idleThresholdMs: val });
+              sendConfigureToAll(val);
+            }}
+          />
+          <span class="text-[10px] text-[var(--text-secondary)]">30s</span>
+        </div>
+        <p class="text-[10px] text-[var(--text-secondary)] mt-1">
+          How long a terminal must be silent before triggering a notification
+        </p>
+      </div>
+    </div>
   );
 }
 

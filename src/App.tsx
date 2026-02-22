@@ -2,9 +2,10 @@ import { onCleanup, onMount } from "solid-js";
 import TopBar from "./components/layout/TopBar";
 import Sidebar from "./components/layout/Sidebar";
 import TilingLayout from "./components/layout/TilingLayout";
-import { addTerminal, activateAdjacentTerminal } from "./store/terminals";
+import { addTerminal, removeTerminal, activateAdjacentTerminal } from "./store/terminals";
 import { state, setState } from "./store/core";
 import { toggleGitPanel } from "./store/git";
+import { setSettingsOpen } from "./store/settings";
 
 export default function App() {
   onMount(() => {
@@ -16,12 +17,42 @@ export default function App() {
         const activePath = state.workspaces.find((w) => w.id === state.activeWorkspaceId)?.path;
         addTerminal(activePath);
       }
-      // Cmd+Arrow: Navigate between terminals
-      if ((e.metaKey || e.ctrlKey) && e.key === "ArrowLeft") {
+      // Cmd+T: New terminal (alias for Cmd+N)
+      if ((e.ctrlKey || e.metaKey) && e.key === "t" && !e.shiftKey) {
+        e.preventDefault();
+        if (!state.activeWorkspaceId) return;
+        const activePath = state.workspaces.find((w) => w.id === state.activeWorkspaceId)?.path;
+        addTerminal(activePath);
+      }
+      // Cmd+W: Close active terminal
+      if ((e.ctrlKey || e.metaKey) && e.key === "w" && !e.shiftKey) {
+        e.preventDefault();
+        const id = state.activeTerminalId;
+        if (!id) return;
+        const visible = state.terminals.filter((t) => !t.stashed && t.workspaceId === state.activeWorkspaceId);
+        if (visible.length <= 1) return; // Don't close last terminal
+        removeTerminal(id);
+      }
+      // Cmd+,: Open settings
+      if ((e.ctrlKey || e.metaKey) && e.key === ",") {
+        e.preventDefault();
+        setSettingsOpen(true);
+      }
+      // Cmd+Shift+Arrow: Navigate between terminals (explicit)
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "ArrowLeft") {
         e.preventDefault();
         activateAdjacentTerminal("prev");
       }
-      if ((e.metaKey || e.ctrlKey) && e.key === "ArrowRight") {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "ArrowRight") {
+        e.preventDefault();
+        activateAdjacentTerminal("next");
+      }
+      // Cmd+Arrow: Navigate between terminals (fallback when no terminal intercepts)
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === "ArrowLeft" && !e.defaultPrevented) {
+        e.preventDefault();
+        activateAdjacentTerminal("prev");
+      }
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === "ArrowRight" && !e.defaultPrevented) {
         e.preventDefault();
         activateAdjacentTerminal("next");
       }

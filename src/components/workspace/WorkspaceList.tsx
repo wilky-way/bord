@@ -1,31 +1,11 @@
 import { createSignal, createMemo, onMount, onCleanup, For, Show } from "solid-js";
 import { state, setState } from "../../store/core";
 import { api } from "../../lib/api";
-import { addTerminal, setActiveTerminal, unstashTerminal, setTerminalNeedsAttention, setTerminalLastSeen, setTerminalMuted } from "../../store/terminals";
+import { addTerminal, setActiveTerminal, unstashTerminal, setTerminalMuted } from "../../store/terminals";
+import { notificationIndex } from "../../lib/notifications/index";
 import type { Workspace } from "../../store/types";
 import { PROVIDER_ICONS } from "../../lib/providers";
 import EditorButton from "../shared/EditorButton";
-
-// Tick signal — drives idle-detection checks every second
-const [tick, setTick] = createSignal(0);
-const IDLE_THRESHOLD = 5000;
-
-function playAttentionChime() {
-  try {
-    const ctx = new AudioContext();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.frequency.value = 880; // A5
-    gain.gain.value = 0.08;    // very quiet
-    osc.start();
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
-    osc.stop(ctx.currentTime + 0.3);
-  } catch { /* AudioContext may not be available */ }
-}
-
-// Idle-detection interval is started inside WorkspaceList component (see onMount)
 
 interface GitInfo {
   branch: string;
@@ -60,37 +40,6 @@ export default function WorkspaceList() {
     } catch {
       // Workspaces may not be available
     }
-  });
-
-  // Idle-detection interval — must be inside component lifecycle
-  onMount(() => {
-    const idleInterval = setInterval(() => {
-      setTick((t) => t + 1);
-      const now = Date.now();
-
-      // Keep lastSeenAt current for the terminal the user is actively viewing
-      const activeId = state.activeTerminalId;
-      if (activeId) {
-        const active = state.terminals.find((at) => at.id === activeId && !at.stashed);
-        if (active) setTerminalLastSeen(activeId);
-      }
-
-      // Check all Claude session terminals for idle state → set needsAttention
-      for (const t of state.terminals) {
-        // Skip globally muted or per-terminal muted
-        if (state.bellMuted || t.muted) continue;
-        if (
-          t.sessionId &&
-          t.lastOutputAt &&
-          now - t.lastOutputAt > IDLE_THRESHOLD &&
-          t.lastOutputAt > (t.lastSeenAt ?? 0)
-        ) {
-          if (!t.needsAttention) playAttentionChime();
-          setTerminalNeedsAttention(t.id, true);
-        }
-      }
-    }, 1000);
-    onCleanup(() => clearInterval(idleInterval));
   });
 
   // Fetch git info for all workspaces periodically
@@ -366,8 +315,7 @@ export default function WorkspaceList() {
           const terminalCount = () => wsTerminals().length;
           const isStashOpen = () => stashOpenId() === ws.id;
           const attentionCount = createMemo(() => {
-            tick(); // subscribe for reactivity
-            return wsTerminals().filter((t) => t.needsAttention).length;
+            return notificationIndex().byWorkspace.get(ws.id)?.unseen ?? 0;
           });
 
           return (
@@ -494,12 +442,14 @@ export default function WorkspaceList() {
                     Terminals
                   </div>
                   <For each={wsTerminals()}>
-                    {(term) => (
+                    {(term) => {
+                      const hasNotif = () => (notificationIndex().byTerminal.get(term.id)?.unseen ?? 0) > 0;
+                      return (
                       <div data-stash-zone class="flex items-center px-2 py-1.5 text-xs hover:bg-[var(--bg-tertiary)] transition-colors gap-1.5"
                         classList={{
-                          "bg-[var(--bg-tertiary)]": term.id === state.activeTerminalId && !term.stashed && !term.needsAttention,
-                          "opacity-50": term.stashed && !term.needsAttention,
-                          "bg-[color-mix(in_srgb,var(--warning)_10%,transparent)]": !!term.needsAttention,
+                          "bg-[var(--bg-tertiary)]": term.id === state.activeTerminalId && !term.stashed && !hasNotif(),
+                          "opacity-50": term.stashed && !hasNotif(),
+                          "bg-[color-mix(in_srgb,var(--warning)_10%,transparent)]": hasNotif(),
                         }}
                       >
                         <button
@@ -516,9 +466,9 @@ export default function WorkspaceList() {
                           <span
                             class="w-1.5 h-1.5 rounded-full shrink-0"
                             classList={{
-                              "bg-[var(--warning)] animate-pulse": !!term.needsAttention,
-                              "bg-[var(--success)]": !term.needsAttention && term.wsConnected && !term.stashed,
-                              "bg-[var(--text-secondary)] opacity-40": !term.needsAttention && (!term.wsConnected || term.stashed),
+                              "bg-[var(--warning)] animate-pulse": hasNotif(),
+                              "bg-[var(--success)]": !hasNotif() && term.wsConnected && !term.stashed,
+                              "bg-[var(--text-secondary)] opacity-40": !hasNotif() && (!term.wsConnected || term.stashed),
                             }}
                           />
                           <Show when={term.provider}>
@@ -528,9 +478,9 @@ export default function WorkspaceList() {
                             })()}
                           </Show>
                           <span class="truncate" classList={{
-                            "text-[var(--warning)]": !!term.needsAttention,
-                            "text-[var(--text-primary)]": !term.needsAttention && !term.stashed,
-                            "text-[var(--text-secondary)] italic": !term.needsAttention && term.stashed,
+                            "text-[var(--warning)]": hasNotif(),
+                            "text-[var(--text-primary)]": !hasNotif() && !term.stashed,
+                            "text-[var(--text-secondary)] italic": !hasNotif() && term.stashed,
                           }}>
                             {term.stashed ? "↑ " : ""}{term.customTitle || term.sessionTitle || term.title || term.cwd.split("/").pop() || "terminal"}
                           </span>
@@ -562,7 +512,8 @@ export default function WorkspaceList() {
                           )}
                         </button>
                       </div>
-                    )}
+                      );
+                    }}
                   </For>
                 </div>
               </Show>

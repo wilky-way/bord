@@ -2,6 +2,7 @@ import { state, setState } from "./core";
 import { api } from "../lib/api";
 import type { TerminalInstance } from "./types";
 import { getProviderFromCommand, getResumeSessionId } from "../lib/providers";
+import { markViewed, clearForTerminal } from "../lib/notifications/store";
 
 export function setTerminalTitle(id: string, title: string) {
   setState("terminals", (t) => t.id === id, "customTitle", title || undefined);
@@ -9,19 +10,10 @@ export function setTerminalTitle(id: string, title: string) {
 
 export function setTerminalLastOutput(id: string) {
   setState("terminals", (t) => t.id === id, "lastOutputAt", Date.now());
-  // Output arrived — terminal is active, clear any attention flag
-  setState("terminals", (t) => t.id === id, "needsAttention", false);
-}
-
-export function setTerminalNeedsAttention(id: string, value: boolean) {
-  setState("terminals", (t) => t.id === id, "needsAttention", value);
 }
 
 export function setTerminalMuted(id: string, value: boolean) {
   setState("terminals", (t) => t.id === id, "muted", value);
-  if (value) {
-    setState("terminals", (t) => t.id === id, "needsAttention", false);
-  }
 }
 
 export function setTerminalLastSeen(id: string) {
@@ -70,6 +62,7 @@ export async function addTerminal(cwd?: string, command?: string[], sessionTitle
 
 export async function removeTerminal(id: string) {
   await api.destroyPty(id);
+  clearForTerminal(id);
   const removedTerminal = state.terminals.find((t) => t.id === id);
   setState("terminals", (prev) => prev.filter((t) => t.id !== id));
 
@@ -86,8 +79,8 @@ export async function removeTerminal(id: string) {
 
 export function setActiveTerminal(id: string) {
   setState("activeTerminalId", id);
-  // User is looking at this terminal — clear notification + record view time
-  setState("terminals", (t) => t.id === id, "needsAttention", false);
+  // User is looking at this terminal — mark notifications viewed + record view time
+  markViewed(id);
   setState("terminals", (t) => t.id === id, "lastSeenAt", Date.now());
 }
 
@@ -107,7 +100,7 @@ export function stashTerminal(id: string) {
 
 export function unstashTerminal(id: string) {
   setState("terminals", (t) => t.id === id, "stashed", false);
-  setState("terminals", (t) => t.id === id, "needsAttention", false);
+  markViewed(id);
   setState("terminals", (t) => t.id === id, "lastSeenAt", Date.now());
   setState("activeTerminalId", id);
 }

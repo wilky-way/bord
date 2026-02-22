@@ -172,6 +172,13 @@ export const api = {
       `/docker/logs?containerId=${encodeURIComponent(containerId)}&tail=${tail}`
     ),
 
+  // Clipboard
+  uploadClipboardImage: (base64: string, mimeType?: string) =>
+    request<{ path: string }>("/clipboard/image", {
+      method: "POST",
+      body: JSON.stringify({ base64, mimeType }),
+    }),
+
   // Filesystem
   browseDir: (path?: string) => {
     const params = path ? `?path=${encodeURIComponent(path)}` : "";

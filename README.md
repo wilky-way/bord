@@ -104,7 +104,7 @@ Shows workspace stash tray behavior with active/stashed terminal states.
 
 ![Collapsed sidebar rail counters](./docs/media/sidebar-rail-counters.png)
 
-Shows per-workspace terminal counters in collapsed mode (`total-active-stashed`) with attention badge.
+Shows per-workspace terminal counters in collapsed mode (`total-active-stashed`) with notification badge.
 
 ### Workspace Hover Preview
 
@@ -155,8 +155,8 @@ Rosé Pine — muted purple and gold.
 - **Layout density** — 1x/2x/3x/4x column buttons to control how many terminals are visible at once (0 = auto-fit all)
 - **Drag-and-drop reorder** — grab a terminal title bar and drag to reposition
 - **Resizable panels** — drag panel edges to adjust width ratios
-- **Stash/unstash** — hide terminals without destroying them; stashed terminals show attention badges when new output arrives
-- **Notification controls** — per-terminal mute controls from terminal card or stash tray
+- **Stash/unstash** — hide terminals without destroying them; notification badges appear when agents go idle
+- **Notification controls** — per-terminal mute controls from terminal card or stash tray; configurable sounds and OS notifications in Settings
 - **Terminal minimap** — compact navigation strip in the top bar center, alongside density buttons and the + add-terminal button
 
 ### Workspace Scoping
@@ -169,8 +169,8 @@ Rosé Pine — muted purple and gold.
 - **Provider tabs** — switch session lists between Claude, Codex, OpenCode, and Gemini modes; quick-action buttons alongside tabs for spawning new sessions and terminals
 - **Session scanning** — reads provider-specific session stores (`~/.claude/projects/`, `~/.codex/sessions/`, OpenCode storage dirs)
 - **Session resume** — click a session card to open a new terminal with provider-specific resume command mapping
-- **Idle detection** — terminals track `lastOutputAt` and `lastSeenAt` timestamps; attention badges pulse when unseen output arrives
-- **Attention chime** — visual pulse animation on minimap dots for terminals that need attention
+- **Server-side idle detection** — PTY manager tracks output silence (configurable 5–30s threshold, default 8s) and emits `idle`/`active` WebSocket control messages. Client-side output volume gating (200-byte threshold) filters out small blips from IDE extensions. Notifications deduplicate per terminal and are suppressed when the terminal is focused.
+- **Notification system** — first-class notification store with localStorage persistence, per-workspace and per-terminal badge counts, configurable chime/error sounds, and OS notifications when the app is not focused. Badges clear when switching to the workspace.
 - **Current gap** — Gemini scan/resume discovery is still placeholder-only
 
 ### Git Workflow
@@ -202,12 +202,38 @@ Rosé Pine — muted purple and gold.
 
 ### Keyboard Shortcuts
 
+#### Global (work everywhere)
+
 | Shortcut | Action |
 |----------|--------|
-| `Cmd+N` / `Ctrl+N` | New terminal in active workspace |
-| `Cmd+Left` / `Ctrl+Left` | Focus previous terminal |
-| `Cmd+Right` / `Ctrl+Right` | Focus next terminal |
-| `Cmd+G` / `Ctrl+G` | Toggle git panel for active terminal |
+| `Cmd+N` / `Cmd+T` | New terminal in active workspace |
+| `Cmd+W` | Close active terminal (won't close last) |
+| `Cmd+Shift+Left/Right` | Navigate between terminals |
+| `Cmd+Left/Right` | Navigate between terminals (fallback) |
+| `Cmd+G` | Toggle git panel for active terminal |
+| `Cmd+B` | Toggle sidebar |
+| `Cmd+,` | Open settings |
+
+#### Terminal (when terminal has focus)
+
+| Shortcut | Action |
+|----------|--------|
+| `Cmd+C` | Copy selection, or send SIGINT if no selection |
+| `Cmd+V` | Paste with bracketed paste support (images paste as file path) |
+| `Cmd+A` | Select all terminal content |
+| `Cmd+K` | Clear terminal scrollback |
+| `Cmd+L` | Clear screen (Ctrl+L) |
+| `Cmd+Left/Right` | Jump to beginning/end of line |
+| `Cmd+Backspace` | Kill line backward |
+| `Cmd+Up/Down` | Scroll to top/bottom |
+| `Cmd+= / Cmd+-` | Increase/decrease font size |
+| `Cmd+0` | Reset font size |
+| `Option+Left/Right` | Move cursor by word |
+| `Option+Backspace` | Delete word backward |
+| `Option+D` | Delete word forward |
+| `Shift+Tab` | Reverse tab (sends `\x1b[Z`) |
+| `Shift+Enter` | Kitty protocol Enter (`\x1b[13;2u`) |
+| `PageUp / PageDown` | Scroll terminal by page |
 
 ## Architecture
 
@@ -387,6 +413,12 @@ sequenceDiagram
     Client->>Server: JSON: { type: "resize", cols, rows }
     Server->>PTY: terminal.resize(cols, rows)
 
+    Note over Server: After idle threshold (8s default)
+    Server->>Client: JSON: { type: "idle" }
+    Note over Server: On new output after idle
+    Server->>Client: JSON: { type: "active" }
+
+    Client->>Server: JSON: { type: "configure", idleThresholdMs }
     Client->>Server: JSON: { type: "ping" }
     Server->>Client: JSON: { type: "pong" }
 
@@ -407,15 +439,15 @@ stateDiagram-v2
     Stashed --> Destroyed: removeTerminal()
     Destroyed --> [*]
 
-    Active --> NeedsAttention: output while unfocused
-    NeedsAttention --> Active: user focuses terminal
+    Active --> Idle: server idle timer fires
+    Idle --> Active: new output arrives
 
     note right of Stashed
         PTY stays alive.
         WS reconnects when
         the panel is visible.
-        Attention badge pulses
-        on new output.
+        Notification badge shows
+        when agent goes idle.
     end note
 ```
 
@@ -520,7 +552,7 @@ bun run qa:capture-media
 
 1. `bun run dev` and confirm UI/server boot (`:1420` + `:4200`)
 2. Add at least two workspaces and verify terminal sets are isolated per workspace
-3. Stash terminal(s), produce output, verify attention indicators and mute controls
+3. Stash terminal(s), let agent go idle, verify notification badge appears and clears on switch-back; test mute controls
 4. Resume a provider session from SessionList and verify linked terminal behavior
 5. Open git panel (`Cmd+G`) and test stage/diff/commit/push flow
 6. Open Docker panel and verify compose discovery and start/stop/logs actions
@@ -538,6 +570,7 @@ bord/
 │   │   ├── editor.ts         # POST /api/editor/open
 │   │   ├── fs.ts             # GET /api/fs/browse
 │   │   ├── git.ts            # /api/git/* (status, diff, stage, commit, push, pull, branches, checkout)
+│   │   ├── clipboard.ts      # POST /api/clipboard/image (image paste to temp file)
 │   │   ├── health.ts         # GET /api/health
 │   │   ├── pty.ts            # POST/GET/DELETE /api/pty
 │   │   ├── session.ts        # GET /api/sessions
@@ -547,12 +580,12 @@ bord/
 │   │   ├── docker-service.ts # Docker compose discovery + container controls
 │   │   ├── editor-service.ts # Spawn VS Code / Cursor CLI
 │   │   ├── git-service.ts    # Shell out to git
-│   │   ├── pty-manager.ts    # PTY lifecycle + 2MB circular buffer + WS fan-out
+│   │   ├── pty-manager.ts    # PTY lifecycle + 2MB circular buffer + WS fan-out + idle detection
 │   │   ├── session-scanner.ts# Scan provider session stores (Claude/Codex/OpenCode/Gemini)
 │   │   └── workspace-service.ts
 │   ├── ws/
 │   │   ├── handler.ts        # WS upgrade, message routing, close
-│   │   └── protocol.ts       # Control message types (resize, ping/pong, cursor)
+│   │   └── protocol.ts       # Control message types (resize, ping/pong, cursor, idle/active, configure)
 │   └── schema.sql            # workspaces, session_cache, app_state tables
 ├── src/
 │   ├── App.tsx               # Root layout + global keyboard shortcuts
@@ -564,17 +597,20 @@ bord/
 │   │   ├── icons/            # ProviderIcons (Claude, VS Code, Cursor, etc.)
 │   │   ├── layout/           # TopBar, Sidebar, TilingLayout, ResizablePanel, TerminalMinimap
 │   │   ├── session/          # ProviderTabs, SessionList, SessionCard
-│   │   ├── settings/         # SettingsPanel (theme picker)
+│   │   ├── settings/         # SettingsPanel (theme picker, notification settings)
 │   │   ├── shared/           # EditorButton
 │   │   ├── terminal/         # TerminalPanel, TerminalView
 │   │   └── workspace/        # WorkspaceList
 │   ├── lib/
 │   │   ├── api.ts            # Typed HTTP client for all server routes
+│   │   ├── debounce.ts       # Burst coalescer + keyed batch coalescer for WS event batching
+│   │   ├── notifications/    # Notification store, types, dual-indexed reactive index, sound system
+│   │   ├── terminal-shortcuts.ts# Terminal key handler (Cmd+C/V/K, Option+arrows, font size, etc.)
 │   │   ├── terminal-writer.ts# Terminal data writer utility
 │   │   ├── theme.ts          # Reactive theme manager (signals + CSS var application)
 │   │   ├── themes/           # Theme definitions (15 curated) + BordTheme type
 │   │   ├── use-drag-reorder.ts# Pointer-event drag reorder hook
-│   │   └── ws.ts             # WebSocket connection manager
+│   │   └── ws.ts             # WebSocket connection manager + idle/active event handling
 │   └── store/
 │       ├── core.ts           # createStore<AppState> — single source of truth
 │       ├── types.ts          # TerminalInstance, Workspace, SessionInfo, GitStatus, AppState
@@ -582,6 +618,7 @@ bord/
 │       ├── workspaces.ts     # Workspace CRUD actions
 │       ├── sessions.ts       # Session loading (signal-based)
 │       ├── git.ts            # Git status refresh (signal-based)
+│       ├── settings.ts      # Font size signal (persistent) + global settings panel state
 │       └── ui.ts             # UI toggles
 ├── src-tauri/                # Tauri v2 Rust shell
 │   ├── tauri.conf.json       # Window config, CSP, bundle settings

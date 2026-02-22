@@ -1,9 +1,11 @@
-import { onMount, onCleanup, createSignal } from "solid-js";
+import { onMount, onCleanup, createSignal, createEffect } from "solid-js";
 import { init, Terminal } from "ghostty-web";
 import { connectTerminal, sendToTerminal, sendResize } from "../../lib/ws";
 import { createTerminalWriter } from "../../lib/terminal-writer";
 import { setTerminalConnected } from "../../store/terminals";
 import { terminalTheme } from "../../lib/theme";
+import { createTerminalKeyHandler } from "../../lib/terminal-shortcuts";
+import { fontSize } from "../../store/settings";
 // Theme is read at terminal creation time — changing themes applies to new terminals only
 
 interface Props {
@@ -29,13 +31,19 @@ export default function TerminalView(props: Props) {
     await ensureWasm();
 
     terminal = new Terminal({
-      fontSize: 13,
+      fontSize: fontSize(),
       cursorStyle: "block",
       cursorBlink: false,
       theme: terminalTheme(),
     });
 
     terminal.open(containerRef);
+
+    // Attach keyboard shortcut handler
+    if (typeof terminal.attachCustomKeyEventHandler === "function") {
+      terminal.attachCustomKeyEventHandler(createTerminalKeyHandler(props.ptyId, terminal));
+    }
+
     setReady(true);
 
     // Calculate initial dimensions and fit
@@ -95,6 +103,15 @@ export default function TerminalView(props: Props) {
     });
     resizeObserver.observe(containerRef);
 
+    // Reactive font size: update all terminals when fontSize signal changes
+    createEffect(() => {
+      const size = fontSize();
+      if (terminal && !disposed) {
+        (terminal as any).options.fontSize = size;
+        fitTerminal(terminal, containerRef, props.ptyId);
+      }
+    });
+
     onCleanup(() => {
       disposed = true;
       clearTimeout(replayIdleTimer);
@@ -109,7 +126,6 @@ export default function TerminalView(props: Props) {
   return <div ref={containerRef} class="terminal-container" />;
 }
 
-const FONT_SIZE = 13;
 const LINE_HEIGHT = 1.2;
 
 let cachedMetrics: { cellWidth: number; cellHeight: number; fontSize: number } | null = null;
@@ -153,7 +169,7 @@ function fitTerminal(terminal: Terminal, container: HTMLElement, ptyId: string) 
   if (rect.width === 0 || rect.height === 0) return;
 
   const rendererMetrics = (terminal as any).renderer?.getMetrics?.();
-  const fallbackMetrics = measureFontMetrics(FONT_SIZE);
+  const fallbackMetrics = measureFontMetrics(fontSize());
   const cellWidth = rendererMetrics?.width ?? fallbackMetrics.cellWidth;
   const cellHeight = rendererMetrics?.height ?? fallbackMetrics.cellHeight;
 

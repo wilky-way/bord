@@ -1,5 +1,5 @@
 import type { ServerWebSocket } from "bun";
-import { attachWs, detachWs, writeToPty, resizePty } from "../services/pty-manager";
+import { attachWs, detachWs, writeToPty, resizePty, configurePty } from "../services/pty-manager";
 
 interface WsData {
   path: string;
@@ -51,6 +51,10 @@ export function handleWsMessage(ws: ServerWebSocket<WsData>, message: string | B
       }
       if (ctrl.type === "ping") {
         ws.send(JSON.stringify({ type: "pong" }));
+        return;
+      }
+      if (ctrl.type === "configure" && typeof ctrl.idleThresholdMs === "number") {
+        configurePty(ptyId, ctrl.idleThresholdMs);
         return;
       }
     } catch {
