@@ -36,7 +36,7 @@ Shows seeded Codex sessions for the same workspace so provider switching is visi
 
 Shows active terminal cards with mixed provider icons after launching terminals from both session providers.
 
-### Layout Density: 1x vs 4x
+### Layout Density: 1x vs 4x - Resizes ALL terminals to fit 1, 2, 3, 4 per viewport. Horizontal scroll 
 
 ![Single-column 1x density](./docs/media/layout-1x.png)
 
@@ -44,7 +44,7 @@ Shows active terminal cards with mixed provider icons after launching terminals 
 
 ![Four-column 4x density](./docs/media/layout-4x.png)
 
-4x mode shows multi-terminal parallel workflows in the same viewport.
+4x mode shows multi-terminal parallel workflows in the same viewport. 5 terminals in x4 means you have 1 overflow to the right to scroll to
 
 ### Minimap Hover Tooltip
 
