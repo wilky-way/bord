@@ -1,10 +1,22 @@
 # bord
-
-A workspace-scoped terminal manager with tiling layout, git integration, docker controls, and multi-provider session resume — built as a native desktop app.
-
 <p align="center">
   <img src="./docs/media/bord-logo.png" alt="bord logo" width="280" />
 </p>
+
+A workspace-scoped terminal manager with tiling layout, git integration, docker controls, and multi-provider session resume — built as a native desktop app.
+- Stash Active Terminals
+    - Receive Notifications when you are needed
+- Workspaces Own Terminals
+    - Terminals can have sessions linked or not
+    - No strays
+    - Open workspace in Editor
+- Horizontal Scroll, Mini-map Navigation, Snap to terminal, hotkeys
+- Git Diff Terminal Overlay
+    - Diff Preview
+    - Stage, Unstage, Commit, Push, Pull, Status
+    - Double click file to load in editor in workspace root
+- Resume CLI Sessions
+    - Claude Code, Codex, Gemini, OpenCode
 
 ![SolidJS](https://img.shields.io/badge/SolidJS-335C88?logo=solid&logoColor=white)
 ![Bun](https://img.shields.io/badge/Bun-000000?logo=bun&logoColor=white)
