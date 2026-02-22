@@ -10,12 +10,17 @@ interface RingBuffer {
   totalWritten: number; // Total bytes ever written (monotonically increasing)
 }
 
+const DEFAULT_IDLE_THRESHOLD_MS = 8000;
+
 interface PtySession {
   id: string;
   proc: ReturnType<typeof Bun.spawn>;
   cwd: string;
   ring: RingBuffer;
   subscribers: Map<ServerWebSocket<{ path: string }>, { cursor: number }>;
+  idleTimer: Timer | null;
+  idleThresholdMs: number;
+  isIdle: boolean;
 }
 
 function createRingBuffer(): RingBuffer {
@@ -98,6 +103,9 @@ export function createPty(
     cwd,
     ring: createRingBuffer(),
     subscribers: new Map(),
+    idleTimer: null,
+    idleThresholdMs: DEFAULT_IDLE_THRESHOLD_MS,
+    isIdle: false,
   };
 
   const shell = process.env.SHELL || "zsh";
@@ -119,12 +127,36 @@ export function createPty(
       rows,
       data(_terminal, data: Uint8Array) {
         appendToBuffer(session, data);
+
+        // Idle state tracking: clear pending timer, notify active if transitioning
+        if (session.idleTimer) {
+          clearTimeout(session.idleTimer);
+          session.idleTimer = null;
+        }
+        if (session.isIdle) {
+          session.isIdle = false;
+          const activeMsg = JSON.stringify({ type: "active" });
+          for (const [ws] of session.subscribers) {
+            if (ws.readyState === 1) ws.send(activeMsg);
+          }
+        }
+
         for (const [ws, meta] of session.subscribers) {
           if (ws.readyState === 1) {
             ws.sendBinary(data);
             meta.cursor = session.ring.totalWritten;
           }
         }
+
+        // Schedule idle detection
+        session.idleTimer = setTimeout(() => {
+          session.isIdle = true;
+          session.idleTimer = null;
+          const idleMsg = JSON.stringify({ type: "idle" });
+          for (const [ws] of session.subscribers) {
+            if (ws.readyState === 1) ws.send(idleMsg);
+          }
+        }, session.idleThresholdMs);
       },
       exit() {
         // PTY stream closed - clean up subscribers
@@ -170,6 +202,14 @@ export function attachWs(
 
   // Send current cursor position so client can track
   ws.send(JSON.stringify({ type: "cursor", cursor: session.ring.totalWritten }));
+
+  // Signal end of replay so client can distinguish replay bytes from live output
+  ws.send(JSON.stringify({ type: "replay-done" }));
+
+  // If terminal is already idle, tell the new client immediately
+  if (session.isIdle) {
+    ws.send(JSON.stringify({ type: "idle" }));
+  }
 
   return true;
 }
@@ -223,6 +263,11 @@ export async function destroyPty(id: string): Promise<boolean> {
   const session = sessions.get(id);
   if (!session) return false;
 
+  if (session.idleTimer) {
+    clearTimeout(session.idleTimer);
+    session.idleTimer = null;
+  }
+
   for (const [ws] of session.subscribers) {
     ws.close(1000, "PTY destroyed");
   }
@@ -233,6 +278,13 @@ export async function destroyPty(id: string): Promise<boolean> {
   }
   await killProcessTree(session.proc);
   sessions.delete(id);
+  return true;
+}
+
+export function configurePty(id: string, idleThresholdMs: number): boolean {
+  const session = sessions.get(id);
+  if (!session) return false;
+  session.idleThresholdMs = Math.max(1000, Math.min(30000, idleThresholdMs));
   return true;
 }
 

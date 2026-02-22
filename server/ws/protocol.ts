@@ -6,10 +6,14 @@
 // Client → Server:
 //   { type: "resize", cols: number, rows: number }
 //   { type: "ping" } -> responds with { type: "pong" }
+//   { type: "configure", idleThresholdMs: number }
 //
 // Server → Client:
 //   { type: "cursor", cursor: number }  - current buffer position after replay
 //   { type: "pong" }
+//   { type: "replay-done" }  - replay burst finished, live output follows
+//   { type: "idle" }   - PTY has been silent for idleThresholdMs
+//   { type: "active" } - PTY resumed output after being idle
 
 export interface ResizeMessage {
   type: "resize";
@@ -21,6 +25,11 @@ export interface PingMessage {
   type: "ping";
 }
 
+export interface ConfigureMessage {
+  type: "configure";
+  idleThresholdMs: number;
+}
+
 export interface CursorMessage {
   type: "cursor";
   cursor: number;
@@ -30,8 +39,20 @@ export interface PongMessage {
   type: "pong";
 }
 
-export type ClientControlMessage = ResizeMessage | PingMessage;
-export type ServerControlMessage = CursorMessage | PongMessage;
+export interface IdleMessage {
+  type: "idle";
+}
+
+export interface ActiveMessage {
+  type: "active";
+}
+
+export interface ReplayDoneMessage {
+  type: "replay-done";
+}
+
+export type ClientControlMessage = ResizeMessage | PingMessage | ConfigureMessage;
+export type ServerControlMessage = CursorMessage | PongMessage | IdleMessage | ActiveMessage | ReplayDoneMessage;
 export type ControlMessage = ClientControlMessage | ServerControlMessage;
 
 export function isControlMessage(data: unknown): data is ControlMessage {
