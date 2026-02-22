@@ -78,6 +78,11 @@ function ringRead(ring: RingBuffer, fromCursor: number): Uint8Array | null {
   return result;
 }
 
+function shellEscape(arg: string): string {
+  if (/^[a-zA-Z0-9_\-./=:@]+$/.test(arg)) return arg;
+  return `'${arg.replace(/'/g, "'\\''")}'`;
+}
+
 const sessions = new Map<string, PtySession>();
 
 export function createPty(
@@ -95,7 +100,10 @@ export function createPty(
     subscribers: new Map(),
   };
 
-  const cmd = command ?? ["zsh", "-l"];
+  const shell = process.env.SHELL || "zsh";
+  const cmd = command
+    ? [shell, "-l", "-c", `${command.map(shellEscape).join(" ")}; exec ${shell} -l`]
+    : [shell, "-l"];
 
   const { CLAUDECODE, ...cleanEnv } = process.env;
 
