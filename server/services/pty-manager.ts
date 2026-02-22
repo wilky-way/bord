@@ -109,9 +109,7 @@ export function createPty(
   };
 
   const shell = process.env.SHELL || "zsh";
-  const cmd = command
-    ? [shell, "-l", "-c", `${command.map(shellEscape).join(" ")}; exec ${shell} -l`]
-    : [shell, "-l"];
+  const cmd = [shell, "-l"];
 
   const { CLAUDECODE, ...cleanEnv } = process.env;
 
@@ -167,6 +165,10 @@ export function createPty(
       },
     },
   });
+
+  if (command?.length && proc.terminal) {
+    proc.terminal.write(`${command.map(shellEscape).join(" ")}\n`);
+  }
 
   session.proc = proc;
   sessions.set(id, session);

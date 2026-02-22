@@ -23,7 +23,9 @@ export default function EditorButton(props: Props) {
 
   const handleOpen = (e: MouseEvent) => {
     e.stopPropagation();
-    api.openInEditor(props.cwd, getPreferredEditor());
+    void api.openInEditor(props.cwd, getPreferredEditor()).catch((err) => {
+      console.error("[bord] open in editor failed:", err);
+    });
   };
 
   const handleDropdown = (e: MouseEvent) => {
@@ -35,7 +37,9 @@ export default function EditorButton(props: Props) {
     e.stopPropagation();
     setPreferredEditor(editor);
     setOpen(false);
-    api.openInEditor(props.cwd, editor);
+    void api.openInEditor(props.cwd, editor).catch((err) => {
+      console.error("[bord] open in editor failed:", err);
+    });
   };
 
   // Close dropdown on outside click

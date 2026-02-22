@@ -17,7 +17,9 @@ interface Props {
 export default function OpenFileButton(props: Props) {
   const handleClick = (e: MouseEvent) => {
     e.stopPropagation();
-    api.openInEditor(props.cwd, getPreferredEditor(), props.file);
+    void api.openInEditor(props.cwd, getPreferredEditor(), props.file).catch((err) => {
+      console.error("[bord] open file in editor failed:", err);
+    });
   };
 
   return (
