@@ -100,6 +100,30 @@ Shows Docker section expanded in sidebar for compose discovery and controls.
 
 Shows workspace-level editor launch controls.
 
+### Theme Picker (Settings Panel)
+
+![Settings panel with 15 theme swatches](./docs/media/settings-theme-picker.png)
+
+Settings panel with 15 curated theme swatches — each swatch shows a mini terminal preview with palette colors and a chrome strip. Click to apply instantly.
+
+### Theme Examples
+
+![Gruvbox Dark theme](./docs/media/theme-gruvbox-dark.png)
+
+Gruvbox Dark — warm earthy tones.
+
+![Dracula theme](./docs/media/theme-dracula.png)
+
+Dracula — deep purple accents.
+
+![Tokyo Night theme](./docs/media/theme-tokyo-night.png)
+
+Tokyo Night — deep blue with pastel highlights.
+
+![Rosé Pine theme](./docs/media/theme-rose-pine.png)
+
+Rosé Pine — muted purple and gold.
+
 ## Features
 
 ### Terminal Management
@@ -139,6 +163,13 @@ Shows workspace-level editor launch controls.
 - **Container controls** — start/stop/restart/pull at project or service level
 - **Logs and shell** — open `docker logs -f` and `docker exec -it ... sh` in new terminals
 - **Live refresh** — container status polling refreshes panel state
+
+### Themes
+- **15 curated themes** — Catppuccin (Frappe, Mocha, Macchiato, Latte), Dracula, Gruvbox Dark, Nord, Tokyo Night, Tokyo Night Storm, One Dark, Solarized Dark, Rosé Pine, Ayu Mirage, Monokai Pro, Night Owl
+- **Synchronized palettes** — terminal ANSI colors and app chrome (backgrounds, borders, accents) update together per theme
+- **Live preview** — click a theme swatch to apply instantly; no restart needed
+- **Settings panel** — gear icon in sidebar opens a modal with theme grid showing mini terminal previews
+- **Persistence** — selected theme saved to `localStorage` and restored on reload
 
 ### Editor Integration
 - **VS Code and Cursor** — open workspace directory in either editor via CLI (`code .` / `cursor .`)
@@ -218,6 +249,7 @@ graph TD
     Sidebar --> ProviderTabs["ProviderTabs + Quick Actions"]
     Sidebar --> SessionList
     Sidebar --> DockerPanel
+    Sidebar --> SettingsPanel
     SessionList --> SessionCard
 
     TilingLayout --> ResizablePanel
@@ -383,7 +415,9 @@ stateDiagram-v2
 └──────────┴───────────────────────────────────────────┘
 ```
 
-### Color Palette (Catppuccin Frappe)
+### Color Palette (Default: Catppuccin Frappe)
+
+15 built-in themes are available via Settings (gear icon). Each theme defines both app chrome CSS variables and a matched terminal ANSI palette. The default is Catppuccin Frappe:
 
 | Role | Variable | Hex | Catppuccin Name |
 |------|----------|-----|-----------------|
@@ -398,6 +432,10 @@ stateDiagram-v2
 | Danger | `--danger` | `#e78284` | Red |
 | Success | `--success` | `#a6d189` | Green |
 | Warning | `--warning` | `#e5c890` | Yellow |
+| Diff additions | `--diff-add-bg` | `#12261e` | — |
+| Diff deletions | `--diff-delete-bg` | `#2d1215` | — |
+
+Other themes: Catppuccin Mocha/Macchiato/Latte, Dracula, Gruvbox Dark, Nord, Tokyo Night, Tokyo Night Storm, One Dark, Solarized Dark, Rosé Pine, Ayu Mirage, Monokai Pro, Night Owl.
 
 ## Getting Started
 
@@ -463,6 +501,7 @@ bun run qa:capture-media
 5. Open git panel (`Cmd+G`) and test stage/diff/commit/push flow
 6. Open Docker panel and verify compose discovery and start/stop/logs actions
 7. Verify 1x/2x/3x/4x density controls, drag reorder, and minimap navigation
+8. Open Settings (gear icon), switch themes, verify chrome + new terminal palettes update
 
 ## Project Structure
 
@@ -494,20 +533,22 @@ bord/
 ├── src/
 │   ├── App.tsx               # Root layout + global keyboard shortcuts
 │   ├── index.tsx             # SolidJS render entry
-│   ├── styles.css            # CSS variables (Catppuccin Frappe) + Tailwind
+│   ├── styles.css            # CSS variable defaults (overridden by active theme) + Tailwind
 │   ├── components/
 │   │   ├── docker/           # DockerPanel
 │   │   ├── git/              # GitPanel, ChangedFilesList, CommitInput, DiffViewer
 │   │   ├── icons/            # ProviderIcons (Claude, VS Code, Cursor, etc.)
 │   │   ├── layout/           # TopBar, Sidebar, TilingLayout, ResizablePanel, TerminalMinimap
 │   │   ├── session/          # ProviderTabs, SessionList, SessionCard
+│   │   ├── settings/         # SettingsPanel (theme picker)
 │   │   ├── shared/           # EditorButton
 │   │   ├── terminal/         # TerminalPanel, TerminalView
 │   │   └── workspace/        # WorkspaceList
 │   ├── lib/
 │   │   ├── api.ts            # Typed HTTP client for all server routes
 │   │   ├── terminal-writer.ts# Terminal data writer utility
-│   │   ├── theme.ts          # Catppuccin terminal color palette for ghostty-web
+│   │   ├── theme.ts          # Reactive theme manager (signals + CSS var application)
+│   │   ├── themes/           # Theme definitions (15 curated) + BordTheme type
 │   │   ├── use-drag-reorder.ts# Pointer-event drag reorder hook
 │   │   └── ws.ts             # WebSocket connection manager
 │   └── store/

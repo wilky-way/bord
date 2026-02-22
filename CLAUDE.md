@@ -24,8 +24,10 @@ Bord is a workspace-scoped terminal manager with tiling layout, git integration,
 | `src/store/terminals.ts` | Terminal actions: add, remove, stash, unstash, move, navigate |
 | `src/lib/api.ts` | Typed HTTP client wrapping all `/api/*` routes |
 | `src/lib/ws.ts` | WebSocket connection manager |
-| `src/styles.css` | CSS custom properties (Catppuccin Frappe palette) + Tailwind import |
-| `src/lib/theme.ts` | Terminal color palette for ghostty-web |
+| `src/styles.css` | CSS variable defaults + Tailwind import (overridden at runtime by active theme) |
+| `src/lib/theme.ts` | Reactive theme manager — signals, localStorage persistence, CSS var application |
+| `src/lib/themes/index.ts` | 15 curated theme definitions (chrome + terminal palettes) |
+| `src/components/settings/SettingsPanel.tsx` | Settings modal with theme picker grid |
 
 ## Store Architecture
 

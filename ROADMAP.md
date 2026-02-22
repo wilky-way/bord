@@ -23,6 +23,7 @@ This roadmap reflects actual implementation status in the repo today. For execut
 - [x] Docker logs/shell spawn into terminals
 - [x] Open workspace/file in VS Code or Cursor
 - [x] App rename from cockpit to bord
+- [x] Theme system with 15 curated themes, settings panel, and localStorage persistence
 
 ## Partial / Needs Polish
 
@@ -58,9 +59,10 @@ This roadmap reflects actual implementation status in the repo today. For execut
 
 ### Phase 3 - Settings and Themes
 
-- [ ] Add settings surface for theme/composer/notification toggles
-- [ ] Add theme selector (Catppuccin variants, Gruvbox, One Dark baseline)
-- [ ] Keep terminal palette and app chrome synchronized per theme
+- [x] Add settings surface (modal from gear icon, left nav with Appearance section)
+- [x] Add theme selector (15 curated: Catppuccin ×4, Dracula, Gruvbox, Nord, Tokyo Night ×2, One Dark, Solarized, Rosé Pine, Ayu Mirage, Monokai Pro, Night Owl)
+- [x] Keep terminal palette and app chrome synchronized per theme
+- [ ] Add composer/notification toggles to settings panel
 
 ### Phase 4 - Distribution and Quality
 

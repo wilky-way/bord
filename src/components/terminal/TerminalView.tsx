@@ -4,6 +4,7 @@ import { connectTerminal, sendToTerminal, sendResize } from "../../lib/ws";
 import { createTerminalWriter } from "../../lib/terminal-writer";
 import { setTerminalConnected } from "../../store/terminals";
 import { terminalTheme } from "../../lib/theme";
+// Theme is read at terminal creation time — changing themes applies to new terminals only
 
 interface Props {
   ptyId: string;
@@ -31,7 +32,7 @@ export default function TerminalView(props: Props) {
       fontSize: 13,
       cursorStyle: "block",
       cursorBlink: false,
-      theme: terminalTheme,
+      theme: terminalTheme(),
     });
 
     terminal.open(containerRef);

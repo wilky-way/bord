@@ -12,6 +12,8 @@
   --danger:        #e78284;  /* Red */
   --success:       #a6d189;  /* Green */
   --warning:       #e5c890;  /* Yellow */
+  --diff-add-bg:   #12261e;
+  --diff-delete-bg:#2d1215;
   /* Parallel-code inspired */
   --shadow-soft:   0 14px 30px rgba(0, 0, 0, 0.28);
   --shadow-glow:   0 0 8px color-mix(in srgb, var(--accent) 50%, transparent);

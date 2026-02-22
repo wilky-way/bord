@@ -40,8 +40,8 @@ export default function DiffViewer(props: Props) {
   }
 
   function lineClass(line: string): string {
-    if (line.startsWith("+") && !line.startsWith("+++")) return "text-[var(--success)] bg-[#12261e]";
-    if (line.startsWith("-") && !line.startsWith("---")) return "text-[var(--danger)] bg-[#2d1215]";
+    if (line.startsWith("+") && !line.startsWith("+++")) return "text-[var(--success)] bg-[var(--diff-add-bg)]";
+    if (line.startsWith("-") && !line.startsWith("---")) return "text-[var(--danger)] bg-[var(--diff-delete-bg)]";
     if (line.startsWith("@@")) return "text-[var(--accent)] bg-[var(--bg-tertiary)]";
     return "text-[var(--text-secondary)]";
   }

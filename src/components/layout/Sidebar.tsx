@@ -5,6 +5,7 @@ import ProviderTabs from "../session/ProviderTabs";
 import DockerPanel from "../docker/DockerPanel";
 import WorkspaceList from "../workspace/WorkspaceList";
 import EditorButton from "../shared/EditorButton";
+import SettingsPanel from "../settings/SettingsPanel";
 import { buildNewSessionCommand, buildResumeCommand, PROVIDER_ICONS, PROVIDER_LABELS } from "../../lib/providers";
 import { addTerminal, setActiveTerminal, setTerminalMuted, unstashTerminal } from "../../store/terminals";
 import { createWorkspace } from "../../store/workspaces";
@@ -61,6 +62,7 @@ export default function Sidebar() {
   const [expandedHoverSessions, setExpandedHoverSessions] = createSignal<SessionInfo[]>([]);
   const [expandedHoverLoading, setExpandedHoverLoading] = createSignal(false);
   const [stashOpen, setStashOpen] = createSignal(false);
+  const [settingsOpen, setSettingsOpen] = createSignal(false);
   const [addingWorkspace, setAddingWorkspace] = createSignal(false);
   const [addWorkspaceError, setAddWorkspaceError] = createSignal<string | null>(null);
   const previewSessionCache = new Map<string, SessionInfo[]>();
@@ -827,9 +829,7 @@ export default function Sidebar() {
           <button
             class="w-10 h-10 mt-1 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors flex items-center justify-center"
             title="Settings"
-            onClick={() => {
-              // Future: open settings panel
-            }}
+            onClick={() => setSettingsOpen(true)}
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="8" cy="8" r="2.5" />
@@ -1131,6 +1131,8 @@ export default function Sidebar() {
           {panel()}
         </div>
       </Show>
+
+      <SettingsPanel open={settingsOpen()} onClose={() => setSettingsOpen(false)} />
     </div>
   );
 }
