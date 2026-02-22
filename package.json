@@ -13,6 +13,7 @@
     "fixtures:register": "bun run scripts/fixtures/register-workspaces.ts",
     "fixtures:cleanup": "bun run scripts/fixtures/cleanup-demo.ts",
     "qa:capture-media": "bun run scripts/qa/capture-media.ts",
+    "qa:capture-hscroll": "bun run scripts/qa/capture-horizontal-scroll.ts",
     "tauri": "tauri",
     "tauri:dev": "tauri dev"
   },

@@ -272,8 +272,14 @@ function ensureVisibleTerminalCount(target: number) {
 }
 
 function revealMinimapProviderTooltip() {
+  // Minimap buttons live inside div.relative.group in the TopBar (top < 50px).
+  // Each group has a <button> and a tooltip <div class="absolute top-full ...hidden group-hover:flex">.
+  // Old selectors used button.h-2.rounded-sm which no longer matches (now h-3.5 rounded).
+  const FIND_GROUPS =
+    "[...document.querySelectorAll('div.group')].filter((g) => g.getBoundingClientRect().top < 50 && g.querySelector('button') && g.querySelector('div.absolute'))";
+
   const coords = evalJs(
-    "(() => { const groups = [...document.querySelectorAll('div.group')].filter((group) => group.querySelector('button.h-2.rounded-sm') && group.querySelector('div.absolute.top-full')); if (!groups.length) return ''; const group = groups[0]; const target = group.querySelector('button.h-2.rounded-sm'); if (!(target instanceof HTMLElement)) return ''; const tip = group.querySelector('div.absolute.top-full'); if (tip instanceof HTMLElement) { tip.classList.remove('hidden'); tip.classList.add('flex'); tip.style.display = 'flex'; tip.style.opacity = '1'; tip.style.visibility = 'visible'; tip.style.zIndex = '9999'; } const rect = target.getBoundingClientRect(); target.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true })); target.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })); return `${Math.round(rect.left + rect.width / 2)},${Math.round(rect.top + rect.height / 2)}`; })()",
+    `(() => { const groups = ${FIND_GROUPS}; if (!groups.length) return ''; const group = groups[0]; const target = group.querySelector('button'); if (!(target instanceof HTMLElement)) return ''; const tip = group.querySelector('div.absolute'); if (tip instanceof HTMLElement) { tip.classList.remove('hidden'); tip.classList.add('flex'); tip.style.display = 'flex'; tip.style.opacity = '1'; tip.style.visibility = 'visible'; tip.style.zIndex = '9999'; } const rect = target.getBoundingClientRect(); target.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true })); target.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })); return Math.round(rect.left + rect.width / 2) + ',' + Math.round(rect.top + rect.height / 2); })()`,
     true,
   ).trim();
 
@@ -285,7 +291,7 @@ function revealMinimapProviderTooltip() {
   for (let i = 0; i < 3; i++) {
     if (minimapTooltipVisible()) break;
     evalJs(
-      "(() => { const groups = [...document.querySelectorAll('div.group')].filter((group) => group.querySelector('button.h-2.rounded-sm') && group.querySelector('div.absolute.top-full')); if (!groups.length) return 'missing'; const tip = groups[0].querySelector('div.absolute.top-full'); if (!(tip instanceof HTMLElement)) return 'missing'; tip.classList.remove('hidden'); tip.classList.add('flex'); tip.style.display = 'flex'; tip.style.visibility = 'visible'; tip.style.opacity = '1'; return 'ok'; })()",
+      `(() => { const groups = ${FIND_GROUPS}; if (!groups.length) return 'missing'; const tip = groups[0].querySelector('div.absolute'); if (!(tip instanceof HTMLElement)) return 'missing'; tip.classList.remove('hidden'); tip.classList.add('flex'); tip.style.display = 'flex'; tip.style.visibility = 'visible'; tip.style.opacity = '1'; return 'ok'; })()`,
       true,
     );
     wait(120);
@@ -320,7 +326,7 @@ function stashPopoverVisible() {
 
 function minimapTooltipVisible() {
   const result = evalJs(
-    "(() => [...document.querySelectorAll('div.group div.absolute.top-full')].some((el) => { if (!(el instanceof HTMLElement)) return false; const style = window.getComputedStyle(el); return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0'; }))()",
+    "(() => { const groups = [...document.querySelectorAll('div.group')].filter((g) => g.getBoundingClientRect().top < 50 && g.querySelector('button') && g.querySelector('div.absolute')); return groups.some((g) => { const tip = g.querySelector('div.absolute'); if (!(tip instanceof HTMLElement)) return false; const style = window.getComputedStyle(tip); return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0'; }); })()",
     true,
   ).trim();
   return result.includes("true");
