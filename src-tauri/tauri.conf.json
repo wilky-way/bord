@@ -44,7 +44,7 @@
       "endpoints": [
         "https://github.com/wilky-way/bord/releases/latest/download/latest.json"
       ],
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDUzM0UzN0VCM0JCOEVDQ0MKUldUTTdMZzc2emMrVTh1Q1hKQzBOTi85U0pFaFlVeWlJWWFQUVJxanExeGh5NFVqRmV3WmhsZ0wK"
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEI1NENERjZBQzhDRTUyMzUKUldRMVVzN0lhdDlNdGYrdkNHREZvcElScjkxUi9NYTdLRkVGVU5MaDJwUWpoU3d0U05ISFM2ckEK"
     }
   }
 }

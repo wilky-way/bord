@@ -588,7 +588,7 @@ bord/
 │   │   └── protocol.ts       # Control message types (resize, ping/pong, cursor, idle/active, configure)
 │   └── schema.sql            # workspaces, session_cache, app_state tables
 ├── src/
-│   ├── App.tsx               # Root layout + global keyboard shortcuts
+│   ├── App.tsx               # Root layout + global keyboard shortcuts + updater init
 │   ├── index.tsx             # SolidJS render entry
 │   ├── styles.css            # CSS variable defaults (overridden by active theme) + Tailwind
 │   ├── components/
@@ -607,6 +607,7 @@ bord/
 │   │   ├── notifications/    # Notification store, types, dual-indexed reactive index, sound system
 │   │   ├── terminal-shortcuts.ts# Terminal key handler (Cmd+C/V/K, Option+arrows, font size, etc.)
 │   │   ├── terminal-writer.ts# Terminal data writer utility
+│   │   ├── updater.ts         # In-app auto-update (check, download, install, relaunch)
 │   │   ├── theme.ts          # Reactive theme manager (signals + CSS var application)
 │   │   ├── themes/           # Theme definitions (15 curated) + BordTheme type
 │   │   ├── use-drag-reorder.ts# Pointer-event drag reorder hook
@@ -621,7 +622,7 @@ bord/
 │       ├── settings.ts      # Font size signal (persistent) + global settings panel state
 │       └── ui.ts             # UI toggles
 ├── src-tauri/                # Tauri v2 Rust shell
-│   ├── tauri.conf.json       # Window config, CSP, bundle settings
+│   ├── tauri.conf.json       # Window config, CSP, bundle settings, updater config
 │   ├── Cargo.toml
 │   └── src/
 ├── scripts/
@@ -638,6 +639,23 @@ bord/
 ├── bord.db                   # SQLite database (created at runtime)
 └── ROADMAP.md
 ```
+
+## Releasing & Auto-Updates
+
+Bord has built-in auto-updates via GitHub Releases. Users see an in-app banner when a new version is available and can update with one click.
+
+To cut a release:
+
+```bash
+# 1. Bump version in package.json, src-tauri/tauri.conf.json, src-tauri/Cargo.toml
+# 2. Commit and tag
+git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml
+git commit -m "chore: bump version to 0.3.0"
+git tag v0.3.0
+git push origin main --tags
+```
+
+The tag push triggers a GitHub Actions workflow that builds signed macOS binaries (arm64 + x86_64) and publishes a release with the update manifest. Full guide: [`docs/how-to/releasing.md`](docs/how-to/releasing.md)
 
 ## Support
 
