@@ -13,6 +13,7 @@ A workspace-scoped terminal manager with tiling layout, git integration, docker 
     - 0 or 1 focused terminal at a time in workspace.
     - No stray terminals
     - Snap to fit active terminal to view.
+    - Auto resize available, or manual drag to re-size or re-order
     - Open workspace in Editor
 - Horizontal Scroll, Mini-map Navigation, Snap to terminal, hotkeys
 - Git Diff Terminal Overlay
