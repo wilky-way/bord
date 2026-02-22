@@ -4,6 +4,7 @@ import { activeTheme, setTheme } from "../../lib/theme";
 import { getSettings, updateSettings, requestOsNotificationPermission } from "../../lib/notifications/store";
 import { sendConfigureToAll } from "../../lib/ws";
 import { fontFamily, setFontFamily, FONT_PRESETS } from "../../store/settings";
+import { checkForUpdates, updateAvailable, updateVersion, updateStatus, installUpdate } from "../../lib/updater";
 import type { BordTheme } from "../../lib/themes";
 
 interface Props {
@@ -11,7 +12,7 @@ interface Props {
   onClose: () => void;
 }
 
-type Section = "appearance" | "notifications";
+type Section = "appearance" | "notifications" | "about";
 
 export default function SettingsPanel(props: Props) {
   const [section, setSection] = createSignal<Section>("appearance");
@@ -62,13 +63,25 @@ export default function SettingsPanel(props: Props) {
                 </svg>
               }
             />
+            <NavItem
+              label="About"
+              active={section() === "about"}
+              onClick={() => setSection("about")}
+              icon={
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                  <circle cx="8" cy="8" r="6" />
+                  <path d="M8 7v4" />
+                  <circle cx="8" cy="5" r="0.5" fill="currentColor" />
+                </svg>
+              }
+            />
           </div>
 
           {/* Content area */}
           <div class="flex-1 overflow-y-auto p-5">
             <div class="flex items-center justify-between mb-5">
               <h3 class="text-sm font-semibold text-[var(--text-primary)]">
-                {section() === "appearance" ? "Appearance" : "Notifications"}
+                {section() === "appearance" ? "Appearance" : section() === "notifications" ? "Notifications" : "About"}
               </h3>
               <button
                 class="w-7 h-7 rounded-md flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
@@ -101,6 +114,10 @@ export default function SettingsPanel(props: Props) {
 
             <Show when={section() === "notifications"}>
               <NotificationSettings />
+            </Show>
+
+            <Show when={section() === "about"}>
+              <AboutSection />
             </Show>
           </div>
         </div>
@@ -253,6 +270,58 @@ function FontPicker() {
       <p class="text-[10px] text-[var(--text-secondary)]">
         Install a <a href="https://www.nerdfonts.com/" target="_blank" class="text-[var(--accent)] hover:underline">Nerd Font</a> for powerlevel10k icons
       </p>
+    </div>
+  );
+}
+
+function AboutSection() {
+  const status = () => updateStatus();
+
+  return (
+    <div class="space-y-4">
+      <div>
+        <label class="text-xs font-medium text-[var(--text-secondary)] mb-2 block">Version</label>
+        <div class="text-xs text-[var(--text-primary)]">Bord v{__APP_VERSION__}</div>
+      </div>
+
+      <div>
+        <label class="text-xs font-medium text-[var(--text-secondary)] mb-2 block">Updates</label>
+        <Show when={updateAvailable()} fallback={
+          <div class="flex items-center gap-3">
+            <span class="text-xs text-[var(--text-secondary)]">
+              {status() === "checking" ? "Checking for updates..." : "You're up to date"}
+            </span>
+            <button
+              class="px-3 py-1 text-xs rounded-md bg-[var(--bg-tertiary)] text-[var(--text-primary)] hover:bg-[var(--accent)] hover:text-white transition-colors disabled:opacity-40"
+              onClick={checkForUpdates}
+              disabled={status() === "checking"}
+            >
+              {status() === "checking" ? "Checking..." : "Check for updates"}
+            </button>
+          </div>
+        }>
+          <div class="flex items-center gap-3">
+            <span class="text-xs text-[var(--text-primary)]">
+              {status() === "downloading"
+                ? "Downloading..."
+                : status() === "installing"
+                ? "Installing..."
+                : `v${updateVersion()} available`}
+            </span>
+            <Show when={status() === "idle"}>
+              <button
+                class="px-3 py-1 text-xs rounded-md bg-[var(--accent)] text-white hover:opacity-90 transition-colors"
+                onClick={installUpdate}
+              >
+                Update now
+              </button>
+            </Show>
+            <Show when={status() === "downloading" || status() === "installing"}>
+              <div class="w-3 h-3 border-2 border-[var(--accent)]/30 border-t-[var(--accent)] rounded-full animate-spin" />
+            </Show>
+          </div>
+        </Show>
+      </div>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "bord",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "identifier": "com.bord.desktop",
   "build": {
     "frontendDist": "../dist",
@@ -30,6 +30,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -37,5 +38,13 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/wilky-way/bord/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDUzM0UzN0VCM0JCOEVDQ0MKUldUTTdMZzc2emMrVTh1Q1hKQzBOTi85U0pFaFlVeWlJWWFQUVJxanExeGh5NFVqRmV3WmhsZ0wK"
+    }
   }
 }

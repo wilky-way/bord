@@ -2,13 +2,17 @@ import { onCleanup, onMount } from "solid-js";
 import TopBar from "./components/layout/TopBar";
 import Sidebar from "./components/layout/Sidebar";
 import TilingLayout from "./components/layout/TilingLayout";
+import UpdateBanner from "./components/UpdateBanner";
 import { addTerminal, removeTerminal, activateAdjacentTerminal } from "./store/terminals";
 import { state, setState } from "./store/core";
 import { toggleGitPanel } from "./store/git";
 import { setSettingsOpen } from "./store/settings";
+import { initUpdater } from "./lib/updater";
 
 export default function App() {
   onMount(() => {
+    initUpdater();
+
     const onKeyDown = (e: KeyboardEvent) => {
       // Ctrl+N: New terminal in active workspace
       if ((e.ctrlKey || e.metaKey) && e.key === "n") {
@@ -74,6 +78,7 @@ export default function App() {
 
   return (
     <div class="flex flex-col h-screen w-screen overflow-hidden">
+      <UpdateBanner />
       <TopBar />
       <div class="flex flex-1 min-h-0">
         <Sidebar />
