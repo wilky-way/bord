@@ -1,11 +1,12 @@
 import { Dynamic } from "solid-js/web";
 import { api } from "../../lib/api";
 import { getPreferredEditor } from "../../lib/editor-preference";
-import { VSCodeIcon, CursorIcon } from "../icons/ProviderIcons";
+import { VSCodeIcon, CursorIcon, ZedIcon } from "../icons/ProviderIcons";
 
 const EDITORS = {
   vscode: { Icon: VSCodeIcon },
   cursor: { Icon: CursorIcon },
+  zed: { Icon: ZedIcon },
 };
 
 interface Props {

@@ -132,7 +132,7 @@ export const api = {
     }>(`/git/repo-tree?cwd=${encodeURIComponent(cwd)}`),
 
   // Editor
-  openInEditor: (cwd: string, editor: "vscode" | "cursor", file?: string) =>
+  openInEditor: (cwd: string, editor: "vscode" | "cursor" | "zed", file?: string) =>
     request<{ ok: boolean; error?: string }>("/editor/open", {
       method: "POST",
       body: JSON.stringify({ cwd, editor, ...(file && { file }) }),

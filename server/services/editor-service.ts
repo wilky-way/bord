@@ -2,11 +2,12 @@ import { existsSync } from "fs";
 import { resolve } from "path";
 import { validateCwd } from "./git-service";
 
-export type EditorType = "vscode" | "cursor";
+export type EditorType = "vscode" | "cursor" | "zed";
 
 const EDITOR_COMMANDS: Record<EditorType, string> = {
   vscode: "code",
   cursor: "cursor",
+  zed: "zed",
 };
 
 export async function openInEditor(

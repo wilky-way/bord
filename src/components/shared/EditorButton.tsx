@@ -2,11 +2,12 @@ import { createSignal, onCleanup, onMount, Show } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import { api } from "../../lib/api";
 import { getPreferredEditor, setPreferredEditor, type Editor } from "../../lib/editor-preference";
-import { VSCodeIcon, CursorIcon } from "../icons/ProviderIcons";
+import { VSCodeIcon, CursorIcon, ZedIcon } from "../icons/ProviderIcons";
 
 const EDITORS: Record<Editor, { label: string; Icon: typeof VSCodeIcon }> = {
   vscode: { label: "VS Code", Icon: VSCodeIcon },
   cursor: { label: "Cursor", Icon: CursorIcon },
+  zed: { label: "Zed", Icon: ZedIcon },
 };
 
 interface Props {

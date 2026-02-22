@@ -6,8 +6,8 @@ export async function editorRoutes(req: Request, url: URL): Promise<Response | n
     if (!body.cwd) {
       return Response.json({ error: "cwd is required" }, { status: 400 });
     }
-    if (!body.editor || !["vscode", "cursor"].includes(body.editor)) {
-      return Response.json({ error: "editor must be 'vscode' or 'cursor'" }, { status: 400 });
+    if (!body.editor || !["vscode", "cursor", "zed"].includes(body.editor)) {
+      return Response.json({ error: "editor must be 'vscode', 'cursor', or 'zed'" }, { status: 400 });
     }
     const result = await openInEditor(body.cwd, body.editor as EditorType, body.file);
     return Response.json(result, { status: result.ok ? 200 : 400 });

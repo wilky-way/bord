@@ -1,6 +1,6 @@
 import { createSignal } from "solid-js";
 
-type Editor = "vscode" | "cursor";
+type Editor = "vscode" | "cursor" | "zed";
 
 const STORAGE_KEY = "bord-preferred-editor";
 
