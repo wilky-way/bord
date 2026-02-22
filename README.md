@@ -4,6 +4,24 @@
 </p>
 
 A workspace-scoped terminal manager with tiling layout, git integration, docker controls, and multi-provider session resume — built as a native desktop app.
+
+## Install
+
+### macOS (Homebrew)
+
+```bash
+brew install --cask wilky-way/tap/bord
+```
+
+### macOS (manual)
+
+Download the `.dmg` from the [latest release](https://github.com/wilky-way/bord/releases/latest) — pick `aarch64` (Apple Silicon) or `x64` (Intel).
+
+### Windows / Linux
+
+Download the installer from the [latest release](https://github.com/wilky-way/bord/releases/latest):
+- **Windows:** `.msi` or `.exe` installer
+- **Linux:** `.deb`, `.rpm`, or `.AppImage`
 - Stash Active Terminals
     - Receive Notifications when you are needed
 - Workspaces Own Terminals
@@ -661,7 +679,7 @@ git tag v0.3.0
 git push origin main --tags
 ```
 
-The tag push triggers a GitHub Actions workflow that builds signed macOS binaries (arm64 + x86_64) and publishes a release with the update manifest. Full guide: [`docs/how-to/releasing.md`](docs/how-to/releasing.md)
+The tag push triggers a GitHub Actions workflow that builds for macOS (arm64 + x86_64), Windows (x64), and Linux (x64), publishes a release with the update manifest, and auto-updates the [Homebrew tap](https://github.com/wilky-way/homebrew-tap). Full guide: [`docs/how-to/releasing.md`](docs/how-to/releasing.md)
 
 ## Support
 

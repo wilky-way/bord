@@ -97,37 +97,33 @@ jobs:
           ARM_SHA=$(shasum -a 256 bord_arm.dmg | awk '{print $1}')
           INTEL_SHA=$(shasum -a 256 bord_intel.dmg | awk '{print $1}')
 
-          git clone git@github.com:wilky-way/homebrew-bord.git tap
+          git clone git@github.com:wilky-way/homebrew-tap.git tap
           cd tap
           mkdir -p Casks
 
-          cat > Casks/bord.rb << 'CASK'
-cask "bord" do
-  arch arm: "aarch64", intel: "x64"
-  version "__VERSION__"
-  sha256 arm: "__ARM_SHA__", intel: "__INTEL_SHA__"
+          cat > Casks/bord.rb <<CASK
+          cask "bord" do
+            arch arm: "aarch64", intel: "x64"
+            version "${VERSION}"
+            sha256 arm: "${ARM_SHA}", intel: "${INTEL_SHA}"
 
-  url "https://github.com/wilky-way/bord/releases/download/v#{version}/bord_#{version}_#{arch}.dmg"
+            url "https://github.com/wilky-way/bord/releases/download/v#{version}/bord_#{version}_#{arch}.dmg"
 
-  name "Bord"
-  desc "Workspace-scoped terminal manager with tiling layout and git integration"
-  homepage "https://github.com/wilky-way/bord"
+            name "Bord"
+            desc "Workspace-scoped terminal manager with tiling layout and git integration"
+            homepage "https://github.com/wilky-way/bord"
 
-  livecheck do
-    url :url
-    strategy :github_latest
-  end
+            livecheck do
+              url :url
+              strategy :github_latest
+            end
 
-  auto_updates true
-  depends_on macos: ">= :monterey"
+            auto_updates true
+            depends_on macos: ">= :monterey"
 
-  app "bord.app"
-end
-CASK
-
-          sed -i '' "s/__VERSION__/${VERSION}/" Casks/bord.rb
-          sed -i '' "s/__ARM_SHA__/${ARM_SHA}/" Casks/bord.rb
-          sed -i '' "s/__INTEL_SHA__/${INTEL_SHA}/" Casks/bord.rb
+            app "bord.app"
+          end
+          CASK
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
