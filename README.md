@@ -64,6 +64,18 @@ Shows staged/changed lists and an active diff render inside the git panel.
 
 Shows workspace stash tray behavior with active/stashed terminal states.
 
+### Collapsed Rail Counters
+
+![Collapsed sidebar rail counters](./docs/media/sidebar-rail-counters.png)
+
+Shows per-workspace terminal counters in collapsed mode (`total-active-stashed`) with attention badge.
+
+### Workspace Hover Preview
+
+![Workspace hover preview with tabs](./docs/media/sidebar-hover-workspace-preview.png)
+
+Shows workspace hover preview tabs (`Sessions`, `All`, `Active`, `Stashed`) and provider switchers.
+
 ### Docker Section Expanded
 
 ![Expanded Docker section](./docs/media/docker-panel-expanded.png)
@@ -76,9 +88,13 @@ Shows Docker section expanded in sidebar for compose discovery and controls.
 
 Shows workspace-level editor launch controls.
 
-### Showcase Video
+### Showcase Workflow
 
-- `./docs/media/showcase-workflow.webm` — 4x -> 3x -> 2x -> 1x transitions, horizontal scrolling, minimap hover, and add-terminal flow.
+![Stash-focused workflow showcase](./docs/media/showcase-workflow.gif)
+
+[Full workflow video (WebM)](./docs/media/showcase-workflow.webm)
+
+Stash-focused flow: workspace switch, Claude/Codex session launches, provider-new terminal, stash/unstash from sidebar flyout, density transitions (4x -> 1x), horizontal scroll, far-right add-terminal, and git diff interaction.
 
 ## Features
 
@@ -89,7 +105,6 @@ Shows workspace-level editor launch controls.
 - **Resizable panels** — drag panel edges to adjust width ratios
 - **Stash/unstash** — hide terminals without destroying them; stashed terminals show attention badges when new output arrives
 - **Notification controls** — global bell mute plus per-terminal mute controls
-- **Scroll sync** — parallel scroll mode that syncs scroll position across all visible terminals (fraction-based normalization)
 - **Terminal minimap** — compact navigation strip in the top bar showing all visible terminals with attention indicators
 
 ### Workspace Scoping
@@ -182,7 +197,6 @@ graph TD
 
     TopBar --> TerminalMinimap
     TopBar --> LayoutDensityButtons["Layout Density (1x-4x)"]
-    TopBar --> ScrollSyncToggle["Scroll Sync Toggle"]
 
     Sidebar --> WorkspaceList
     Sidebar --> ProviderTabs
@@ -472,7 +486,7 @@ bord/
 │   │   ├── layout/           # TopBar, Sidebar, TilingLayout, ResizablePanel, TerminalMinimap
 │   │   ├── session/          # ProviderTabs, SessionList, SessionCard
 │   │   ├── shared/           # EditorButton
-│   │   ├── terminal/         # TerminalPanel, TerminalView, ParallelScroll
+│   │   ├── terminal/         # TerminalPanel, TerminalView
 │   │   └── workspace/        # WorkspaceList
 │   ├── lib/
 │   │   ├── api.ts            # Typed HTTP client for all server routes

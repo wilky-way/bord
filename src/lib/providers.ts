@@ -60,6 +60,10 @@ export function buildResumeCommand(provider: Provider, sessionId: string): strin
   }
 }
 
+export function buildNewSessionCommand(provider: Provider): string[] {
+  return [PROVIDER_COMMANDS[provider]];
+}
+
 export function getResumeSessionId(command?: string[]): string | undefined {
   if (!command?.length) return undefined;
 

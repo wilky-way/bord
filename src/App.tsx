@@ -3,7 +3,7 @@ import TopBar from "./components/layout/TopBar";
 import Sidebar from "./components/layout/Sidebar";
 import TilingLayout from "./components/layout/TilingLayout";
 import { addTerminal, activateAdjacentTerminal } from "./store/terminals";
-import { state } from "./store/core";
+import { state, setState } from "./store/core";
 import { toggleGitPanel } from "./store/git";
 
 export default function App() {
@@ -28,6 +28,11 @@ export default function App() {
       if ((e.metaKey || e.ctrlKey) && e.key === "g") {
         e.preventDefault();
         toggleGitPanel(state.activeTerminalId);
+      }
+      // Cmd+B / Ctrl+B: Toggle sidebar expanded/collapsed
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "b") {
+        e.preventDefault();
+        setState("sidebarOpen", (v) => !v);
       }
     };
 

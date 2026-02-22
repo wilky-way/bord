@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  buildNewSessionCommand,
   buildResumeCommand,
   getProviderFromCommand,
   getResumeSessionId,
@@ -10,6 +11,13 @@ describe("provider command helpers", () => {
     expect(buildResumeCommand("claude", "claude-id")).toEqual(["claude", "--resume", "claude-id"]);
     expect(buildResumeCommand("codex", "codex-id")).toEqual(["codex", "resume", "codex-id"]);
     expect(buildResumeCommand("opencode", "open-id")).toEqual(["opencode", "--session", "open-id"]);
+  });
+
+  test("builds provider-specific new session commands", () => {
+    expect(buildNewSessionCommand("claude")).toEqual(["claude"]);
+    expect(buildNewSessionCommand("codex")).toEqual(["codex"]);
+    expect(buildNewSessionCommand("opencode")).toEqual(["opencode"]);
+    expect(buildNewSessionCommand("gemini")).toEqual(["gemini"]);
   });
 
   test("detects providers from command binaries", () => {

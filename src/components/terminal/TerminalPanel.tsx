@@ -171,6 +171,8 @@ export default function TerminalPanel(props: Props) {
   return (
     <div
       ref={panelRef}
+      data-terminal-id={props.id}
+      data-provider={terminal()?.provider ?? ""}
       class="flex flex-col h-full min-w-0 bg-[var(--bg-secondary)] rounded-xl overflow-hidden"
       style={{
         "box-shadow": props.isActive ? "var(--shadow-glow)" : "var(--shadow-soft)",
@@ -291,6 +293,7 @@ export default function TerminalPanel(props: Props) {
           </Show>
           <EditorButton cwd={props.cwd} size="md" />
           <button
+            data-action="stash-terminal"
             class="text-[var(--text-secondary)] hover:text-[var(--accent)] text-xs w-6 h-6 flex items-center justify-center rounded-[var(--btn-radius)] hover:bg-[var(--bg-tertiary)] transition-colors"
             onClick={(e) => {
               e.stopPropagation();
@@ -303,6 +306,7 @@ export default function TerminalPanel(props: Props) {
             </svg>
           </button>
           <button
+            data-action="close-terminal"
             class="text-[var(--text-secondary)] hover:text-[var(--danger)] text-xs w-6 h-6 flex items-center justify-center rounded-[var(--btn-radius)] hover:bg-[var(--bg-tertiary)] transition-colors"
             onClick={(e) => {
               e.stopPropagation();

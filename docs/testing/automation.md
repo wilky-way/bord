@@ -37,8 +37,11 @@ Generated media files (default):
 - `docs/media/sessions-codex.png`
 - `docs/media/git-panel-diff-selected.png`
 - `docs/media/stash-sidebar-popover.png`
+- `docs/media/sidebar-rail-counters.png`
+- `docs/media/sidebar-hover-workspace-preview.png`
 - `docs/media/docker-panel-expanded.png`
 - `docs/media/open-in-editor-controls.png`
+- `docs/media/showcase-workflow.gif`
 - `docs/media/showcase-workflow.webm`
 
 ## Environment Variables

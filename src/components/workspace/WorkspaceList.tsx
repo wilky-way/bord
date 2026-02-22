@@ -189,22 +189,15 @@ export default function WorkspaceList() {
   }
 
   function selectWorkspace(id: string) {
-    if (id === state.activeWorkspaceId) {
-      // Toggle: deselect workspace, close popover
-      setState("activeWorkspaceId", null);
-      setStashOpenId(null);
+    setState("activeWorkspaceId", id);
+    // Set active terminal to first non-stashed terminal in this workspace
+    const wsTerminals = state.terminals.filter((t) => t.workspaceId === id && !t.stashed);
+    if (wsTerminals.length > 0) {
+      setState("activeTerminalId", wsTerminals[0].id);
+      setStashOpenId(id);
     } else {
-      // Select workspace
-      setState("activeWorkspaceId", id);
-      // Set active terminal to first non-stashed terminal in this workspace
-      const wsTerminals = state.terminals.filter((t) => t.workspaceId === id && !t.stashed);
-      if (wsTerminals.length > 0) {
-        setState("activeTerminalId", wsTerminals[0].id);
-        setStashOpenId(id);
-      } else {
-        setState("activeTerminalId", null);
-        setStashOpenId(null);
-      }
+      setState("activeTerminalId", null);
+      setStashOpenId(null);
     }
   }
 
@@ -427,6 +420,7 @@ export default function WorkspaceList() {
                       {/* Stash / terminal tray button */}
                       <Show when={terminalCount() > 0}>
                         <button
+                          data-stash-tray-button
                           data-stash-zone
                           class="text-[10px] px-1.5 py-0.5 rounded-[var(--btn-radius)] hover:bg-[var(--bg-tertiary)] transition-colors flex items-center gap-0.5"
                           classList={{

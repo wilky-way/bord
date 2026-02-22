@@ -1,9 +1,5 @@
 import { state, setState } from "../../store/core";
 import { addTerminal } from "../../store/terminals";
-import {
-  scrollSyncEnabled,
-  setScrollSyncEnabled,
-} from "../terminal/ParallelScroll";
 import TerminalMinimap from "./TerminalMinimap";
 
 export default function TopBar() {
@@ -69,27 +65,6 @@ export default function TopBar() {
               <path d="M6.5 12a1.5 1.5 0 003 0" />
             </svg>
           )}
-        </button>
-        <button
-          class={`px-2 py-1 text-xs rounded-[var(--btn-radius)] transition-colors ${
-            scrollSyncEnabled()
-              ? "bg-[var(--accent)] text-[var(--bg-primary)] font-medium"
-              : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
-          }`}
-          onClick={() => setScrollSyncEnabled(!scrollSyncEnabled())}
-          title="Sync scroll across terminals"
-        >
-          Scroll Sync
-        </button>
-        <button
-          class="px-2 py-1 text-xs rounded-[var(--btn-radius)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] transition-colors"
-          style={{ "--tw-bg-opacity": "1" } as any}
-          classList={{
-            "hover:bg-[color-mix(in_srgb,var(--accent)_15%,var(--bg-tertiary))]": true,
-          }}
-          onClick={() => setState("sidebarOpen", (v) => !v)}
-        >
-          {state.sidebarOpen ? "Hide" : "Show"} Sidebar
         </button>
         <button
           class="px-2.5 py-1 text-xs rounded-[var(--btn-radius)] bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg-primary)] font-medium transition-colors"

@@ -4,11 +4,6 @@ import { connectTerminal, sendToTerminal, sendResize } from "../../lib/ws";
 import { createTerminalWriter } from "../../lib/terminal-writer";
 import { setTerminalConnected } from "../../store/terminals";
 import { terminalTheme } from "../../lib/theme";
-import {
-  registerTerminal,
-  unregisterTerminal,
-  onTerminalScroll,
-} from "./ParallelScroll";
 
 interface Props {
   ptyId: string;
@@ -87,31 +82,6 @@ export default function TerminalView(props: Props) {
       });
     }
 
-    // Register scroll handlers for parallel scroll sync
-    if (terminal.onScroll) {
-      terminal.onScroll(() => onTerminalScroll(props.ptyId));
-    }
-
-    registerTerminal(props.ptyId, {
-      getScrollFraction: () => {
-        if (!terminal) return 0;
-        const buf = (terminal as any).buffer?.active;
-        if (!buf) return 0;
-        const maxScroll = buf.length - (terminal as any).rows;
-        return maxScroll > 0 ? buf.viewportY / maxScroll : 0;
-      },
-      setScrollFraction: (fraction: number) => {
-        if (!terminal) return;
-        const buf = (terminal as any).buffer?.active;
-        if (!buf) return;
-        const maxScroll = buf.length - (terminal as any).rows;
-        const line = Math.round(fraction * maxScroll);
-        if (typeof (terminal as any).scrollToLine === "function") {
-          (terminal as any).scrollToLine(line);
-        }
-      },
-    });
-
     // Handle resize
     const resizeObserver = new ResizeObserver(() => {
       if (!disposed && terminal && ready()) {
@@ -124,7 +94,6 @@ export default function TerminalView(props: Props) {
       disposed = true;
       clearTimeout(replayIdleTimer);
       writer.dispose();
-      unregisterTerminal(props.ptyId);
       resizeObserver.disconnect();
       cleanup?.();
       terminal?.dispose();

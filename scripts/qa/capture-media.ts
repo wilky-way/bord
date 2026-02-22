@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, rm } from "fs/promises";
+import { mkdir, readFile, readdir, rename, rm } from "fs/promises";
 import { spawnSync } from "child_process";
 import { homedir } from "os";
 import { join } from "path";
@@ -132,11 +132,94 @@ async function verifyApp() {
   }
 }
 
-function ensureSidebarOpen() {
-  if (hasText("Show Sidebar")) {
-    clickButton("Show Sidebar", true);
-    wait(500);
+function sidebarExpanded() {
+  const result = evalJs(
+    "(() => !!document.querySelector('[data-bord-sidebar-panel=\"expanded\"]'))()",
+    true,
+  ).trim();
+  return result.includes("true");
+}
+
+function sidebarFlyoutVisible() {
+  const result = evalJs(
+    "(() => { const flyout = document.querySelector('[data-bord-sidebar-flyout]'); if (!(flyout instanceof HTMLElement)) return false; const style = window.getComputedStyle(flyout); return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0'; })()",
+    true,
+  ).trim();
+  return result.includes("true");
+}
+
+function toggleSidebar() {
+  evalJs(
+    "(() => { const rail = document.querySelector('[data-bord-sidebar-rail]'); if (!(rail instanceof HTMLElement)) return 'missing'; const button = rail.querySelector('button'); if (!(button instanceof HTMLElement)) return 'missing'; button.click(); return 'clicked'; })()",
+    true,
+  );
+  wait(450);
+}
+
+function ensureSidebarExpanded() {
+  if (sidebarExpanded()) return;
+  toggleSidebar();
+  wait(450);
+}
+
+function ensureSidebarCollapsed() {
+  if (!sidebarExpanded()) return;
+  toggleSidebar();
+  wait(450);
+}
+
+function ensureSidebarFlyoutVisible() {
+  ensureSidebarCollapsed();
+  if (sidebarFlyoutVisible()) return;
+
+  const coords = evalJs(
+    "(() => { const rail = document.querySelector('[data-bord-sidebar-rail]'); if (!(rail instanceof HTMLElement)) return ''; const toggle = rail.querySelector('button'); if (!(toggle instanceof HTMLElement)) return ''; const rect = toggle.getBoundingClientRect(); return `${Math.round(rect.left + rect.width / 2)},${Math.round(rect.top + rect.height / 2)}`; })()",
+    true,
+  ).trim();
+
+  const [x, y] = coords.split(",").map((part) => parseInt(part, 10));
+  if (Number.isFinite(x) && Number.isFinite(y)) {
+    browser(["mouse", "move", String(x), String(y)], { allowFailure: true, silent: true });
   }
+
+  wait(260);
+}
+
+function moveMouseToMainArea() {
+  browser(["mouse", "move", "1460", "220"], { allowFailure: true, silent: true });
+  wait(260);
+}
+
+function hoverExpandedWorkspacePreview(name: string) {
+  ensureSidebarExpanded();
+
+  const coords = evalJs(
+    `(() => { const buttons = [...document.querySelectorAll('[data-bord-sidebar-rail] button[title]')]; const target = buttons.find((button) => (button.getAttribute('title') || '').trim() === ${JSON.stringify(name)}); if (!(target instanceof HTMLElement)) return ''; const rect = target.getBoundingClientRect(); target.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true })); target.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })); return String(Math.round(rect.left + rect.width / 2)) + ',' + String(Math.round(rect.top + rect.height / 2)); })()`,
+    true,
+  ).trim();
+
+  const [x, y] = coords.split(",").map((part) => parseInt(part, 10));
+  if (Number.isFinite(x) && Number.isFinite(y)) {
+    browser(["mouse", "move", String(x), String(y)], { allowFailure: true, silent: true });
+  }
+
+  wait(320);
+}
+
+function clickPreviewTab(tab: "sessions" | "all" | "active" | "stashed") {
+  evalJs(
+    `(() => { const buttons = [...document.querySelectorAll('[data-preview-tab=\"${tab}\"]')].filter((el) => el instanceof HTMLElement && el.getClientRects().length > 0); const button = buttons[0]; if (!(button instanceof HTMLElement)) return 'missing'; button.click(); return 'ok'; })()`,
+    true,
+  );
+  wait(260);
+}
+
+function openEditorDropdown() {
+  evalJs(
+    "(() => { const buttons = [...document.querySelectorAll('button[title=\"Choose editor\"]')].filter((el) => el instanceof HTMLElement && el.getClientRects().length > 0); const button = buttons[0]; if (!(button instanceof HTMLElement)) return 'missing'; button.click(); return 'ok'; })()",
+    true,
+  );
+  wait(280);
 }
 
 function ensureSectionExpanded(header: string, marker: string) {
@@ -150,12 +233,15 @@ function ensureSectionExpanded(header: string, marker: string) {
 }
 
 function selectWorkspace(name: string) {
-  ensureSidebarOpen();
-  ensureSectionExpanded("Workspaces", name);
-
-  clickText(name, true, true);
+  evalJs(
+    `(() => { const buttons = [...document.querySelectorAll('[data-bord-sidebar-rail] button[title]')]; const target = buttons.find((button) => (button.getAttribute('title') || '').trim() === ${JSON.stringify(name)}); if (!(target instanceof HTMLElement)) return 'missing'; target.click(); return 'ok'; })()`,
+    true,
+  );
   wait(700);
-  if (!hasText(name)) {
+
+  ensureSidebarExpanded();
+
+  if (!hasText(name) && !hasText("Refresh")) {
     clickText(name, false, true);
     wait(700);
   }
@@ -246,7 +332,7 @@ function stashOneTerminalAndOpenTray() {
 
   for (let i = 0; i < 6; i++) {
     evalJs(
-      "(() => { const old = document.querySelector('[data-bord-tray]'); if (old) old.removeAttribute('data-bord-tray'); const tray = [...document.querySelectorAll('button[title]')].find((btn) => /^\\d+ terminals?$/.test(btn.getAttribute('title') || '')); if (!tray) return ''; tray.setAttribute('data-bord-tray', '1'); const rect = tray.getBoundingClientRect(); return `${Math.round(rect.left + rect.width / 2)},${Math.round(rect.top + rect.height / 2)}`; })()",
+      "(() => { const old = document.querySelector('[data-bord-tray]'); if (old) old.removeAttribute('data-bord-tray'); const trays = [...document.querySelectorAll('[data-stash-tray-button]')].filter((el) => el instanceof HTMLElement && el.getClientRects().length > 0); const tray = trays[0]; if (!(tray instanceof HTMLElement)) return ''; tray.setAttribute('data-bord-tray', '1'); const rect = tray.getBoundingClientRect(); return `${Math.round(rect.left + rect.width / 2)},${Math.round(rect.top + rect.height / 2)}`; })()",
       true,
     );
 
@@ -307,6 +393,63 @@ function clickLayoutPlusButton() {
   );
 }
 
+function clickProviderNewTerminal(provider: "Claude" | "Codex") {
+  clickText(`+ New ${provider}`, false, true);
+  wait(700);
+}
+
+function stashTerminalByProvider(provider: "claude" | "codex") {
+  evalJs(
+    `(() => { const panels = [...document.querySelectorAll('[data-terminal-id]')]; const panel = panels.find((el) => (el.getAttribute('data-provider') || '').toLowerCase() === '${provider}'); if (!(panel instanceof HTMLElement)) return 'missing'; panel.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })); const button = panel.querySelector('button[data-action="stash-terminal"]'); if (!(button instanceof HTMLElement)) return 'missing'; button.click(); return 'ok'; })()`,
+    true,
+  );
+  wait(450);
+}
+
+function openWorkspaceStashTray() {
+  for (let i = 0; i < 6; i++) {
+    const clicked = evalJs(
+      "(() => { const trays = [...document.querySelectorAll('[data-stash-tray-button]')].filter((el) => el instanceof HTMLElement && el.getClientRects().length > 0); const tray = trays[0]; if (!(tray instanceof HTMLElement)) return 'missing'; tray.click(); return 'ok'; })()",
+      true,
+    ).trim();
+    wait(360);
+    if (stashPopoverVisible()) return;
+    if (clicked.includes("missing")) break;
+  }
+}
+
+function unstashFirstStashedTerminal() {
+  evalJs(
+    "(() => { const buttons = [...document.querySelectorAll('[data-stash-zone] button')].filter((button) => (button.textContent || '').includes('↑ ')); if (!(buttons[0] instanceof HTMLElement)) return 'missing'; buttons[0].click(); return 'ok'; })()",
+    true,
+  );
+  wait(520);
+}
+
+function closeExtraTerminals() {
+  for (let i = 0; i < 14; i++) {
+    const status = evalJs(
+      "(() => { const panels = [...document.querySelectorAll('[data-terminal-id]')]; if (panels.length <= 2) return 'done'; const keep = new Set(['claude', 'codex']); const preferred = panels.find((panel) => !keep.has((panel.getAttribute('data-provider') || '').toLowerCase())); const target = preferred ?? panels[panels.length - 1]; if (!(target instanceof HTMLElement)) return 'missing'; const close = target.querySelector('button[data-action=\"close-terminal\"]'); if (!(close instanceof HTMLElement)) return 'missing'; close.click(); return 'closed'; })()",
+      true,
+    ).trim();
+
+    if (status.includes("done")) break;
+    wait(280);
+  }
+}
+
+function closeAllVisibleTerminals() {
+  for (let i = 0; i < 20; i++) {
+    const status = evalJs(
+      "(() => { const close = document.querySelector('button[data-action=\"close-terminal\"]'); if (!(close instanceof HTMLElement)) return 'done'; close.click(); return 'closed'; })()",
+      true,
+    ).trim();
+
+    if (status.includes("done")) break;
+    wait(220);
+  }
+}
+
 function ensureMixedProviderTerminals(claudeTokens: string[], codexTokens: string[]) {
   ensureProvider("Claude");
   refreshSessions();
@@ -325,7 +468,7 @@ function ffmpegBinaryPath() {
   return process.env.BORD_FFMPEG_PATH ?? "ffmpeg";
 }
 
-async function buildWebmFromFrames(frameDir: string, outputPath: string) {
+async function buildWebmFromFrames(frameDir: string, outputPath: string, fps = 2) {
   const ffmpeg = ffmpegBinaryPath();
 
   const files = await readdir(frameDir).catch(() => [] as string[]);
@@ -338,17 +481,49 @@ async function buildWebmFromFrames(frameDir: string, outputPath: string) {
       ffmpeg,
       "-y",
       "-framerate",
-      "2",
+      String(fps),
       "-start_number",
       "1",
       "-i",
       join(frameDir, "frame-%03d.png"),
       "-c:v",
-      "libvpx",
+      "libvpx-vp9",
+      "-crf",
+      "30",
       "-b:v",
-      "1M",
+      "0",
       "-pix_fmt",
       "yuv420p",
+      outputPath,
+    ],
+    { timeout: 120_000 },
+  );
+}
+
+async function buildGifFromFrames(
+  frameDir: string,
+  outputPath: string,
+  fps: number,
+  startNumber: number,
+  frameLimit: number,
+) {
+  const ffmpeg = ffmpegBinaryPath();
+  const pattern = join(frameDir, "frame-%03d.png");
+
+  run(
+    [
+      ffmpeg,
+      "-y",
+      "-framerate",
+      String(fps),
+      "-start_number",
+      String(startNumber),
+      "-i",
+      pattern,
+      "-frames:v",
+      String(frameLimit),
+      "-vf",
+      "fps=8,scale=1320:-1:flags=lanczos",
       outputPath,
     ],
     { timeout: 120_000 },
@@ -402,115 +577,227 @@ async function main() {
   if (!claudeTokens.length || !codexTokens.length) {
     throw new Error("Missing capture tokens for fixture-web. Re-run fixture setup.");
   }
-
-  openBrowser(appUrl);
-  browser(["set", "viewport", "1720", "980"]);
-  wait(1200);
-
-  screenshot("home-overview.png");
-
-  selectWorkspace(fixtureWeb.name);
-  ensureSectionExpanded("Sessions", "Refresh");
-
-  ensureProvider("Claude");
-  refreshSessions();
-
-  ensureProvider("Codex");
-  refreshSessions();
-
-  ensureMixedProviderTerminals(claudeTokens, codexTokens);
-
-  ensureProvider("Claude");
-  refreshSessions();
-  screenshot("sessions-claude.png");
-
-  ensureProvider("Codex");
-  refreshSessions();
-  screenshot("sessions-codex.png");
-
-  screenshot("terminals-provider-icons.png");
-
-  clickButton("1x", true);
-  wait(700);
-  screenshot("layout-1x.png");
-
-  clickButton("4x", true);
-  wait(700);
-  screenshot("layout-4x.png");
-
-  revealMinimapProviderTooltip();
-  screenshot("minimap-hover-provider-tooltip.png");
-
-  openGitDiff();
-  screenshot("git-panel-diff-selected.png");
-  closeGitPanel();
-
-  stashOneTerminalAndOpenTray();
-  screenshot("stash-sidebar-popover.png");
-
-  selectWorkspace(fixtureDocker.name);
-  ensureDockerPanelVisible();
-  screenshot("docker-panel-expanded.png");
-
-  screenshot("open-in-editor-controls.png");
-
-  selectWorkspace(fixtureWeb.name);
-  ensureMixedProviderTerminals(claudeTokens, codexTokens);
-  clickButton("4x", true);
-  wait(500);
-
   const showcasePath = join(mediaDir, "showcase-workflow.webm");
+  const showcaseGifPath = join(mediaDir, "showcase-workflow.gif");
+  const showcaseTempPath = join(mediaDir, "showcase-workflow.tmp.webm");
+  const showcaseGifTempPath = join(mediaDir, "showcase-workflow.tmp.gif");
   const frameDir = join(mediaDir, "_showcase_frames");
 
-  await rm(showcasePath, { force: true });
-  await rm(frameDir, { recursive: true, force: true });
-  await mkdir(frameDir, { recursive: true });
+  try {
+    openBrowser(appUrl);
+    browser(["set", "viewport", "1720", "980"]);
+    wait(1200);
+    ensureSidebarExpanded();
+    wait(250);
 
-  let frame = 1;
-  const frameShot = () => {
-    const name = `frame-${String(frame).padStart(3, "0")}.png`;
-    screenshotAbsolute(join(frameDir, name));
-    frame++;
-  };
+    screenshot("home-overview.png");
 
-  frameShot();
+    selectWorkspace(fixtureWeb.name);
+    ensureSectionExpanded("Sessions", "Refresh");
 
-  clickButton("3x", true);
-  wait(350);
-  frameShot();
-  clickButton("2x", true);
-  wait(350);
-  frameShot();
-  clickButton("1x", true);
-  wait(700);
-  frameShot();
+    ensureProvider("Claude");
+    refreshSessions();
 
-  horizontalScrollRight();
-  wait(900);
-  frameShot();
-  horizontalScrollLeft();
-  wait(900);
-  frameShot();
+    ensureProvider("Codex");
+    refreshSessions();
 
-  revealMinimapProviderTooltip();
-  wait(500);
-  frameShot();
+    ensureMixedProviderTerminals(claudeTokens, codexTokens);
 
-  clickButton("4x", true);
-  wait(500);
-  frameShot();
-  horizontalScrollRight();
-  wait(900);
-  frameShot();
-  clickLayoutPlusButton();
-  wait(900);
-  frameShot();
+    ensureSidebarCollapsed();
+    moveMouseToMainArea();
+    screenshot("sidebar-rail-counters.png");
 
-  await buildWebmFromFrames(frameDir, showcasePath);
-  await rm(frameDir, { recursive: true, force: true });
+    ensureSidebarExpanded();
+    hoverExpandedWorkspacePreview(fixtureWeb.name);
+    clickPreviewTab("all");
+    screenshot("sidebar-hover-workspace-preview.png");
+    clickPreviewTab("sessions");
+    moveMouseToMainArea();
 
-  browser(["close"], { allowFailure: true });
-  console.log(`Media capture complete: ${mediaDir}`);
+    ensureProvider("Claude");
+    refreshSessions();
+    screenshot("sessions-claude.png");
+
+    ensureProvider("Codex");
+    refreshSessions();
+    screenshot("sessions-codex.png");
+
+    screenshot("terminals-provider-icons.png");
+
+    clickButton("1x", true);
+    wait(700);
+    screenshot("layout-1x.png");
+
+    clickButton("4x", true);
+    wait(700);
+    screenshot("layout-4x.png");
+
+    revealMinimapProviderTooltip();
+    screenshot("minimap-hover-provider-tooltip.png");
+
+    openGitDiff();
+    screenshot("git-panel-diff-selected.png");
+    closeGitPanel();
+
+    stashOneTerminalAndOpenTray();
+    screenshot("stash-sidebar-popover.png");
+
+    selectWorkspace(fixtureDocker.name);
+    ensureDockerPanelVisible();
+    screenshot("docker-panel-expanded.png");
+
+    selectWorkspace(fixtureWeb.name);
+    ensureSidebarExpanded();
+    openEditorDropdown();
+    screenshot("open-in-editor-controls.png");
+    evalJs("(() => { document.body.click(); return 'ok'; })()", true);
+    wait(200);
+
+    selectWorkspace(fixtureWeb.name);
+    ensureSidebarExpanded();
+    ensureSectionExpanded("Sessions", "Refresh");
+    closeAllVisibleTerminals();
+    wait(500);
+
+    await rm(showcaseTempPath, { force: true });
+    await rm(showcaseGifTempPath, { force: true });
+    await rm(frameDir, { recursive: true, force: true });
+    await mkdir(frameDir, { recursive: true });
+
+    let frame = 1;
+    const frameShot = () => {
+      const name = `frame-${String(frame).padStart(3, "0")}.png`;
+      screenshotAbsolute(join(frameDir, name));
+      frame++;
+    };
+
+    const hold = (count: number, delay = 220) => {
+      for (let i = 0; i < count; i++) {
+        frameShot();
+        wait(delay);
+      }
+    };
+
+    ensureProvider("Claude");
+    refreshSessions();
+    openSessionByToken(claudeTokens[0]);
+    hold(3, 240);
+
+    ensureProvider("Codex");
+    refreshSessions();
+    openSessionByToken(codexTokens[0]);
+    hold(3, 240);
+
+    selectWorkspace(fixtureDocker.name);
+    hold(2, 220);
+    selectWorkspace(fixtureWeb.name);
+    hold(2, 220);
+
+    hoverExpandedWorkspacePreview(fixtureWeb.name);
+    clickPreviewTab("all");
+    hold(2, 220);
+    clickPreviewTab("active");
+    hold(2, 220);
+    clickPreviewTab("stashed");
+    hold(2, 220);
+    clickPreviewTab("sessions");
+    hold(2, 220);
+    moveMouseToMainArea();
+
+    ensureProvider("Claude");
+    clickProviderNewTerminal("Claude");
+    hold(2, 220);
+
+    stashTerminalByProvider("claude");
+    hold(2, 220);
+
+    if (claudeTokens[1]) {
+      ensureProvider("Claude");
+      openSessionByToken(claudeTokens[1]);
+      hold(3, 220);
+    }
+
+    ensureSidebarFlyoutVisible();
+    hold(2, 220);
+
+    openWorkspaceStashTray();
+    hold(3, 240);
+
+    unstashFirstStashedTerminal();
+    hold(3, 240);
+
+    clickButton("4x", true);
+    wait(360);
+    hold(2, 180);
+
+    clickButton("3x", true);
+    wait(360);
+    hold(2, 180);
+
+    clickButton("2x", true);
+    wait(360);
+    hold(2, 180);
+
+    clickButton("1x", true);
+    wait(620);
+    hold(2, 180);
+
+    horizontalScrollRight();
+    wait(880);
+    hold(3, 180);
+
+    horizontalScrollLeft();
+    wait(880);
+    hold(3, 180);
+
+    clickButton("4x", true);
+    wait(500);
+    hold(2, 180);
+
+    horizontalScrollRight();
+    wait(900);
+    hold(2, 180);
+
+    clickLayoutPlusButton();
+    wait(900);
+    hold(2, 220);
+
+    closeExtraTerminals();
+    wait(560);
+    hold(2, 220);
+
+    ensureProvider("Claude");
+    openSessionByToken(claudeTokens[0]);
+    wait(420);
+    ensureProvider("Codex");
+    openSessionByToken(codexTokens[0]);
+    wait(420);
+    hold(2, 220);
+
+    ensureSidebarFlyoutVisible();
+    hold(2, 220);
+
+    openGitDiff();
+    hold(3, 240);
+
+    const totalFrames = frame - 1;
+    const preferredStart = 9;
+    const preferredCount = 36;
+    const gifStart = Math.max(1, Math.min(preferredStart, totalFrames));
+    const gifCount = Math.max(1, Math.min(preferredCount, totalFrames - gifStart + 1));
+
+    await buildWebmFromFrames(frameDir, showcaseTempPath, 2);
+    await buildGifFromFrames(frameDir, showcaseGifTempPath, 2, gifStart, gifCount);
+    await rename(showcaseTempPath, showcasePath);
+    await rename(showcaseGifTempPath, showcaseGifPath);
+
+    console.log(`Media capture complete: ${mediaDir}`);
+  } finally {
+    await rm(frameDir, { recursive: true, force: true });
+    await rm(showcaseTempPath, { force: true });
+    await rm(showcaseGifTempPath, { force: true });
+    browser(["close"], { allowFailure: true, silent: true });
+  }
 }
 
 main().catch((error) => {

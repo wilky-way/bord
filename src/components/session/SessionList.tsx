@@ -1,24 +1,32 @@
 import { createSignal, createEffect, For, Show } from "solid-js";
-import { state } from "../../store/core";
+import { state, setState } from "../../store/core";
 import { api } from "../../lib/api";
 import { addTerminal } from "../../store/terminals";
+import { buildNewSessionCommand, PROVIDER_LABELS } from "../../lib/providers";
 import SessionCard from "./SessionCard";
 import type { SessionInfo } from "../../store/types";
 
 const DEFAULT_VISIBLE = 5;
 const LOAD_MORE_COUNT = 10;
 
-export default function SessionList() {
+interface Props {
+  workspaceId?: string | null;
+}
+
+export default function SessionList(props: Props) {
   const [sessions, setSessions] = createSignal<SessionInfo[]>([]);
   const [loading, setLoading] = createSignal(false);
   const [visibleCount, setVisibleCount] = createSignal(DEFAULT_VISIBLE);
+  let requestId = 0;
 
-  const activeWorkspace = () => state.workspaces.find((w) => w.id === state.activeWorkspaceId);
+  const selectedWorkspaceId = () => props.workspaceId ?? state.activeWorkspaceId;
+  const activeWorkspace = () => state.workspaces.find((w) => w.id === selectedWorkspaceId());
 
   // Reload sessions when active workspace or provider changes
   createEffect(async () => {
     const ws = activeWorkspace();
     const provider = state.activeProvider;
+    const current = ++requestId;
     if (!ws) {
       setSessions([]);
       return;
@@ -27,10 +35,13 @@ export default function SessionList() {
     setVisibleCount(DEFAULT_VISIBLE);
     try {
       const data = await api.listSessions(ws.path, provider);
+      if (current !== requestId) return;
       setSessions(data);
     } catch {
+      if (current !== requestId) return;
       setSessions([]);
     } finally {
+      if (current !== requestId) return;
       setLoading(false);
     }
   });
@@ -38,20 +49,28 @@ export default function SessionList() {
   async function refresh() {
     const ws = activeWorkspace();
     if (!ws) return;
+    const current = ++requestId;
     setLoading(true);
     try {
       const data = await api.listSessions(ws.path, state.activeProvider);
+      if (current !== requestId) return;
       setSessions(data);
     } catch {
+      if (current !== requestId) return;
       setSessions([]);
     } finally {
+      if (current !== requestId) return;
       setLoading(false);
     }
   }
 
   function newSession() {
     const ws = activeWorkspace();
-    if (ws) addTerminal(ws.path);
+    if (!ws) return;
+    if (ws.id !== state.activeWorkspaceId) {
+      setState("activeWorkspaceId", ws.id);
+    }
+    addTerminal(ws.path, buildNewSessionCommand(state.activeProvider));
   }
 
   const visibleSessions = () => sessions().slice(0, visibleCount());
@@ -67,7 +86,7 @@ export default function SessionList() {
       </Show>
 
       <Show when={activeWorkspace()}>
-        <div class="flex items-center justify-end py-1 gap-1.5">
+        <div class="flex items-center py-1 gap-1.5">
           <button
             class="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
             onClick={refresh}
@@ -77,8 +96,9 @@ export default function SessionList() {
           <button
             class="text-xs text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors"
             onClick={newSession}
+            title={`Start new ${PROVIDER_LABELS[state.activeProvider]} terminal`}
           >
-            + New
+            + New {PROVIDER_LABELS[state.activeProvider]}
           </button>
         </div>
 
