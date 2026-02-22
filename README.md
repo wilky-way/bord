@@ -640,6 +640,12 @@ bord/
 └── ROADMAP.md
 ```
 
+### Auto-Updates (Settings → About)
+
+![Settings About panel with update check](./docs/media/settings-about-updates.png)
+
+Settings panel shows current version and a manual "Check for updates" button. When a new version is available, an accent-colored banner appears at the top of the app with a one-click "Update now" button that downloads, installs, and relaunches.
+
 ## Releasing & Auto-Updates
 
 Bord has built-in auto-updates via GitHub Releases. Users see an in-app banner when a new version is available and can update with one click.
