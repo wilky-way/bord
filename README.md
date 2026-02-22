@@ -19,6 +19,12 @@ A workspace-scoped terminal manager with tiling layout, git integration, docker 
 
 Workspace switching, session launches, density transitions, stash/unstash, minimap navigation, and git diff — all from one tiling terminal manager.
 
+### Snap-scroll between full-width terminals
+
+![Horizontal scrolling at 1x density](./docs/media/horizontal-scroll-1x.gif)
+
+Swipe or arrow-key between terminals at 1x density — the mid-scroll state shows partial panels on both sides before snapping into place.
+
 ## Status
 
 - **Execution plan:** `docs/plan.md`
@@ -57,12 +63,6 @@ Shows active terminal cards with mixed provider icons after launching terminals 
 4x mode shows multi-terminal parallel workflows in the same viewport.
 5 terminals in 4x mode means you have 1 terminal overflowing to the right to scroll to.
 Resets manual resize.
-
-#### Horizontal scrolling at 1x density
-
-![Horizontal scrolling at 1x density](./docs/media/horizontal-scroll-1x.gif)
-
-Swipe between full-width terminals — the mid-scroll state shows partial panels on both sides before snapping into place.
 
 ### Minimap Hover Tooltip
 
