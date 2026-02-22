@@ -2,12 +2,22 @@
 
 A workspace-scoped terminal manager with tiling layout, git integration, docker controls, and multi-provider session resume — built as a native desktop app.
 
+<p align="center">
+  <img src="./docs/media/bord-logo.png" alt="bord logo" width="280" />
+</p>
+
 ![SolidJS](https://img.shields.io/badge/SolidJS-335C88?logo=solid&logoColor=white)
 ![Bun](https://img.shields.io/badge/Bun-000000?logo=bun&logoColor=white)
 ![Tauri](https://img.shields.io/badge/Tauri-24C8D8?logo=tauri&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-06B6D4?logo=tailwindcss&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-003B57?logo=sqlite&logoColor=white)
+
+![Bord workflow showcase](./docs/media/showcase-workflow.gif)
+
+[Full workflow video (WebM)](./docs/media/showcase-workflow.webm)
+
+Workspace switching, session launches, density transitions, stash/unstash, minimap navigation, and git diff — all from one tiling terminal manager.
 
 ## Status
 
@@ -76,7 +86,7 @@ Shows per-workspace terminal counters in collapsed mode (`total-active-stashed`)
 
 ![Workspace hover preview with tabs](./docs/media/sidebar-hover-workspace-preview.png)
 
-Shows workspace hover preview tabs (`Sessions`, `All`, `Active`, `Stashed`) and provider switchers.
+Shows workspace hover preview tabs (`Sessions`, `All`, `Active`, `Stashed`), provider switchers, and quick-action buttons for spawning new sessions and terminals.
 
 ### Docker Section Expanded
 
@@ -90,14 +100,6 @@ Shows Docker section expanded in sidebar for compose discovery and controls.
 
 Shows workspace-level editor launch controls.
 
-### Showcase Workflow
-
-![Stash-focused workflow showcase](./docs/media/showcase-workflow.gif)
-
-[Full workflow video (WebM)](./docs/media/showcase-workflow.webm)
-
-Stash-focused flow: workspace switch, Claude/Codex session launches, provider-new terminal, stash/unstash from sidebar flyout, density transitions (4x -> 1x), horizontal scroll, far-right add-terminal, and git diff interaction.
-
 ## Features
 
 ### Terminal Management
@@ -106,8 +108,8 @@ Stash-focused flow: workspace switch, Claude/Codex session launches, provider-ne
 - **Drag-and-drop reorder** — grab a terminal title bar and drag to reposition
 - **Resizable panels** — drag panel edges to adjust width ratios
 - **Stash/unstash** — hide terminals without destroying them; stashed terminals show attention badges when new output arrives
-- **Notification controls** — global bell mute plus per-terminal mute controls
-- **Terminal minimap** — compact navigation strip in the top bar showing all visible terminals with attention indicators
+- **Notification controls** — per-terminal mute controls from terminal card or stash tray
+- **Terminal minimap** — compact navigation strip in the top bar center, alongside density buttons and the + add-terminal button
 
 ### Workspace Scoping
 - **Terminal isolation** — each workspace maintains its own set of active and stashed terminals
@@ -116,7 +118,7 @@ Stash-focused flow: workspace switch, Claude/Codex session launches, provider-ne
 - **Folder browser** — browse and add workspace directories via the filesystem API
 
 ### Session Integration (Multi-Provider)
-- **Provider tabs** — switch session lists between Claude, Codex, OpenCode, and Gemini modes
+- **Provider tabs** — switch session lists between Claude, Codex, OpenCode, and Gemini modes; quick-action buttons alongside tabs for spawning new sessions and terminals
 - **Session scanning** — reads provider-specific session stores (`~/.claude/projects/`, `~/.codex/sessions/`, OpenCode storage dirs)
 - **Session resume** — click a session card to open a new terminal with provider-specific resume command mapping
 - **Idle detection** — terminals track `lastOutputAt` and `lastSeenAt` timestamps; attention badges pulse when unseen output arrives
@@ -197,11 +199,12 @@ graph TD
     App --> Sidebar
     App --> TilingLayout
 
-    TopBar --> TerminalMinimap
     TopBar --> LayoutDensityButtons["Layout Density (1x-4x)"]
+    TopBar --> TerminalMinimap
+    TopBar --> AddTerminalButton["Add Terminal (+)"]
 
     Sidebar --> WorkspaceList
-    Sidebar --> ProviderTabs
+    Sidebar --> ProviderTabs["ProviderTabs + Quick Actions"]
     Sidebar --> SessionList
     Sidebar --> DockerPanel
     SessionList --> SessionCard
@@ -349,12 +352,23 @@ stateDiagram-v2
     end note
 ```
 
+### Why This Stack?
+
+These choices form a coherent stack for a desktop app that spawns PTY processes, streams real-time output to multiple panes, and needs to stay lightweight. [OpenCode](https://github.com/anomalyco/opencode) uses the same core stack (Tauri v2 + SolidJS + ghostty-web + Bun) for their desktop AI coding tool.
+
+| Choice | Over | Why |
+|--------|------|-----|
+| **ghostty-web** | xterm.js | Compiles Ghostty's battle-tested native VT100 parser to WASM instead of reimplementing terminal emulation from scratch in JavaScript. The win is correctness — proper grapheme cluster handling, complex script rendering (Devanagari, Arabic, RTL), and full XTPUSHSGR/XTPOPSGR escape sequence support that xterm.js lacks. ~400 KB WASM bundle, zero runtime dependencies, and xterm.js API-compatible so it's a drop-in swap. Performance parity with native Ghostty is still in progress (the RenderState delta-update API hasn't landed in the web build yet), but the emulation fidelity is already ahead. Created by Coder for their agentic dev tool Mux. |
+| **Bun** | Node.js | Native PTY support via `Bun.spawn({ terminal })` — no node-pty dependency (which doesn't even work under Bun). Built-in SQLite (`bun:sqlite`), native WebSocket in `Bun.serve()`, and `bun build --compile` for single-binary distribution. One runtime replaces three dependencies. |
+| **SolidJS** | React | Fine-grained reactivity without a virtual DOM. When multiple terminal panes stream output while the UI updates layout, minimap, and attention badges simultaneously, SolidJS touches only the exact DOM nodes that changed — no component-level re-renders. ~7 KB gzipped vs ~40 KB. |
+| **Tauri v2** | Electron | Uses the system WebView instead of bundling Chromium. ~30–40 MB memory at idle vs ~200–300 MB. Sub-second startup. Capability-based security (everything disabled by default) fits an app that spawns shell processes. The Bun server runs as a sidecar managed by the Rust shell. |
+
 ## UI Layout
 
 ```
 ┌──────────────────────────────────────────────────────┐
 │  TopBar                                              │
-│  [bord] [3 terminals]  ··●··  [1x 2x 3x 4x] [Sync] │
+│  [bord] [3 terminals]   [1x 2x 3x 4x] ··●·· [+]    │
 ├──────────┬───────────────────────────────────────────┤
 │ Sidebar  │  TilingLayout                             │
 │          │ ┌──────────┐ ┌──────────┐ ┌──────────┐   │
