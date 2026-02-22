@@ -1,5 +1,6 @@
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
+#[cfg(unix)]
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
@@ -22,13 +23,16 @@ fn get_server_port(state: tauri::State<'_, ServerPort>) -> u16 {
 impl Drop for SidecarState {
     fn drop(&mut self) {
         if let Some(ref mut child) = self.child {
-            // Kill entire process group (sidecar + all PTY children)
-            unsafe {
-                libc::killpg(child.id() as i32, libc::SIGTERM);
+            #[cfg(unix)]
+            {
+                // Kill entire process group (sidecar + all PTY children)
+                unsafe {
+                    libc::killpg(child.id() as i32, libc::SIGTERM);
+                }
+                // Give processes 2 seconds to exit gracefully
+                std::thread::sleep(Duration::from_secs(2));
             }
-            // Give processes 2 seconds to exit gracefully
-            std::thread::sleep(Duration::from_secs(2));
-            let _ = child.kill(); // SIGKILL if still alive
+            let _ = child.kill();
             let _ = child.wait();
         }
     }
@@ -44,19 +48,28 @@ fn wait_for_server(port: u16) -> bool {
     false
 }
 
+fn sidecar_name() -> &'static str {
+    if cfg!(windows) {
+        "bord-server.exe"
+    } else {
+        "bord-server"
+    }
+}
+
 fn resolve_server_path(app: &tauri::AppHandle) -> Option<PathBuf> {
+    let name = sidecar_name();
     let mut candidates: Vec<PathBuf> = Vec::new();
 
     if let Ok(exe_path) = std::env::current_exe() {
         if let Some(exe_dir) = exe_path.parent() {
-            candidates.push(exe_dir.join("bord-server"));
+            candidates.push(exe_dir.join(name));
         }
     }
 
     if let Ok(resource_dir) = app.path().resource_dir() {
-        candidates.push(resource_dir.join("bord-server"));
-        candidates.push(resource_dir.join("resources").join("bord-server"));
-        candidates.push(resource_dir.join("dist").join("bord-server"));
+        candidates.push(resource_dir.join(name));
+        candidates.push(resource_dir.join("resources").join(name));
+        candidates.push(resource_dir.join("dist").join(name));
     }
 
     candidates.into_iter().find(|path| path.exists())
@@ -114,26 +127,35 @@ pub fn run() {
                     #[cfg(unix)]
                     ensure_executable(&server_path);
 
+                    let mut cmd = Command::new(&server_path);
+                    cmd.env("BORD_PORT", sidecar_port.to_string());
+
+                    if let Ok(app_data_dir) = app.path().app_data_dir() {
+                        let _ = std::fs::create_dir_all(&app_data_dir);
+                        cmd.env("BORD_DB_PATH", app_data_dir.join("bord.db"));
+                    }
+
+                    if let Some(schema_path) = resolve_schema_path(&app.handle()) {
+                        cmd.env("BORD_SCHEMA_PATH", schema_path);
+                    }
+
+                    #[cfg(windows)]
+                    {
+                        use std::os::windows::process::CommandExt;
+                        const CREATE_NO_WINDOW: u32 = 0x08000000;
+                        cmd.creation_flags(CREATE_NO_WINDOW);
+                    }
+
+                    #[cfg(unix)]
                     let child = unsafe {
-                        let mut cmd = Command::new(&server_path);
-                        cmd.env("BORD_PORT", sidecar_port.to_string());
-
-                        if let Ok(app_data_dir) = app.path().app_data_dir() {
-                            let _ = std::fs::create_dir_all(&app_data_dir);
-                            cmd.env("BORD_DB_PATH", app_data_dir.join("bord.db"));
-                        }
-
-                        if let Some(schema_path) = resolve_schema_path(&app.handle()) {
-                            cmd.env("BORD_SCHEMA_PATH", schema_path);
-                        }
-
                         cmd.pre_exec(|| {
-                            // Create new process group with this process as leader
                             libc::setpgid(0, 0);
                             Ok(())
                         })
                         .spawn()
                     };
+                    #[cfg(not(unix))]
+                    let child = cmd.spawn();
 
                     match child {
                         Ok(child) => {

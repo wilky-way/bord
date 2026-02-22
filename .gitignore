@@ -5,3 +5,5 @@ bord.db-shm
 bord.db-wal
 src-tauri/target/
 src-tauri/gen/schemas/
+playwright-report/
+test-results/

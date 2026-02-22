@@ -19,11 +19,23 @@ jobs:
           - os: macos-latest
             target: x86_64-apple-darwin
             args: "--target x86_64-apple-darwin"
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            args: "--target x86_64-pc-windows-msvc"
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            args: "--target x86_64-unknown-linux-gnu"
 
     runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install Linux dependencies
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -51,3 +63,74 @@ jobs:
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
+
+  update-homebrew:
+    needs: build
+    runs-on: macos-latest
+    steps:
+      - name: Setup SSH for tap repo
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.TAP_DEPLOY_KEY }}" > ~/.ssh/tap_key
+          chmod 600 ~/.ssh/tap_key
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+      - name: Update Homebrew tap
+        env:
+          GIT_SSH_COMMAND: "ssh -i ~/.ssh/tap_key -o IdentitiesOnly=yes"
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+
+          ARM_URL="https://github.com/wilky-way/bord/releases/download/${GITHUB_REF_NAME}/bord_${VERSION}_aarch64.dmg"
+          INTEL_URL="https://github.com/wilky-way/bord/releases/download/${GITHUB_REF_NAME}/bord_${VERSION}_x64.dmg"
+
+          # Wait for release assets to be available
+          for i in $(seq 1 10); do
+            if curl -sfIL "$ARM_URL" > /dev/null 2>&1; then break; fi
+            echo "Waiting for release assets... (attempt $i)"
+            sleep 10
+          done
+
+          curl -sL "$ARM_URL" -o bord_arm.dmg
+          curl -sL "$INTEL_URL" -o bord_intel.dmg
+
+          ARM_SHA=$(shasum -a 256 bord_arm.dmg | awk '{print $1}')
+          INTEL_SHA=$(shasum -a 256 bord_intel.dmg | awk '{print $1}')
+
+          git clone git@github.com:wilky-way/homebrew-bord.git tap
+          cd tap
+          mkdir -p Casks
+
+          cat > Casks/bord.rb << 'CASK'
+cask "bord" do
+  arch arm: "aarch64", intel: "x64"
+  version "__VERSION__"
+  sha256 arm: "__ARM_SHA__", intel: "__INTEL_SHA__"
+
+  url "https://github.com/wilky-way/bord/releases/download/v#{version}/bord_#{version}_#{arch}.dmg"
+
+  name "Bord"
+  desc "Workspace-scoped terminal manager with tiling layout and git integration"
+  homepage "https://github.com/wilky-way/bord"
+
+  livecheck do
+    url :url
+    strategy :github_latest
+  end
+
+  auto_updates true
+  depends_on macos: ">= :monterey"
+
+  app "bord.app"
+end
+CASK
+
+          sed -i '' "s/__VERSION__/${VERSION}/" Casks/bord.rb
+          sed -i '' "s/__ARM_SHA__/${ARM_SHA}/" Casks/bord.rb
+          sed -i '' "s/__INTEL_SHA__/${INTEL_SHA}/" Casks/bord.rb
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Casks/bord.rb
+          git commit -m "Update bord to ${VERSION}"
+          git push
