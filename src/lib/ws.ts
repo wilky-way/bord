@@ -1,4 +1,5 @@
 import { setTerminalLastOutput } from "../store/terminals";
+import { getWsBase } from "./server";
 
 type MessageHandler = (data: ArrayBuffer | string) => void;
 type StatusHandler = (connected: boolean) => void;
@@ -13,12 +14,6 @@ const connections = new Map<string, WsConnection>();
 
 const CURSOR_STORAGE_KEY = "bord:terminal-cursors";
 const MAX_CURSOR_ENTRIES = 20;
-
-function getWsBase(): string {
-  const loc = window.location;
-  const proto = loc.protocol === "https:" ? "wss:" : "ws:";
-  return `${proto}//${loc.host}`;
-}
 
 function loadCursors(): Record<string, { cursor: number; scrollY: number }> {
   try {

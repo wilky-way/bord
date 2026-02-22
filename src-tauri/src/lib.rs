@@ -1,11 +1,19 @@
 use std::os::unix::process::CommandExt;
 use std::process::{Child, Command};
+use std::sync::atomic::{AtomicU16, Ordering};
 use std::sync::Mutex;
 use std::time::Duration;
 use tauri::Manager;
 
+struct ServerPort(AtomicU16);
+
 struct SidecarState {
     child: Option<Child>,
+}
+
+#[tauri::command]
+fn get_server_port(state: tauri::State<'_, ServerPort>) -> u16 {
+    state.0.load(Ordering::Relaxed)
 }
 
 impl Drop for SidecarState {
@@ -38,6 +46,8 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(Mutex::new(SidecarState { child: None }))
+        .manage(ServerPort(AtomicU16::new(0)))
+        .invoke_handler(tauri::generate_handler![get_server_port])
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -73,10 +83,12 @@ pub fn run() {
                         };
 
                         if let Ok(child) = child {
-                            let state = app.state::<Mutex<SidecarState>>();
-                            state.lock().unwrap().child = Some(child);
+                            let sidecar_state = app.state::<Mutex<SidecarState>>();
+                            sidecar_state.lock().unwrap().child = Some(child);
 
-                            if !wait_for_server(sidecar_port) {
+                            if wait_for_server(sidecar_port) {
+                                app.state::<ServerPort>().0.store(sidecar_port, Ordering::Relaxed);
+                            } else {
                                 log::error!(
                                     "Sidecar server failed to start on port {}",
                                     sidecar_port

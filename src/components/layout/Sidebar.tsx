@@ -256,11 +256,18 @@ export default function Sidebar() {
     setAddingWorkspace(true);
     try {
       const initialPath = panelWorkspace()?.path ?? undefined;
-      let pickedPath = await pickWorkspaceDirectory(initialPath);
+      let pickedPath: string | null = null;
 
-      if (!pickedPath && !tauriRuntime) {
+      try {
+        pickedPath = await pickWorkspaceDirectory(initialPath);
+      } catch (err) {
+        console.error("[bord] folder picker failed:", err);
+      }
+
+      // Fallback: manual path entry (web mode, or if native picker failed)
+      if (!pickedPath) {
         const entered = window.prompt(
-          "Enter the full local project path (desktop app supports native folder picker):",
+          "Enter the full local project path:",
           initialPath ?? "",
         );
         if (entered) pickedPath = entered.trim();
@@ -283,7 +290,7 @@ export default function Sidebar() {
       activateWorkspace(createdId);
       setState("sidebarOpen", true);
     } catch (error) {
-      console.error("Failed to add workspace from folder picker", error);
+      console.error("[bord] Failed to add workspace:", error);
       const message = error instanceof Error ? error.message : "Failed to add workspace";
       setAddWorkspaceError(message);
     } finally {
@@ -796,6 +803,15 @@ export default function Sidebar() {
             </For>
           </div>
 
+          <Show when={addWorkspaceError()}>
+            <div
+              class="w-10 h-10 flex items-center justify-center cursor-pointer"
+              title={addWorkspaceError()!}
+              onClick={() => setAddWorkspaceError(null)}
+            >
+              <span class="text-red-400 text-[10px] font-medium">err</span>
+            </div>
+          </Show>
           <button
             class="w-10 h-10 rounded-lg text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--bg-tertiary)] transition-colors flex items-center justify-center"
             classList={{ "opacity-60 cursor-wait": addingWorkspace() }}

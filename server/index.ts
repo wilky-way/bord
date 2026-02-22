@@ -10,7 +10,11 @@ import { dockerRoutes } from "./routes/docker";
 import { initDb } from "./services/db";
 
 const PORT = parseInt(process.env.BORD_PORT ?? "4200");
-const ALLOWED_ORIGIN = process.env.BORD_CORS_ORIGIN ?? "http://localhost:1420";
+const ALLOWED_ORIGINS = [
+  process.env.BORD_CORS_ORIGIN ?? "http://localhost:1420",
+  "tauri://localhost",
+  "https://tauri.localhost",
+];
 
 // Initialize database
 initDb();
@@ -29,9 +33,11 @@ const server = Bun.serve({
       return new Response("WebSocket upgrade failed", { status: 400 });
     }
 
-    // CORS headers - restrict to known origin
+    // CORS headers - restrict to known origins
+    const origin = req.headers.get("origin") ?? "";
+    const corsOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
     const corsHeaders = {
-      "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
+      "Access-Control-Allow-Origin": corsOrigin,
       "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type",
     };

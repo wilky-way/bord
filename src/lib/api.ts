@@ -1,9 +1,8 @@
 import type { Provider } from "../store/types";
-
-const BASE_URL = "/api";
+import { getHttpBase } from "./server";
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, {
+  const res = await fetch(`${getHttpBase()}/api${path}`, {
     headers: { "Content-Type": "application/json" },
     ...options,
   });
