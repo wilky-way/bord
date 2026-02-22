@@ -7,8 +7,8 @@ A workspace-scoped terminal manager with tiling layout, git integration, docker 
 - Stash Active Terminals
     - Receive Notifications when you are needed
 - Workspaces Own Terminals
-    - Terminals can have sessions linked or not
-    - No strays
+    - Terminals can have CLI sessions linked or not
+    - No stray terminals
     - Open workspace in Editor
 - Horizontal Scroll, Mini-map Navigation, Snap to terminal, hotkeys
 - Git Diff Terminal Overlay
