@@ -5,6 +5,8 @@ import { getSettings, updateSettings, requestOsNotificationPermission } from "..
 import { sendConfigureToAll } from "../../lib/ws";
 import { fontFamily, setFontFamily, FONT_PRESETS } from "../../store/settings";
 import { checkForUpdates, updateAvailable, updateVersion, updateStatus, installUpdate } from "../../lib/updater";
+import { getFeatures, updateFeatures } from "../../store/features";
+import { listProviders } from "../../lib/providers";
 import type { BordTheme } from "../../lib/themes";
 
 interface Props {
@@ -12,7 +14,7 @@ interface Props {
   onClose: () => void;
 }
 
-type Section = "appearance" | "notifications" | "about";
+type Section = "appearance" | "notifications" | "features" | "about";
 
 export default function SettingsPanel(props: Props) {
   const [section, setSection] = createSignal<Section>("appearance");
@@ -64,6 +66,19 @@ export default function SettingsPanel(props: Props) {
               }
             />
             <NavItem
+              label="Features"
+              active={section() === "features"}
+              onClick={() => setSection("features")}
+              icon={
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M2 4h12M2 8h12M2 12h12" />
+                  <circle cx="5" cy="4" r="1.5" fill="var(--bg-secondary)" stroke="currentColor" />
+                  <circle cx="11" cy="8" r="1.5" fill="var(--bg-secondary)" stroke="currentColor" />
+                  <circle cx="7" cy="12" r="1.5" fill="var(--bg-secondary)" stroke="currentColor" />
+                </svg>
+              }
+            />
+            <NavItem
               label="About"
               active={section() === "about"}
               onClick={() => setSection("about")}
@@ -81,7 +96,7 @@ export default function SettingsPanel(props: Props) {
           <div class="flex-1 overflow-y-auto p-5">
             <div class="flex items-center justify-between mb-5">
               <h3 class="text-sm font-semibold text-[var(--text-primary)]">
-                {section() === "appearance" ? "Appearance" : section() === "notifications" ? "Notifications" : "About"}
+                {section() === "appearance" ? "Appearance" : section() === "notifications" ? "Notifications" : section() === "features" ? "Features" : "About"}
               </h3>
               <button
                 class="w-7 h-7 rounded-md flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
@@ -115,6 +130,10 @@ export default function SettingsPanel(props: Props) {
 
             <Show when={section() === "notifications"}>
               <NotificationSettings />
+            </Show>
+
+            <Show when={section() === "features"}>
+              <FeatureSettings />
             </Show>
 
             <Show when={section() === "about"}>
@@ -232,6 +251,31 @@ function NotificationSettings() {
           How long a terminal must be silent before triggering a notification
         </p>
       </div>
+
+      <div>
+        <label class="text-xs font-medium text-[var(--text-secondary)] mb-2 block">
+          Notification warmup: {s().warmupDurationMs === 0 ? "Off" : `${(s().warmupDurationMs / 1000).toFixed(0)}s`}
+        </label>
+        <div class="flex items-center gap-3">
+          <span class="text-[10px] text-[var(--text-secondary)]">Off</span>
+          <input
+            type="range"
+            min="0"
+            max="30000"
+            step="1000"
+            value={s().warmupDurationMs}
+            class="flex-1 accent-[var(--accent)]"
+            onInput={(e) => {
+              const val = parseInt(e.currentTarget.value, 10);
+              updateSettings({ warmupDurationMs: val });
+            }}
+          />
+          <span class="text-[10px] text-[var(--text-secondary)]">30s</span>
+        </div>
+        <p class="text-[10px] text-[var(--text-secondary)] mt-1">
+          After an agent starts producing output, wait this long before sending notifications. Prevents alerts during startup and initial prompt loading.
+        </p>
+      </div>
     </div>
   );
 }
@@ -271,6 +315,91 @@ function FontPicker() {
       <p class="text-[10px] text-[var(--text-secondary)]">
         Install a <a href="https://www.nerdfonts.com/" target="_blank" class="text-[var(--accent)] hover:underline">Nerd Font</a> for powerlevel10k icons
       </p>
+    </div>
+  );
+}
+
+function FeatureSettings() {
+  const flags = () => getFeatures();
+  const providers = () => listProviders();
+
+  const enabledProviderCount = () => providers().filter((p) => flags().providers[p.id] !== false).length;
+
+  return (
+    <div class="space-y-5">
+      <div>
+        <label class="text-xs font-medium text-[var(--text-secondary)] mb-2 block">Integrations</label>
+        <div class="space-y-1">
+          <ToggleRow
+            label="Git integration"
+            description="Show git branch, status, diff, and commit controls"
+            checked={flags().git}
+            onChange={(v) => updateFeatures({ git: v })}
+          />
+          <ToggleRow
+            label="Docker panel"
+            description="Show Docker compose controls in the sidebar"
+            checked={flags().docker}
+            onChange={(v) => updateFeatures({ docker: v })}
+          />
+          <ToggleRow
+            label="Session history"
+            description="Scan and display past AI coding sessions"
+            checked={flags().sessions}
+            onChange={(v) => updateFeatures({ sessions: v })}
+          />
+        </div>
+      </div>
+
+      <div>
+        <label class="text-xs font-medium text-[var(--text-secondary)] mb-2 block">Providers</label>
+        <div class="space-y-1">
+          <For each={providers()}>
+            {(provider) => {
+              const isEnabled = () => flags().providers[provider.id] !== false;
+              const isLastEnabled = () => isEnabled() && enabledProviderCount() <= 1;
+              const Icon = provider.icon;
+              return (
+                <label class="flex items-center justify-between py-2 cursor-pointer group">
+                  <div class="flex items-center gap-2">
+                    <span class="flex items-center justify-center w-5 h-5" style={{ color: provider.color }}>
+                      <Icon size={14} />
+                    </span>
+                    <div>
+                      <div class="text-xs font-medium text-[var(--text-primary)]">{provider.label}</div>
+                      <div class="text-[11px] text-[var(--text-secondary)] mt-0.5">{provider.command}</div>
+                    </div>
+                  </div>
+                  <button
+                    class="relative w-9 h-5 rounded-full transition-colors duration-200 shrink-0 ml-3"
+                    classList={{ "opacity-40 cursor-not-allowed": isLastEnabled() }}
+                    style={{
+                      background: isEnabled()
+                        ? "var(--accent)"
+                        : "var(--bg-tertiary)",
+                    }}
+                    onClick={() => {
+                      if (isLastEnabled()) return;
+                      updateFeatures({ providers: { [provider.id]: !isEnabled() } });
+                    }}
+                    title={isLastEnabled() ? "At least one provider must remain enabled" : ""}
+                  >
+                    <span
+                      class="absolute top-[2px] w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200"
+                      style={{
+                        transform: isEnabled() ? "translateX(18px)" : "translateX(2px)",
+                      }}
+                    />
+                  </button>
+                </label>
+              );
+            }}
+          </For>
+        </div>
+        <p class="text-[10px] text-[var(--text-secondary)] mt-1">
+          At least one provider must remain enabled
+        </p>
+      </div>
     </div>
   );
 }

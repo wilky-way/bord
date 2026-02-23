@@ -5,9 +5,11 @@ import { removeTerminal, setActiveTerminal, stashTerminal, setTerminalTitle, set
 import { state } from "../../store/core";
 import { toggleGitPanel, closeGitPanel } from "../../store/git";
 import { PROVIDER_ICONS } from "../../lib/providers";
+import WarmupIndicator from "./WarmupIndicator";
 import EditorButton from "../shared/EditorButton";
 import GitPanel from "../git/GitPanel";
 import { api } from "../../lib/api";
+import { isFeatureEnabled } from "../../store/features";
 
 interface Props {
   id: string;
@@ -189,7 +191,7 @@ export default function TerminalPanel(props: Props) {
       >
         <div class="flex items-center gap-2 min-w-0 overflow-hidden flex-1">
           {/* Branch badge + dirty indicator — clickable to toggle git panel */}
-          <Show when={branch()}>
+          <Show when={isFeatureEnabled("git") && branch()}>
             <button
               ref={branchButtonRef}
               class="flex items-center gap-1 shrink-0 rounded-[var(--btn-radius)] px-1 py-0.5 transition-colors"
@@ -245,31 +247,13 @@ export default function TerminalPanel(props: Props) {
           <span class="text-[10px] text-[var(--text-secondary)] opacity-50 truncate">
             {props.cwd}
           </span>
-          <button
-            class="shrink-0 flex items-center justify-center rounded-[var(--btn-radius)] transition-colors"
-            classList={{
-              "text-[var(--text-secondary)] opacity-50 hover:opacity-100": !!terminal()?.muted,
-              "text-[var(--text-secondary)] opacity-30 hover:opacity-60": !terminal()?.muted,
-            }}
-            onClick={(e) => {
-              e.stopPropagation();
-              setTerminalMuted(props.id, !terminal()?.muted);
-            }}
-            title={terminal()?.muted ? "Unmute notifications" : "Mute notifications"}
-          >
-            {terminal()?.muted ? (
-              <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-                <path d="M8 2C6 2 4.5 3.5 4.5 5v3L3 10.5V12h10v-1.5L11.5 8V5c0-1.5-1.5-3-3.5-3z" />
-                <path d="M6.5 12a1.5 1.5 0 003 0" />
-                <path d="M2 2l12 12" />
-              </svg>
-            ) : (
-              <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-                <path d="M8 2C6 2 4.5 3.5 4.5 5v3L3 10.5V12h10v-1.5L11.5 8V5c0-1.5-1.5-3-3.5-3z" />
-                <path d="M6.5 12a1.5 1.5 0 003 0" />
-              </svg>
-            )}
-          </button>
+          <WarmupIndicator
+            firstOutputAt={terminal()?.firstOutputAt}
+            muted={!!terminal()?.muted}
+            globalMuted={state.bellMuted}
+            provider={!!terminal()?.provider}
+            onMuteToggle={() => setTerminalMuted(props.id, !terminal()?.muted)}
+          />
         </div>
         <div class="flex items-center gap-1 shrink-0">
           {/* Push button - shows when ahead > 0 */}
@@ -331,7 +315,7 @@ export default function TerminalPanel(props: Props) {
       </div>
 
       {/* Git popover via Portal */}
-      <Show when={isGitPanelOpen()}>
+      <Show when={isFeatureEnabled("git") && isGitPanelOpen()}>
         <Portal>
           <div
             ref={popoverRef}

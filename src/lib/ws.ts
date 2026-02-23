@@ -1,6 +1,6 @@
-import { setTerminalLastOutput } from "../store/terminals";
+import { setTerminalLastOutput, setTerminalFirstOutput } from "../store/terminals";
 import { state } from "../store/core";
-import { addNotification } from "./notifications/store";
+import { addNotification, getSettings } from "./notifications/store";
 import { getWsBase } from "./server";
 import { createKeyedBatchCoalescer } from "./debounce";
 
@@ -42,6 +42,7 @@ const lastNotifiedAt = new Map<string, number>();
 // session (startup text takes ~2s → active duration < 5s → suppressed).
 const MIN_ACTIVE_DURATION_MS = 5_000;
 const activeStartedAt = new Map<string, number>();
+
 
 const CURSOR_STORAGE_KEY = "bord:terminal-cursors";
 const MAX_CURSOR_ENTRIES = 20;
@@ -140,6 +141,9 @@ export function connectTerminal(
           if (!activeStartedAt.has(ptyId)) {
             activeStartedAt.set(ptyId, Date.now());
           }
+          // Mark first active transition for warmup — this means a command
+          // started running after the terminal was idle (sitting at a prompt).
+          setTerminalFirstOutput(ptyId);
           return;
         }
       } catch {
@@ -183,6 +187,13 @@ function handleIdleEvent(ptyId: string) {
 
   // Respect mute flags
   if (terminal.muted || state.bellMuted) return;
+
+  // Suppress during notification warmup period (starts from first real output, not terminal creation)
+  const settings = getSettings();
+  if (settings.warmupDurationMs > 0) {
+    if (!terminal.firstOutputAt) return; // no output yet — suppress
+    if (Date.now() - terminal.firstOutputAt < settings.warmupDurationMs) return;
+  }
 
   // Suppress if user was viewing this terminal recently (fixes workspace-switch race)
   if (terminal.lastSeenAt && Date.now() - terminal.lastSeenAt < 10_000) return;

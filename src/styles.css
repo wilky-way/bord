@@ -97,3 +97,30 @@ html, body, #root {
 .popover-appear {
   animation: popoverAppear 0.15s ease-out;
 }
+
+/* Warmup indicator — bell rocks side to side during countdown */
+@keyframes bellDing {
+  0%, 100% { transform: rotate(0deg); }
+  15% { transform: rotate(12deg); }
+  30% { transform: rotate(-10deg); }
+  45% { transform: rotate(6deg); }
+  60% { transform: rotate(-4deg); }
+  75% { transform: rotate(2deg); }
+}
+.warmup-bell-ding {
+  transform-origin: 50% 15%;
+  animation: bellDing 1.2s ease-in-out infinite;
+}
+.warmup-bell-steady {
+  transform-origin: 50% 15%;
+  animation: none;
+}
+
+/* Warmup indicator — green glow pulse when tracking activates */
+@keyframes warmupPulse {
+  0%, 100% { box-shadow: 0 0 0 0 transparent; }
+  50% { box-shadow: 0 0 8px 2px var(--success); }
+}
+.warmup-green-pulse {
+  animation: warmupPulse 0.6s ease-in-out 2;
+}

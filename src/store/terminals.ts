@@ -27,6 +27,13 @@ export function setTerminalLastOutput(id: string) {
   setState("terminals", (t) => t.id === id, "lastOutputAt", Date.now());
 }
 
+export function setTerminalFirstOutput(id: string) {
+  const terminal = state.terminals.find((t) => t.id === id);
+  if (terminal && !terminal.firstOutputAt) {
+    setState("terminals", (t) => t.id === id, "firstOutputAt", Date.now());
+  }
+}
+
 export function setTerminalMuted(id: string, value: boolean) {
   setState("terminals", (t) => t.id === id, "muted", value);
 }
@@ -67,6 +74,7 @@ export async function addTerminal(cwd?: string, command?: string[], sessionTitle
     sessionId,
     sessionTitle,
     provider,
+    createdAt: Date.now(),
   };
 
   setState("terminals", (prev) => [...prev, terminal]);

@@ -15,6 +15,8 @@ export interface TerminalInstance {
   lastSeenAt?: number; // Date.now() when user last viewed this terminal
   muted?: boolean; // per-terminal mute — skips idle detection entirely
   provider?: Provider; // which AI provider spawned this terminal
+  createdAt: number; // Date.now() when terminal was spawned
+  firstOutputAt?: number; // Date.now() when first real (post-replay) output arrived — warmup starts here
 }
 
 export interface Workspace {

@@ -19,6 +19,7 @@ export interface NotificationSettings {
   errorSoundEnabled: boolean;
   osNotificationsEnabled: boolean;
   idleThresholdMs: number;
+  warmupDurationMs: number; // how long a terminal must run before notifications activate
 }
 
 export const DEFAULT_SETTINGS: NotificationSettings = {
@@ -26,4 +27,5 @@ export const DEFAULT_SETTINGS: NotificationSettings = {
   errorSoundEnabled: true,
   osNotificationsEnabled: false,
   idleThresholdMs: 8000,
+  warmupDurationMs: 10000,
 };
