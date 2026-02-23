@@ -1,18 +1,21 @@
 import { For, Show, type JSX } from "solid-js";
 import { state, setState } from "../../store/core";
 import { PROVIDER_COLORS, PROVIDER_ICONS, PROVIDER_LABELS } from "../../lib/providers";
+import { isProviderEnabled } from "../../store/features";
 import type { Provider } from "../../store/types";
 
-const PROVIDERS: Provider[] = ["claude", "codex", "opencode", "gemini"];
+const ALL_PROVIDERS: Provider[] = ["claude", "codex", "opencode", "gemini"];
 
 interface Props {
   actions?: JSX.Element;
 }
 
 export default function ProviderTabs(props: Props) {
+  const visibleProviders = () => ALL_PROVIDERS.filter((p) => isProviderEnabled(p));
+
   return (
     <div class="flex items-center justify-center gap-3 py-1.5">
-      <For each={PROVIDERS}>
+      <For each={visibleProviders()}>
         {(provider) => {
           const Icon = PROVIDER_ICONS[provider];
           const isActive = () => state.activeProvider === provider;

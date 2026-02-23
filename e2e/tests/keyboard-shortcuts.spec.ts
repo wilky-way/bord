@@ -265,4 +265,65 @@ test.describe("Keyboard shortcuts", () => {
     await page.waitForTimeout(300);
     expect(await settings.isOpen()).toBe(false);
   });
+
+  test("Alt+Left/Right terminal navigation switches terminals", async ({
+    page,
+    topbar,
+    terminalPanel,
+  }) => {
+    // Ensure at least 2 terminals
+    while ((await terminalPanel.visibleCount()) < 2) {
+      await topbar.addTerminal();
+      await page.waitForTimeout(800);
+    }
+
+    const ids = await terminalPanel.allTerminalIds();
+    if (ids.length < 2) {
+      test.skip();
+      return;
+    }
+
+    // Click the first terminal to set starting point
+    await terminalPanel.panel(ids[0]).click();
+    await page.waitForTimeout(300);
+
+    // Use Alt+Right to navigate to next terminal
+    await page.evaluate(() => {
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "ArrowRight",
+          code: "ArrowRight",
+          altKey: true,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+    });
+    await page.waitForTimeout(300);
+
+    // Second terminal should now be active
+    const secondOpacity = await terminalPanel
+      .panel(ids[1])
+      .evaluate((el) => (el as HTMLElement).style.opacity);
+    expect(secondOpacity).toBe("1");
+
+    // Use Alt+Left to navigate back
+    await page.evaluate(() => {
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "ArrowLeft",
+          code: "ArrowLeft",
+          altKey: true,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+    });
+    await page.waitForTimeout(300);
+
+    const firstOpacity = await terminalPanel
+      .panel(ids[0])
+      .evaluate((el) => (el as HTMLElement).style.opacity);
+    expect(firstOpacity).toBe("1");
+  });
 });

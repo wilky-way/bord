@@ -7,6 +7,7 @@ import WorkspaceList from "../workspace/WorkspaceList";
 import EditorButton from "../shared/EditorButton";
 import SettingsPanel from "../settings/SettingsPanel";
 import { buildNewSessionCommand, buildResumeCommand, PROVIDER_ICONS, PROVIDER_LABELS } from "../../lib/providers";
+import { isFeatureEnabled, isProviderEnabled } from "../../store/features";
 import { addTerminal, setActiveTerminal, setTerminalMuted, unstashTerminal } from "../../store/terminals";
 import { createWorkspace, deleteWorkspace } from "../../store/workspaces";
 import { notificationIndex } from "../../lib/notifications/index";
@@ -51,7 +52,7 @@ function SectionHeader(props: {
 
 export default function Sidebar() {
   let sidebarRef: HTMLDivElement | undefined;
-  const previewProviders: Provider[] = ["claude", "codex", "opencode", "gemini"];
+  const previewProviders = () => (["claude", "codex", "opencode", "gemini"] as Provider[]).filter((p) => isProviderEnabled(p));
   const tauriRuntime = isTauriRuntime();
 
   const [hovering, setHovering] = createSignal(false);
@@ -554,6 +555,7 @@ export default function Sidebar() {
       />
 
       <div class="flex-1 min-h-0 flex flex-col">
+        <Show when={isFeatureEnabled("sessions")}>
         <SectionHeader
           label="Sessions"
           collapsed={state.sidebarCollapsed.sessions}
@@ -737,20 +739,23 @@ export default function Sidebar() {
             </Show>
           </div>
         </Show>
+        </Show>
       </div>
 
       <div class="border-t border-[var(--border)]" />
 
-      <div class="shrink-0">
-        <SectionHeader
-          label="Docker"
-          collapsed={state.sidebarCollapsed.docker}
-          onToggle={() => setState("sidebarCollapsed", "docker", (v) => !v)}
-        />
-        <Show when={!state.sidebarCollapsed.docker}>
-          <DockerPanel />
-        </Show>
-      </div>
+      <Show when={isFeatureEnabled("docker")}>
+        <div class="shrink-0">
+          <SectionHeader
+            label="Docker"
+            collapsed={state.sidebarCollapsed.docker}
+            onToggle={() => setState("sidebarCollapsed", "docker", (v) => !v)}
+          />
+          <Show when={!state.sidebarCollapsed.docker}>
+            <DockerPanel />
+          </Show>
+        </div>
+      </Show>
     </div>
   );
 
@@ -917,7 +922,7 @@ export default function Sidebar() {
 
           <div class="px-2 py-1.5 border-b border-[var(--border)]">
             <div class="flex items-center justify-center gap-1">
-              <For each={previewProviders}>
+              <For each={previewProviders()}>
                 {(provider) => {
                   const Icon = PROVIDER_ICONS[provider];
                   return (

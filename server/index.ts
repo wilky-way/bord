@@ -8,7 +8,9 @@ import { fsRoutes } from "./routes/fs";
 import { editorRoutes } from "./routes/editor";
 import { dockerRoutes } from "./routes/docker";
 import { clipboardRoutes } from "./routes/clipboard";
+import { featureRoutes } from "./routes/features";
 import { initDb } from "./services/db";
+import { isFeatureEnabled } from "./services/feature-flags";
 
 const PORT = parseInt(process.env.BORD_PORT ?? "4200");
 const ALLOWED_ORIGINS = [
@@ -47,6 +49,17 @@ const server = Bun.serve({
       return new Response(null, { headers: corsHeaders });
     }
 
+    // Feature flag gating
+    if (url.pathname.startsWith("/api/git") && !isFeatureEnabled("git")) {
+      return Response.json({ error: "Git integration is disabled" }, { status: 404, headers: corsHeaders });
+    }
+    if (url.pathname.startsWith("/api/docker") && !isFeatureEnabled("docker")) {
+      return Response.json({ error: "Docker integration is disabled" }, { status: 404, headers: corsHeaders });
+    }
+    if (url.pathname.startsWith("/api/sessions") && !isFeatureEnabled("sessions")) {
+      return Response.json({ error: "Session history is disabled" }, { status: 404, headers: corsHeaders });
+    }
+
     // Route matching
     let response: Response | null = null;
 
@@ -68,6 +81,8 @@ const server = Bun.serve({
       response = await dockerRoutes(req, url);
     } else if (url.pathname.startsWith("/api/clipboard")) {
       response = await clipboardRoutes(req, url);
+    } else if (url.pathname.startsWith("/api/features")) {
+      response = await featureRoutes(req, url);
     }
 
     if (response) {

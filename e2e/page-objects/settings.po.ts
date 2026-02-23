@@ -25,8 +25,8 @@ export class SettingsPO {
     await this.page.keyboard.press("Escape");
   }
 
-  /** Switch to a settings section: Appearance, Notifications, or About. */
-  async switchSection(name: "Appearance" | "Notifications" | "About") {
+  /** Switch to a settings section. */
+  async switchSection(name: "Appearance" | "Notifications" | "Features" | "About") {
     await this.modal.locator(`button:has-text("${name}")`).click();
   }
 
@@ -55,5 +55,15 @@ export class SettingsPO {
   /** Get the idle threshold slider. */
   idleSlider(): Locator {
     return this.modal.locator('input[type="range"]');
+  }
+
+  /** Get feature toggle buttons in the Features section. */
+  featureToggles(): Locator {
+    return this.modal.locator("label.flex button");
+  }
+
+  /** Get provider toggle buttons in the Features section (inside the Providers sub-section). */
+  providerToggles(): Locator {
+    return this.modal.locator("label.flex button");
   }
 }

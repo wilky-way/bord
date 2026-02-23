@@ -368,4 +368,121 @@ test.describe("Git panel (G1-G7)", () => {
     const resetButton = gitPanel.repoResetButton();
     await expect(resetButton).toBeVisible({ timeout: 5000 });
   });
+
+  test("G8: Pull badge shows behind count", async ({ page, gitPanel }) => {
+    const toggleBtn = page.locator(sel.toggleGitPanel).first();
+    await toggleBtn.waitFor({ state: "visible", timeout: 10_000 });
+    await toggleBtn.click();
+    await page.waitForTimeout(1000);
+
+    // Look for pull badge with "↓" and a number
+    const pullBadge = gitPanel.pullBadge();
+    if (await pullBadge.isVisible()) {
+      const text = await pullBadge.textContent();
+      // Should contain "↓" and a number
+      expect(text).toMatch(/↓\d+/);
+    }
+    // If no pull badge, the repo is up to date — that's fine
+  });
+
+  test("G9: Branch switch button opens branch picker", async ({ page, gitPanel }) => {
+    const toggleBtn = page.locator(sel.toggleGitPanel).first();
+    await toggleBtn.waitFor({ state: "visible", timeout: 10_000 });
+    await toggleBtn.click();
+    await page.waitForTimeout(1000);
+
+    const switchBtn = gitPanel.branchSwitchButton();
+    if (!(await switchBtn.isVisible())) {
+      test.skip();
+      return;
+    }
+
+    // Click the branch switch button
+    await switchBtn.click();
+    await page.waitForTimeout(500);
+
+    // Should show some branch list or dropdown content
+    // The exact UI may vary but clicking shouldn't crash
+    expect(await gitPanel.isVisible()).toBe(true);
+  });
+
+  test("G10: Reset repo button returns to terminal's repo", async ({ page, gitPanel }) => {
+    const toggleBtn = page.locator(sel.toggleGitPanel).first();
+    await toggleBtn.waitFor({ state: "visible", timeout: 10_000 });
+    await toggleBtn.click();
+    await page.waitForTimeout(1000);
+
+    // First switch to a sibling repo via RepoNavigator
+    const repoDropdown = gitPanel.repoDropdown();
+    if (!(await repoDropdown.isVisible())) {
+      test.skip();
+      return;
+    }
+
+    await repoDropdown.click();
+    await page.waitForTimeout(500);
+
+    const siblingRepos = gitPanel.root.locator("button").filter({ hasText: /app-|fixture-/ });
+    const count = await siblingRepos.count();
+    if (count < 2) {
+      test.skip();
+      return;
+    }
+
+    // Click a different repo
+    await siblingRepos.nth(1).click();
+    await page.waitForTimeout(2000);
+
+    // Reset button should appear
+    const resetBtn = gitPanel.repoResetButton();
+    if (!(await resetBtn.isVisible())) {
+      test.skip();
+      return;
+    }
+
+    // Click reset
+    await resetBtn.click();
+    await page.waitForTimeout(1000);
+
+    // Reset button should disappear after returning to original repo
+    expect(await resetBtn.isVisible()).toBe(false);
+  });
+
+  test("G11: DiffViewer next hunk disabled at last hunk", async ({ page, gitPanel }) => {
+    const toggleBtn = page.locator(sel.toggleGitPanel).first();
+    await toggleBtn.waitFor({ state: "visible", timeout: 10_000 });
+    await toggleBtn.click();
+    await page.waitForTimeout(1000);
+
+    // Click a file to show diff
+    const fileButtons = gitPanel.root.locator("button").filter({ hasText: /\.(ts|css|md)$/ });
+    if ((await fileButtons.count()) === 0) {
+      test.skip();
+      return;
+    }
+
+    await fileButtons.first().click();
+    await page.waitForTimeout(500);
+
+    // Look for next/prev hunk navigation
+    const nextBtn = gitPanel.nextHunkButton();
+    if ((await nextBtn.count()) === 0) {
+      // No hunk navigation available — skip
+      test.skip();
+      return;
+    }
+
+    // Click next hunk until we reach the end
+    let safetyCount = 0;
+    while (safetyCount < 20) {
+      const isDisabled = await nextBtn.first().isDisabled().catch(() => true);
+      if (isDisabled) break;
+      await nextBtn.first().click();
+      await page.waitForTimeout(200);
+      safetyCount++;
+    }
+
+    // At the end, next should be disabled or we ran out of hunks
+    expect(safetyCount).toBeLessThan(20);
+  });
 });

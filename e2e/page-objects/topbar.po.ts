@@ -31,11 +31,27 @@ export class TopBarPO {
   /** Get the terminal count text from the badge. */
   async getTerminalCountText(): Promise<string> {
     const badge = this.page.locator("span").filter({ hasText: /\d+ terminals?/ });
-    return badge.first().textContent() ?? "";
+    return (await badge.first().textContent()) ?? "";
   }
 
   /** Get the density button locator. */
   densityButton(n: number): Locator {
     return this.page.locator(sel.densityButton(n));
+  }
+
+  /** Toggle the global mute button. */
+  async toggleGlobalMute() {
+    await this.page.locator(sel.globalMuteButton).click();
+  }
+
+  /** Get the title attribute of the global mute button. */
+  async getGlobalMuteTitle(): Promise<string> {
+    return (await this.page.locator(sel.globalMuteButton).getAttribute("title")) ?? "";
+  }
+
+  /** Check if the add terminal button is disabled. */
+  async isAddTerminalDisabled(): Promise<boolean> {
+    const btn = this.page.locator(sel.addTerminalButton).first();
+    return (await btn.getAttribute("disabled")) !== null;
   }
 }

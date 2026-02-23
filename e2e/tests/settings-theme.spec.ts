@@ -202,4 +202,29 @@ test.describe("Settings & themes", () => {
     expect(parseInt(initialValue)).toBeGreaterThanOrEqual(5000);
     expect(parseInt(initialValue)).toBeLessThanOrEqual(30000);
   });
+
+  test("Check for updates button click doesn't crash", async ({ page, settings }) => {
+    await page.keyboard.press("Meta+,");
+    await page.waitForTimeout(300);
+
+    await settings.switchSection("About");
+    await page.waitForTimeout(200);
+
+    const updateButton = settings.modal.locator('button:has-text("Check for updates")');
+    if (!(await updateButton.isVisible())) {
+      test.skip();
+      return;
+    }
+
+    // Click the button — it should not crash
+    await updateButton.click();
+    await page.waitForTimeout(1000);
+
+    // Settings should still be open and functional
+    expect(await settings.isOpen()).toBe(true);
+
+    // The button text may change to "Checking..." temporarily
+    const btnText = await updateButton.textContent();
+    expect(btnText).toMatch(/Check for updates|Checking/);
+  });
 });

@@ -1,4 +1,5 @@
 import * as docker from "../services/docker-service";
+import { validateContainerId } from "../lib/validate";
 
 export async function dockerRoutes(req: Request, url: URL): Promise<Response | null> {
   // GET /api/docker/discover?paths=path1,path2
@@ -71,6 +72,11 @@ export async function dockerRoutes(req: Request, url: URL): Promise<Response | n
     const containerId = url.searchParams.get("containerId");
     if (!containerId) {
       return Response.json({ error: "containerId query parameter required" }, { status: 400 });
+    }
+    try {
+      validateContainerId(containerId);
+    } catch (e) {
+      return Response.json({ error: (e as Error).message }, { status: 400 });
     }
     const tail = parseInt(url.searchParams.get("tail") || "50");
     const logs = await docker.getContainerLogs(containerId, tail);

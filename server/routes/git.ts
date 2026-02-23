@@ -1,4 +1,5 @@
 import * as git from "../services/git-service";
+import { validateBranchName, validateFilePath, MAX_COMMIT_MESSAGE_LENGTH } from "../lib/validate";
 
 export async function gitRoutes(req: Request, url: URL): Promise<Response | null> {
   const cwd = url.searchParams.get("cwd");
@@ -22,6 +23,13 @@ export async function gitRoutes(req: Request, url: URL): Promise<Response | null
   if (req.method === "GET" && url.pathname === "/api/git/diff") {
     const staged = url.searchParams.get("staged") === "true";
     const file = url.searchParams.get("file");
+    if (file) {
+      try {
+        validateFilePath(cwd, file);
+      } catch (e) {
+        return Response.json({ error: (e as Error).message }, { status: 400 });
+      }
+    }
     const diff = file
       ? await git.getFileDiff(cwd, file, staged)
       : await git.getDiff(cwd, staged);
@@ -34,6 +42,11 @@ export async function gitRoutes(req: Request, url: URL): Promise<Response | null
     if (!body.file) {
       return Response.json({ error: "file is required" }, { status: 400 });
     }
+    try {
+      validateFilePath(cwd, body.file);
+    } catch (e) {
+      return Response.json({ error: (e as Error).message }, { status: 400 });
+    }
     const ok = await git.stageFile(cwd, body.file);
     return Response.json({ ok });
   }
@@ -44,6 +57,11 @@ export async function gitRoutes(req: Request, url: URL): Promise<Response | null
     if (!body.file) {
       return Response.json({ error: "file is required" }, { status: 400 });
     }
+    try {
+      validateFilePath(cwd, body.file);
+    } catch (e) {
+      return Response.json({ error: (e as Error).message }, { status: 400 });
+    }
     const ok = await git.unstageFile(cwd, body.file);
     return Response.json({ ok });
   }
@@ -53,6 +71,9 @@ export async function gitRoutes(req: Request, url: URL): Promise<Response | null
     const body = (await req.json()) as { message: string };
     if (!body.message) {
       return Response.json({ error: "message is required" }, { status: 400 });
+    }
+    if (body.message.length > MAX_COMMIT_MESSAGE_LENGTH) {
+      return Response.json({ error: `Commit message exceeds maximum length of ${MAX_COMMIT_MESSAGE_LENGTH}` }, { status: 400 });
     }
     const result = await git.commit(cwd, body.message);
     return Response.json(result, { status: result.ok ? 200 : 400 });
@@ -100,6 +121,11 @@ export async function gitRoutes(req: Request, url: URL): Promise<Response | null
     const body = (await req.json()) as { branch: string };
     if (!body.branch) {
       return Response.json({ error: "branch is required" }, { status: 400 });
+    }
+    try {
+      validateBranchName(body.branch);
+    } catch (e) {
+      return Response.json({ error: (e as Error).message }, { status: 400 });
     }
     const result = await git.checkout(cwd, body.branch);
     return Response.json(result, { status: result.ok ? 200 : 400 });

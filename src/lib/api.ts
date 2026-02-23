@@ -179,6 +179,24 @@ export const api = {
       body: JSON.stringify({ base64, mimeType }),
     }),
 
+  // Features
+  getFeatures: () => request<{
+    git: boolean;
+    docker: boolean;
+    sessions: boolean;
+    providers: Record<string, boolean>;
+  }>("/features"),
+  updateFeatures: (patch: Record<string, unknown>) =>
+    request<{
+      git: boolean;
+      docker: boolean;
+      sessions: boolean;
+      providers: Record<string, boolean>;
+    }>("/features", {
+      method: "PUT",
+      body: JSON.stringify(patch),
+    }),
+
   // Filesystem
   browseDir: (path?: string) => {
     const params = path ? `?path=${encodeURIComponent(path)}` : "";

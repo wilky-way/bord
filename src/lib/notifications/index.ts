@@ -12,17 +12,17 @@ export interface NotificationIndex {
   byWorkspace: Map<string, NotificationIndexEntry>;
 }
 
-export const notificationIndex = createMemo<NotificationIndex>(() => {
-  // Build a set of live terminal IDs so we skip stale notifications
-  const liveTerminals = new Set(state.terminals.map((t) => t.id));
-
+/** @internal — exported for testing */
+export function buildNotificationIndex(
+  liveTerminalIds: Set<string>,
+  notifs: import("./types").Notification[],
+): NotificationIndex {
   const byTerminal = new Map<string, NotificationIndexEntry>();
   const byWorkspace = new Map<string, NotificationIndexEntry>();
 
-  for (const n of notifications()) {
+  for (const n of notifs) {
     if (n.viewed) continue;
-    // Skip notifications for terminals that no longer exist
-    if (!liveTerminals.has(n.terminalId)) continue;
+    if (!liveTerminalIds.has(n.terminalId)) continue;
 
     // Index by terminal
     const tEntry = byTerminal.get(n.terminalId);
@@ -50,6 +50,11 @@ export const notificationIndex = createMemo<NotificationIndex>(() => {
   }
 
   return { byTerminal, byWorkspace };
+}
+
+export const notificationIndex = createMemo<NotificationIndex>(() => {
+  const liveTerminals = new Set(state.terminals.map((t) => t.id));
+  return buildNotificationIndex(liveTerminals, notifications());
 });
 
 export { notifications, addNotification, markViewed, markAllViewedForWorkspace, clearForTerminal, pruneStaleNotifications, getSettings, updateSettings } from "./store";

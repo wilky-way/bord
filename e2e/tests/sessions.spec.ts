@@ -169,4 +169,34 @@ test.describe("Sessions (S1-S5)", () => {
     const noSessions = sessionList.noSessionsMessage();
     expect(await noSessions.isVisible()).toBe(true);
   });
+
+  test("S6: refresh sessions button reloads list", async ({ page, sidebar }) => {
+    // Ensure Claude tab is selected
+    const claudeTab = page.locator('button[title="Claude"]').first();
+    if (await claudeTab.isVisible()) {
+      await claudeTab.click();
+      await page.waitForTimeout(1000);
+    }
+
+    // Click the refresh sessions button
+    const refreshBtn = page.locator('button[title="Refresh sessions"]');
+    if (!(await refreshBtn.isVisible())) {
+      test.skip();
+      return;
+    }
+
+    await refreshBtn.click();
+    await page.waitForTimeout(2000);
+
+    // After refresh, the session list should still be functional
+    // (either showing sessions or "No sessions found")
+    const panelContent = page.locator('[data-bord-sidebar-panel="expanded"]');
+    const panelText = await panelContent.textContent();
+    const hasContent =
+      panelText?.includes("No sessions found") ||
+      panelText?.includes("Loading sessions") ||
+      panelText?.includes("msgs");
+
+    expect(hasContent).toBe(true);
+  });
 });

@@ -106,4 +106,24 @@ export class GitPanelPO {
   repoResetButton(): Locator {
     return this.root.locator('button[title="Return to terminal\'s repo"]');
   }
+
+  /** Get the branch switch button. */
+  branchSwitchButton(): Locator {
+    return this.root.locator('button[title="Switch branch"]');
+  }
+
+  /** Get the branch list dropdown. */
+  branchList(): Locator {
+    return this.root.locator("select, [data-branch-list]");
+  }
+
+  /** Get the next hunk navigation button. */
+  nextHunkButton(): Locator {
+    return this.root.locator('button[title*="Next"], button[title*="next"]');
+  }
+
+  /** Get the previous hunk navigation button. */
+  prevHunkButton(): Locator {
+    return this.root.locator('button[title*="Prev"], button[title*="prev"]');
+  }
 }

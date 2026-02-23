@@ -34,7 +34,7 @@ jobs:
           BORD_FIXTURE_ROOT: ${{ runner.temp }}/bord-fixtures
 
       - name: Run unit tests
-        run: bun test src/lib/*.test.ts server/**/*.test.ts
+        run: bun test src/store/*.test.ts && bun test src/lib/**/*.test.ts && bun test server/services/*.test.ts && bun test server/routes/*.test.ts server/ws/*.test.ts
 
       - name: Run E2E tests
         run: bun run test:e2e

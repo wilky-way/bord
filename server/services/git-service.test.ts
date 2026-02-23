@@ -1,9 +1,13 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test, beforeAll, afterAll } from "bun:test";
 import {
   parseStatusPorcelain,
   parseNumstatOutput,
   parseAheadBehindOutput,
+  validateCwd,
 } from "./git-service";
+import { mkdirSync, writeFileSync, rmSync } from "fs";
+import { join } from "path";
+import { tmpdir } from "os";
 
 describe("parseStatusPorcelain", () => {
   test("parses staged file (M in index)", () => {
@@ -118,5 +122,37 @@ describe("parseAheadBehindOutput", () => {
 
   test("handles only behind", () => {
     expect(parseAheadBehindOutput("2\t0")).toEqual({ ahead: 0, behind: 2 });
+  });
+});
+
+describe("validateCwd", () => {
+  const testDir = join(tmpdir(), "bord-test-validate-cwd-" + Date.now());
+  const testFile = join(testDir, "file.txt");
+
+  beforeAll(() => {
+    mkdirSync(testDir, { recursive: true });
+    writeFileSync(testFile, "test");
+  });
+
+  afterAll(() => {
+    rmSync(testDir, { recursive: true, force: true });
+  });
+
+  test("returns valid for existing directory", () => {
+    const result = validateCwd(testDir);
+    expect(result.valid).toBe(true);
+    expect(result.error).toBeUndefined();
+  });
+
+  test("returns invalid for nonexistent path", () => {
+    const result = validateCwd(join(testDir, "nonexistent"));
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain("does not exist");
+  });
+
+  test("returns invalid for file (not directory)", () => {
+    const result = validateCwd(testFile);
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain("not a directory");
   });
 });

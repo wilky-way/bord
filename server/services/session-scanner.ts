@@ -1,6 +1,7 @@
 import { readdir, readFile, stat } from "fs/promises";
 import { join } from "path";
 import { homedir } from "os";
+import { registerServerProvider } from "./provider-registry";
 
 export const PROVIDERS = ["claude", "codex", "opencode", "gemini"] as const;
 export type Provider = (typeof PROVIDERS)[number];
@@ -97,7 +98,7 @@ async function readSessionIndex(
   return map;
 }
 
-async function scanCodexSessions(projectPath?: string): Promise<SessionInfo[]> {
+export async function scanCodexSessions(projectPath?: string): Promise<SessionInfo[]> {
   const sessions: SessionInfo[] = [];
   try {
     // Codex stores sessions under ~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl
@@ -197,7 +198,7 @@ async function scanCodexSessions(projectPath?: string): Promise<SessionInfo[]> {
   return sessions;
 }
 
-async function scanOpenCodeSessions(projectPath?: string): Promise<SessionInfo[]> {
+export async function scanOpenCodeSessions(projectPath?: string): Promise<SessionInfo[]> {
   const sessions: SessionInfo[] = [];
   try {
     // OpenCode stores sessions as JSON files under .../storage/session/{projectHash}/*.json
@@ -269,11 +270,11 @@ async function scanOpenCodeSessions(projectPath?: string): Promise<SessionInfo[]
   return result;
 }
 
-async function scanGeminiSessions(_projectPath?: string): Promise<SessionInfo[]> {
+export async function scanGeminiSessions(_projectPath?: string): Promise<SessionInfo[]> {
   return [];
 }
 
-async function scanClaudeSessions(projectPath?: string): Promise<SessionInfo[]> {
+export async function scanClaudeSessions(projectPath?: string): Promise<SessionInfo[]> {
   const sessions: SessionInfo[] = [];
 
   try {
@@ -385,6 +386,12 @@ async function scanClaudeSessions(projectPath?: string): Promise<SessionInfo[]> 
   return sessions;
 }
 
+// Register all providers with the server registry
+registerServerProvider({ id: "claude", scanSessions: scanClaudeSessions });
+registerServerProvider({ id: "codex", scanSessions: scanCodexSessions });
+registerServerProvider({ id: "opencode", scanSessions: scanOpenCodeSessions });
+registerServerProvider({ id: "gemini", scanSessions: scanGeminiSessions });
+
 export async function scanSessions(projectPath?: string, provider?: Provider): Promise<SessionInfo[]> {
   switch (provider) {
     case "claude": return scanClaudeSessions(projectPath);
@@ -394,3 +401,6 @@ export async function scanSessions(projectPath?: string, provider?: Provider): P
     default: return scanClaudeSessions(projectPath);
   }
 }
+
+/** @internal — exported for testing */
+export { readSessionIndex as _readSessionIndex };

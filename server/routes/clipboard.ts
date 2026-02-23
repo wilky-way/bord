@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
+import { MAX_CLIPBOARD_IMAGE_SIZE } from "../lib/validate";
 
 const PASTE_DIR = join(tmpdir(), "bord-paste");
 
@@ -31,6 +32,12 @@ export async function clipboardRoutes(req: Request, url: URL): Promise<Response 
       const filePath = join(PASTE_DIR, filename);
 
       const buffer = Buffer.from(body.base64, "base64");
+      if (buffer.byteLength > MAX_CLIPBOARD_IMAGE_SIZE) {
+        return Response.json(
+          { error: `Image exceeds maximum size of ${MAX_CLIPBOARD_IMAGE_SIZE} bytes` },
+          { status: 400 },
+        );
+      }
       await writeFile(filePath, buffer);
 
       return Response.json({ path: filePath });

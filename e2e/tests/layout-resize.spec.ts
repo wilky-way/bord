@@ -123,4 +123,55 @@ test.describe("Layout & resize", () => {
     await page.waitForTimeout(1000);
     expect(await terminalPanel.visibleCount()).toBe(before + 1);
   });
+
+  test("terminal count badge matches visible count", async ({ page, topbar, terminalPanel }) => {
+    const badgeText = await topbar.getTerminalCountText();
+    const match = badgeText.match(/(\d+)/);
+    if (!match) {
+      test.skip();
+      return;
+    }
+
+    const badgeCount = parseInt(match[1], 10);
+    // Badge shows total terminals (including stashed), not just visible
+    // So it should be >= visible count
+    const visibleCount = await terminalPanel.visibleCount();
+    expect(badgeCount).toBeGreaterThanOrEqual(visibleCount);
+  });
+
+  test("window resize reflows panels", async ({ page, topbar, terminalPanel }) => {
+    // Set 2x density
+    await topbar.setDensity(2);
+    await page.waitForTimeout(300);
+
+    // Get initial panel bounding box
+    const panels = terminalPanel.allPanels();
+    if ((await panels.count()) < 2) {
+      test.skip();
+      return;
+    }
+
+    const boxBefore = await panels.first().boundingBox();
+    if (!boxBefore) {
+      test.skip();
+      return;
+    }
+
+    // Resize viewport to smaller width
+    await page.setViewportSize({ width: 1000, height: 800 });
+    await page.waitForTimeout(500);
+
+    const boxAfter = await panels.first().boundingBox();
+    if (!boxAfter) {
+      test.skip();
+      return;
+    }
+
+    // Panel width should have changed (smaller viewport = narrower panels)
+    expect(boxAfter.width).not.toBe(boxBefore.width);
+
+    // Restore viewport
+    await page.setViewportSize({ width: 1720, height: 980 });
+    await page.waitForTimeout(300);
+  });
 });

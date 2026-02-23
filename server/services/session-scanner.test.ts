@@ -1,10 +1,14 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test, afterAll } from "bun:test";
 import {
   isProvider,
   normalizeSessionTitle,
   normalizeSessionTime,
   decodeDirToPath,
+  _readSessionIndex as readSessionIndex,
 } from "./session-scanner";
+import { mkdirSync, writeFileSync, rmSync } from "fs";
+import { join } from "path";
+import { tmpdir } from "os";
 
 describe("isProvider", () => {
   test("accepts all valid providers", () => {
@@ -113,5 +117,77 @@ describe("decodeDirToPath", () => {
 
   test("handles single segment", () => {
     expect(decodeDirToPath("-tmp")).toBe("/tmp");
+  });
+});
+
+describe("readSessionIndex", () => {
+  const testDir = join(tmpdir(), "bord-test-session-index-" + Date.now());
+
+  function writeIndex(name: string, data: unknown) {
+    const dir = join(testDir, name);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "sessions-index.json"), JSON.stringify(data));
+  }
+
+  afterAll(() => {
+    rmSync(testDir, { recursive: true, force: true });
+  });
+
+  test("parses { version, entries: [...] } envelope format", async () => {
+    writeIndex("envelope", {
+      version: 1,
+      entries: [
+        { sessionId: "s1", summary: "Fix bug" },
+        { sessionId: "s2", summary: "Add feature" },
+      ],
+    });
+    const map = await readSessionIndex(join(testDir, "envelope"));
+    expect(map.size).toBe(2);
+    expect(map.get("s1")?.summary).toBe("Fix bug");
+    expect(map.get("s2")?.summary).toBe("Add feature");
+  });
+
+  test("parses flat array format", async () => {
+    writeIndex("flat-array", [
+      { sessionId: "a1", summary: "Session A" },
+      { sessionId: "a2", summary: "Session B" },
+    ]);
+    const map = await readSessionIndex(join(testDir, "flat-array"));
+    expect(map.size).toBe(2);
+    expect(map.get("a1")?.summary).toBe("Session A");
+  });
+
+  test("parses object keyed by session id", async () => {
+    writeIndex("obj-keyed", {
+      "obj-1": { summary: "Obj Session 1", messageCount: 5 },
+      "obj-2": { summary: "Obj Session 2", messageCount: 10 },
+    });
+    const map = await readSessionIndex(join(testDir, "obj-keyed"));
+    expect(map.size).toBe(2);
+    expect(map.get("obj-1")?.summary).toBe("Obj Session 1");
+    expect(map.get("obj-1")?.messageCount).toBe(5);
+  });
+
+  test("returns empty map for nonexistent directory", async () => {
+    const map = await readSessionIndex(join(testDir, "nonexistent"));
+    expect(map.size).toBe(0);
+  });
+
+  test("returns empty map for invalid JSON", async () => {
+    const dir = join(testDir, "bad-json");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "sessions-index.json"), "not valid json{{{");
+    const map = await readSessionIndex(dir);
+    expect(map.size).toBe(0);
+  });
+
+  test("skips entries without sessionId", async () => {
+    writeIndex("missing-id", [
+      { sessionId: "valid", summary: "OK" },
+      { summary: "No ID" } as any,
+    ]);
+    const map = await readSessionIndex(join(testDir, "missing-id"));
+    expect(map.size).toBe(1);
+    expect(map.has("valid")).toBe(true);
   });
 });

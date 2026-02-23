@@ -99,4 +99,29 @@ test.describe("Terminal minimap", () => {
     expect(activeCount).toBe(1);
     expect(inactiveCount).toBeGreaterThanOrEqual(1);
   });
+
+  test("MM-4: minimap hidden when fewer than 2 terminals", async ({
+    page,
+    topbar,
+    terminalPanel,
+  }) => {
+    // Remove terminals until we have 1 or fewer
+    while ((await terminalPanel.visibleCount()) > 1) {
+      await terminalPanel.closeFirst();
+      await page.waitForTimeout(500);
+    }
+
+    const terminalCount = await terminalPanel.visibleCount();
+    if (terminalCount > 1) {
+      test.skip();
+      return;
+    }
+
+    // Minimap dots should not be visible with <2 terminals
+    const minimapDots = page.locator("button.h-3\\.5.rounded");
+    const dotCount = await minimapDots.count();
+
+    // With 0 or 1 terminals, minimap should have 0 or 1 dots (hidden or minimal)
+    expect(dotCount).toBeLessThanOrEqual(1);
+  });
 });

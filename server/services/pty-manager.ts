@@ -208,9 +208,11 @@ export function attachWs(
   // Signal end of replay so client can distinguish replay bytes from live output
   ws.send(JSON.stringify({ type: "replay-done" }));
 
-  // If terminal is already idle, tell the new client immediately
+  // Tell the new client the current idle/active state immediately
   if (session.isIdle) {
     ws.send(JSON.stringify({ type: "idle" }));
+  } else {
+    ws.send(JSON.stringify({ type: "active" }));
   }
 
   return true;
@@ -297,3 +299,11 @@ export function getPtySession(id: string): PtySession | undefined {
 export function listPtySessions(): Array<{ id: string; cwd: string }> {
   return Array.from(sessions.values()).map((s) => ({ id: s.id, cwd: s.cwd }));
 }
+
+/** @internal — exported for testing */
+export const _createRingBuffer = createRingBuffer;
+export const _ringWrite = ringWrite;
+export const _ringRead = ringRead;
+export const _shellEscape = shellEscape;
+export const _BUFFER_LIMIT = BUFFER_LIMIT;
+export const _MAX_REPLAY_BURST = MAX_REPLAY_BURST;

@@ -8,10 +8,12 @@ import { state, setState } from "./store/core";
 import { toggleGitPanel } from "./store/git";
 import { setSettingsOpen } from "./store/settings";
 import { initUpdater } from "./lib/updater";
+import { loadFeatures } from "./store/features";
 
 export default function App() {
   onMount(() => {
     initUpdater();
+    loadFeatures();
 
     const onKeyDown = (e: KeyboardEvent) => {
       // Ctrl+N: New terminal in active workspace

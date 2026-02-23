@@ -65,4 +65,26 @@ test.describe("Editor integration (E1-E2)", () => {
       expect(classes).toContain("accent");
     }
   });
+
+  test("E3: VS Code selection changes active editor", async ({ page, terminalPanel }) => {
+    const panel = terminalPanel.allPanels().first();
+    const editorDropdown = panel.locator(sel.chooseEditorButton);
+    await editorDropdown.click();
+    await page.waitForTimeout(300);
+
+    // Click VS Code option
+    const vscodeOption = page.locator("button:has-text('VS Code')");
+    if (await vscodeOption.isVisible()) {
+      await vscodeOption.click();
+      await page.waitForTimeout(300);
+
+      // Re-open dropdown to verify VS Code is now active
+      await editorDropdown.click();
+      await page.waitForTimeout(300);
+
+      const vscodeBtn = page.locator("button:has-text('VS Code')");
+      const classes = await vscodeBtn.getAttribute("class");
+      expect(classes).toContain("accent");
+    }
+  });
 });

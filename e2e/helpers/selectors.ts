@@ -34,7 +34,19 @@ export const sel = {
   // GitPanel.tsx (Portal-rendered)
   gitPanelPortal: ".fixed.z-\\[9999\\]",
 
+  // TopBar.tsx — global mute
+  globalMuteButton: 'button[title="Mute notifications"], button[title="Unmute notifications"]',
+
+  // Sidebar.tsx — add workspace
+  addWorkspaceButton: 'button[title="Open project"]',
+
   // SettingsPanel.tsx
   settingsBackdrop: ".fixed.inset-0.z-50",
   settingsCloseButton: 'button[title="Close"]',
+
+  // SettingsPanel.tsx — Features section
+  featureToggle: (name: string) => `label:has-text("${name}") button`,
+
+  // GitPanel.tsx — branch switch
+  branchSwitchButton: 'button[title="Switch branch"]',
 } as const;

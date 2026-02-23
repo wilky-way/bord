@@ -95,7 +95,7 @@ export async function getFileDiff(cwd: string, filePath: string, staged: boolean
 }
 
 export async function stageFile(cwd: string, filePath: string): Promise<boolean> {
-  const result = await runGit(cwd, ["add", filePath]);
+  const result = await runGit(cwd, ["add", "--", filePath]);
   return result.exitCode === 0;
 }
 
