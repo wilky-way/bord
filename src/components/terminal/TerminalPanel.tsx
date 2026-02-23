@@ -248,10 +248,9 @@ export default function TerminalPanel(props: Props) {
             {props.cwd}
           </span>
           <WarmupIndicator
-            firstOutputAt={terminal()?.firstOutputAt}
+            armed={!!terminal()?.notificationsArmed}
             muted={!!terminal()?.muted}
             globalMuted={state.bellMuted}
-            provider={!!terminal()?.provider}
             onMuteToggle={() => setTerminalMuted(props.id, !terminal()?.muted)}
           />
         </div>

@@ -16,7 +16,7 @@ export interface TerminalInstance {
   muted?: boolean; // per-terminal mute — skips idle detection entirely
   provider?: Provider; // which AI provider spawned this terminal
   createdAt: number; // Date.now() when terminal was spawned
-  firstOutputAt?: number; // Date.now() when first real (post-replay) output arrived — warmup starts here
+  notificationsArmed?: boolean; // true when agent has worked long enough to trigger notifications on idle
 }
 
 export interface Workspace {

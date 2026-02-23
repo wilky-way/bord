@@ -254,7 +254,7 @@ function NotificationSettings() {
 
       <div>
         <label class="text-xs font-medium text-[var(--text-secondary)] mb-2 block">
-          Notification warmup: {s().warmupDurationMs === 0 ? "Off" : `${(s().warmupDurationMs / 1000).toFixed(0)}s`}
+          Notification delay: {s().warmupDurationMs === 0 ? "Off" : `${(s().warmupDurationMs / 1000).toFixed(0)}s`}
         </label>
         <div class="flex items-center gap-3">
           <span class="text-[10px] text-[var(--text-secondary)]">Off</span>
@@ -273,7 +273,7 @@ function NotificationSettings() {
           <span class="text-[10px] text-[var(--text-secondary)]">30s</span>
         </div>
         <p class="text-[10px] text-[var(--text-secondary)] mt-1">
-          After an agent starts producing output, wait this long before sending notifications. Prevents alerts during startup and initial prompt loading.
+          Agent must work this long before notifications arm. Prevents alerts from brief output bursts.
         </p>
       </div>
     </div>

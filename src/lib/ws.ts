@@ -1,4 +1,4 @@
-import { setTerminalLastOutput, setTerminalFirstOutput } from "../store/terminals";
+import { setTerminalLastOutput, setTerminalArmed } from "../store/terminals";
 import { state } from "../store/core";
 import { addNotification, getSettings } from "./notifications/store";
 import { getWsBase } from "./server";
@@ -20,28 +20,20 @@ const connections = new Map<string, WsConnection>();
 // Reset when `active` arrives (output resumed).
 const knownIdleTerminals = new Set<string>();
 
-// Track bytes received per terminal since last idle→active transition.
-// Only notify if a meaningful amount of output was produced (agent turn),
-// not just a tiny blip from an IDE click or cursor escape sequence.
-// 3000 bytes gives headroom above Claude Code prompt redraws (200-800 bytes ANSI)
-// while still catching real agent turns (5KB+).
-const OUTPUT_THRESHOLD_BYTES = 3000;
-const outputBytesSinceActive = new Map<string, number>();
+// Per-terminal arming timers — agent must work this long before notifications arm.
+const armingTimers = new Map<string, Timer>();
 
-// Track which terminals have finished replay — only count bytes after replay-done.
-// Prevents replay data (up to 128KB) from inflating the output counter.
-const replayDoneTerminals = new Set<string>();
+// Track when the user last sent input (keystroke, paste, Ctrl-C, etc.) to each
+// terminal.  When the arming timer fires we check recency — if the user was
+// typing recently the output is TUI redraws, not real agent work.
+const lastUserInputAt = new Map<string, number>();
+const USER_INPUT_RECENCY_MS = 3_000;
+const ARMING_RETRY_MS = 2_000;
 
 // Per-terminal notification cooldown to avoid repeated notifications
 // from prompt redraws or rapid idle/active cycling.
 const NOTIFICATION_COOLDOWN_MS = 30_000;
 const lastNotifiedAt = new Map<string, number>();
-
-// Minimum time a terminal must be in active state before an idle transition
-// triggers a notification. Prevents false positives when resuming a Claude
-// session (startup text takes ~2s → active duration < 5s → suppressed).
-const MIN_ACTIVE_DURATION_MS = 5_000;
-const activeStartedAt = new Map<string, number>();
 
 
 const CURSOR_STORAGE_KEY = "bord:terminal-cursors";
@@ -87,15 +79,25 @@ const outputCoalescer = createKeyedBatchCoalescer<string, number>(
   },
 );
 
+/** Try to arm a provider terminal.  If the user was typing recently the check
+ *  is retried on a short interval until either the user stops typing (→ arm)
+ *  or the terminal goes idle (→ timer cleared, no arm). */
+function tryArm(ptyId: string) {
+  const lastInput = lastUserInputAt.get(ptyId) ?? 0;
+  if (Date.now() - lastInput < USER_INPUT_RECENCY_MS) {
+    // User was typing — retry shortly
+    armingTimers.set(ptyId, setTimeout(() => tryArm(ptyId), ARMING_RETRY_MS));
+    return;
+  }
+  armingTimers.delete(ptyId);
+  setTerminalArmed(ptyId, true);
+}
+
 export function connectTerminal(
   ptyId: string,
   onData: MessageHandler,
   onStatus: StatusHandler,
 ): () => void {
-  // Reset replay/output state for this connection
-  replayDoneTerminals.delete(ptyId);
-  outputBytesSinceActive.set(ptyId, 0);
-
   // Use stored cursor for replay
   const stored = getStoredCursor(ptyId);
   const cursorParam = stored?.cursor ? `?cursor=${stored.cursor}` : "";
@@ -116,34 +118,38 @@ export function connectTerminal(
           return; // Don't forward control frames to terminal
         }
         if (ctrl.type === "replay-done") {
-          replayDoneTerminals.add(ptyId);
-          outputBytesSinceActive.set(ptyId, 0);
           return;
         }
         if (ctrl.type === "idle") {
           const alreadyKnown = knownIdleTerminals.has(ptyId);
           if (!alreadyKnown) {
             knownIdleTerminals.add(ptyId);
-            const bytes = outputBytesSinceActive.get(ptyId) ?? 0;
-            const activeStart = activeStartedAt.get(ptyId);
-            const activeDuration = activeStart ? Date.now() - activeStart : 0;
-            if (bytes >= OUTPUT_THRESHOLD_BYTES && activeDuration >= MIN_ACTIVE_DURATION_MS) {
-              handleIdleEvent(ptyId);
+
+            // Clear pending arming timer — agent didn't work long enough
+            const pending = armingTimers.get(ptyId);
+            if (pending) {
+              clearTimeout(pending);
+              armingTimers.delete(ptyId);
             }
-            outputBytesSinceActive.set(ptyId, 0);
-            activeStartedAt.delete(ptyId);
+
+            // If armed → fire notification + disarm
+            const terminal = state.terminals.find((t) => t.id === ptyId);
+            if (terminal?.notificationsArmed) {
+              handleIdleEvent(ptyId);
+              setTerminalArmed(ptyId, false);
+            }
           }
           return;
         }
         if (ctrl.type === "active") {
           knownIdleTerminals.delete(ptyId);
-          outputBytesSinceActive.set(ptyId, 0);
-          if (!activeStartedAt.has(ptyId)) {
-            activeStartedAt.set(ptyId, Date.now());
+
+          // Start arming timer if this is a provider terminal, not already armed, and no timer pending
+          const terminal = state.terminals.find((t) => t.id === ptyId);
+          if (terminal?.provider && !terminal.notificationsArmed && !armingTimers.has(ptyId)) {
+            const delay = getSettings().warmupDurationMs;
+            armingTimers.set(ptyId, setTimeout(() => tryArm(ptyId), delay));
           }
-          // Mark first active transition for warmup — this means a command
-          // started running after the terminal was idle (sitting at a prompt).
-          setTerminalFirstOutput(ptyId);
           return;
         }
       } catch {
@@ -151,16 +157,6 @@ export function connectTerminal(
       }
     }
     onData(event.data);
-    // Track output volume for idle notification threshold — only after replay is done
-    if (replayDoneTerminals.has(ptyId)) {
-      const dataLen = event.data instanceof ArrayBuffer ? event.data.byteLength
-        : typeof event.data === "string" ? event.data.length : 0;
-      outputBytesSinceActive.set(ptyId, (outputBytesSinceActive.get(ptyId) ?? 0) + dataLen);
-      // Start active timer on first post-replay output if not already set
-      if (!activeStartedAt.has(ptyId)) {
-        activeStartedAt.set(ptyId, Date.now());
-      }
-    }
     outputCoalescer.enqueue(ptyId, Date.now());
   };
 
@@ -171,10 +167,15 @@ export function connectTerminal(
     ws.close();
     connections.delete(ptyId);
     knownIdleTerminals.delete(ptyId);
-    outputBytesSinceActive.delete(ptyId);
-    replayDoneTerminals.delete(ptyId);
+    lastUserInputAt.delete(ptyId);
     lastNotifiedAt.delete(ptyId);
-    activeStartedAt.delete(ptyId);
+    // Clear arming timer on disconnect, but do NOT disarm — armed state
+    // persists in store across tab switches.
+    const pending = armingTimers.get(ptyId);
+    if (pending) {
+      clearTimeout(pending);
+      armingTimers.delete(ptyId);
+    }
   };
 }
 
@@ -187,13 +188,6 @@ function handleIdleEvent(ptyId: string) {
 
   // Respect mute flags
   if (terminal.muted || state.bellMuted) return;
-
-  // Suppress during notification warmup period (starts from first real output, not terminal creation)
-  const settings = getSettings();
-  if (settings.warmupDurationMs > 0) {
-    if (!terminal.firstOutputAt) return; // no output yet — suppress
-    if (Date.now() - terminal.firstOutputAt < settings.warmupDurationMs) return;
-  }
 
   // Suppress if user was viewing this terminal recently (fixes workspace-switch race)
   if (terminal.lastSeenAt && Date.now() - terminal.lastSeenAt < 10_000) return;
@@ -217,6 +211,7 @@ function handleIdleEvent(ptyId: string) {
 }
 
 export function sendToTerminal(ptyId: string, data: string | Uint8Array) {
+  lastUserInputAt.set(ptyId, Date.now());
   const conn = connections.get(ptyId);
   if (!conn || conn.ws.readyState !== WebSocket.OPEN) return;
   conn.ws.send(data);
