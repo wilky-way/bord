@@ -1,17 +1,25 @@
 import { createPty, destroyPty, listPtySessions } from "../services/pty-manager";
 import { validateCwd } from "../services/git-service";
+import { getWorkspace } from "../services/workspace-service";
 import { randomUUID } from "crypto";
 
 export async function ptyRoutes(req: Request, url: URL): Promise<Response | null> {
   // POST /api/pty - create a new PTY session
   if (req.method === "POST" && url.pathname === "/api/pty") {
     const body = await req.json().catch(() => ({}));
-    const { cwd: rawCwd, cols, rows, command } = body as {
+    const { cwd: rawCwd, cols, rows, command, workspaceId } = body as {
       cwd?: string;
       cols?: number;
       rows?: number;
       command?: string[];
+      workspaceId?: string;
     };
+
+    // Validate workspaceId if provided
+    if (workspaceId && !getWorkspace(workspaceId)) {
+      return Response.json({ error: "Workspace not found" }, { status: 400 });
+    }
+
     const cwd = rawCwd ?? process.env.HOME ?? "/";
 
     // Validate cwd

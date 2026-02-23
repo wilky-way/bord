@@ -8,8 +8,17 @@ export function setTerminalTitle(id: string, title: string) {
   setState("terminals", (t) => t.id === id, "customTitle", title || undefined);
 }
 
+/** Strip leading emoji/symbol clusters that CLI tools prepend to terminal titles
+ *  (e.g. "✳️ Claude Code" → "Claude Code"). Bord already renders SVG provider icons,
+ *  so the emoji prefix is redundant visual noise. */
+function stripLeadingEmoji(title: string): string {
+  // Match one or more leading emoji (with optional variation selectors / ZWJ sequences) + trailing space
+  return title.replace(/^[\p{Emoji_Presentation}\p{Extended_Pictographic}\u200d\ufe0e\ufe0f]+\s*/u, "").trim() || title;
+}
+
 export function setTerminalOscTitle(id: string, title: string) {
-  setState("terminals", (t) => t.id === id, "title", title);
+  const cleaned = stripLeadingEmoji(title);
+  setState("terminals", (t) => t.id === id, "title", cleaned);
   // OSC title from the running program supersedes the initial session label
   setState("terminals", (t) => t.id === id, "sessionTitle", undefined);
 }
@@ -42,7 +51,7 @@ export async function addTerminal(cwd?: string, command?: string[], sessionTitle
   const activeTerminalCwd = state.terminals.find((t) => t.id === state.activeTerminalId)?.cwd;
   const targetCwd = cwd ?? activePath ?? activeTerminalCwd ?? undefined;
 
-  const result = await api.createPty(targetCwd, command);
+  const result = await api.createPty(targetCwd, command, activeWorkspaceId);
 
   const sessionId = getResumeSessionId(command);
   const provider = getProviderFromCommand(command);
@@ -90,9 +99,8 @@ export function setActiveTerminal(id: string) {
   setState("terminals", (t) => t.id === id, "lastSeenAt", Date.now());
 }
 
-export function getTerminalsForWorkspace(wsPath: string): TerminalInstance[] {
-  const normalized = wsPath.endsWith("/") ? wsPath : wsPath + "/";
-  return state.terminals.filter((t) => t.cwd === wsPath || t.cwd.startsWith(normalized));
+export function getTerminalsForWorkspace(workspaceId: string): TerminalInstance[] {
+  return state.terminals.filter((t) => t.workspaceId === workspaceId);
 }
 
 export function stashTerminal(id: string) {

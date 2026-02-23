@@ -19,10 +19,10 @@ export const api = {
   health: () => request<{ status: string }>("/health"),
 
   // PTY
-  createPty: (cwd?: string, command?: string[]) =>
+  createPty: (cwd?: string, command?: string[], workspaceId?: string) =>
     request<{ id: string; cwd: string }>("/pty", {
       method: "POST",
-      body: JSON.stringify({ cwd, command }),
+      body: JSON.stringify({ cwd, command, workspaceId }),
     }),
   listPty: () => request<Array<{ id: string; cwd: string }>>("/pty"),
   destroyPty: (id: string) => request<{ ok: boolean }>(`/pty/${id}`, { method: "DELETE" }),
