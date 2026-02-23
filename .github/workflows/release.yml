@@ -71,6 +71,14 @@ jobs:
       - name: Build sidecar server
         run: bun run build:server
 
+      - name: Prepare resources
+        run: bun run scripts/prepare-resources.ts
+
+      - name: Codesign sidecar binary
+        if: matrix.os == 'macos-latest'
+        run: |
+          codesign --sign "$CERT_ID" --options runtime --timestamp --force src-tauri/resources/bord-server
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -89,6 +97,7 @@ jobs:
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
+          tauriScript: bun run tauri
 
   update-homebrew:
     needs: build
