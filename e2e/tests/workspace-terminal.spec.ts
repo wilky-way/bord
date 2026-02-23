@@ -64,7 +64,7 @@ test.describe("Workspace & terminal management (W1-W7)", () => {
     expect(after).toBe(before + 1);
   });
 
-  test("W4: Cmd+Right/Left cycles through terminals", async ({
+  test("W4: Alt+Right/Left cycles through terminals", async ({
     page,
     sidebar,
     topbar,
@@ -97,19 +97,19 @@ test.describe("Workspace & terminal management (W1-W7)", () => {
     await terminalPanel.panel(ids[0]).click();
     await page.waitForTimeout(300);
 
-    // Use dispatchEvent to bypass terminal WASM capturing keyboard events
+    // Use Alt+Right (the implemented shortcut) via dispatchEvent
     await page.evaluate(() => {
       window.dispatchEvent(
         new KeyboardEvent("keydown", {
-          key: "ArrowRight", code: "ArrowRight", metaKey: true,
+          key: "ArrowRight", code: "ArrowRight", altKey: true,
           bubbles: true, cancelable: true,
         }),
       );
     });
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(500);
 
     const secondOpacity = await terminalPanel.panel(ids[1]).evaluate(
-      (el) => (el as HTMLElement).style.opacity,
+      (el) => getComputedStyle(el).opacity,
     );
     expect(secondOpacity).toBe("1");
 
@@ -117,15 +117,15 @@ test.describe("Workspace & terminal management (W1-W7)", () => {
     await page.evaluate(() => {
       window.dispatchEvent(
         new KeyboardEvent("keydown", {
-          key: "ArrowLeft", code: "ArrowLeft", metaKey: true,
+          key: "ArrowLeft", code: "ArrowLeft", altKey: true,
           bubbles: true, cancelable: true,
         }),
       );
     });
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(500);
 
     const firstOpacity = await terminalPanel.panel(ids[0]).evaluate(
-      (el) => (el as HTMLElement).style.opacity,
+      (el) => getComputedStyle(el).opacity,
     );
     expect(firstOpacity).toBe("1");
 
@@ -633,20 +633,14 @@ test.describe("Workspace & terminal management (W1-W7)", () => {
     await page.waitForTimeout(500);
   });
 
-  test("W-add-disabled: add terminal button disabled when no workspace", async ({
+  test("W-add-disabled: add terminal button in topbar exists and is functional", async ({
     page,
     topbar,
   }) => {
-    // Navigate away from any workspace by reloading without selecting one
-    // The add terminal button should be disabled/grayed when no workspace is active
-    const isDisabled = await topbar.isAddTerminalDisabled();
-
-    // If a workspace was auto-selected, button may be enabled — just verify no crash
-    // The key behavior is that the button has the disabled attribute when no workspace is selected
-    if (isDisabled) {
-      expect(isDisabled).toBe(true);
-    }
-    // If a workspace is auto-selected, the button should be enabled
-    expect(true).toBe(true);
+    // The "Add terminal" button (or "Select a workspace first") should exist in the tiling layout
+    // If no workspace is selected, it shows "Select a workspace first" and is disabled
+    // If a workspace is selected, it shows "Add terminal" and is enabled
+    const addBtn = page.locator('button[title="Add terminal"], button[title="Select a workspace first"]');
+    await expect(addBtn.first()).toBeVisible();
   });
 });

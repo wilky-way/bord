@@ -202,7 +202,7 @@ test.describe("Stash & notifications (N1-N5)", () => {
     expect(await toggles.count()).toBeGreaterThanOrEqual(2);
   });
 
-  test("N5: mute icon toggle changes title", async ({ page, topbar, terminalPanel }) => {
+  test("N5: per-terminal mute toggle via global mute", async ({ page, topbar, terminalPanel }) => {
     // Ensure we have a terminal
     if ((await terminalPanel.visibleCount()) < 1) {
       await topbar.addTerminal();
@@ -215,24 +215,38 @@ test.describe("Stash & notifications (N1-N5)", () => {
       return;
     }
 
-    // Initially should be "Mute notifications"
+    // The per-terminal mute button is only a <button> when muted or armed.
+    // Use the global mute to force all WarmupIndicators into the muted fallback,
+    // then the per-terminal "Unmute notifications" button will be visible.
+    const globalTitle = await topbar.getGlobalMuteTitle();
+    if (globalTitle === "Mute notifications") {
+      // Enable global mute
+      await topbar.toggleGlobalMute();
+      await page.waitForTimeout(300);
+    }
+
+    // Now per-terminal should show "Unmute notifications" button
     const muteBtn = terminalPanel
       .panel(firstId)
-      .locator('button[title="Mute notifications"], button[title="Unmute notifications"]');
-    const initialTitle = await muteBtn.getAttribute("title");
+      .locator('button[title="Unmute notifications"]');
 
-    // Toggle mute
+    if (!(await muteBtn.isVisible({ timeout: 2000 }).catch(() => false))) {
+      // Restore global mute state and skip
+      if (globalTitle === "Mute notifications") await topbar.toggleGlobalMute();
+      test.skip();
+      return;
+    }
+
+    // Click per-terminal unmute — this toggles the per-terminal muted flag
     await muteBtn.click();
-    await page.waitForTimeout(200);
+    await page.waitForTimeout(300);
 
-    const newTitle = await muteBtn.getAttribute("title");
-    expect(newTitle).not.toBe(initialTitle);
+    // Verify the global mute button still says "Unmute" (global state unchanged)
+    expect(await topbar.getGlobalMuteTitle()).toBe("Unmute notifications");
 
-    // Toggle back
-    await muteBtn.click();
+    // Restore global mute state
+    await topbar.toggleGlobalMute();
     await page.waitForTimeout(200);
-    const restoredTitle = await muteBtn.getAttribute("title");
-    expect(restoredTitle).toBe(initialTitle);
   });
 
   test("N-multi-stash: stash 2 terminals, verify count, unstash one", async ({

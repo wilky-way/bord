@@ -64,7 +64,7 @@ test.describe("Global mute", () => {
     await topbar.toggleGlobalMute();
   });
 
-  test("GM-4: global mute affects per-terminal visual state", async ({
+  test("GM-4: global mute shows per-terminal muted indicator", async ({
     page,
     topbar,
     terminalPanel,
@@ -90,17 +90,14 @@ test.describe("Global mute", () => {
     // The global mute button should now say "Unmute"
     expect(await topbar.getGlobalMuteTitle()).toBe("Unmute notifications");
 
-    // Per-terminal mute button state — the mute/unmute buttons on individual
-    // terminals should still be independently controllable
+    // When globally muted, the WarmupIndicator renders an "Unmute notifications" button
+    // on each terminal panel (the fallback path of effectivelyMuted())
     const firstId = await terminalPanel.firstTerminalId();
     if (firstId) {
-      const termMuteBtn = terminalPanel.panel(firstId).locator(
-        'button[title="Mute notifications"], button[title="Unmute notifications"]',
+      const termUnmuteBtn = terminalPanel.panel(firstId).locator(
+        'button[title="Unmute notifications"]',
       );
-      // Terminal mute button should still be visible and clickable
-      if (await termMuteBtn.isVisible()) {
-        await expect(termMuteBtn).toBeVisible();
-      }
+      await expect(termUnmuteBtn).toBeVisible({ timeout: 3000 });
     }
 
     // Restore original state

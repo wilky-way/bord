@@ -194,7 +194,7 @@ test.describe("Settings & themes", () => {
     await settings.switchSection("Notifications");
     await page.waitForTimeout(200);
 
-    const slider = settings.idleSlider();
+    const slider = settings.idleSlider().first();
     await expect(slider).toBeVisible();
 
     // Get initial value

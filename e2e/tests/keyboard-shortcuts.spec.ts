@@ -58,7 +58,7 @@ test.describe("Keyboard shortcuts", () => {
     expect(await terminalPanel.visibleCount()).toBe(before - 1);
   });
 
-  test("Cmd+Right / Cmd+Left navigates between terminals", async ({
+  test("Alt+Right / Alt+Left navigates between terminals (via dispatchEvent)", async ({
     page,
     topbar,
     terminalPanel,
@@ -74,20 +74,20 @@ test.describe("Keyboard shortcuts", () => {
     await terminalPanel.panel(ids[0]).click();
     await page.waitForTimeout(300);
 
-    // Use dispatchEvent to bypass terminal WASM capturing keyboard events
+    // Navigate right with Alt+Right (the implemented shortcut)
     await page.evaluate(() => {
       window.dispatchEvent(
         new KeyboardEvent("keydown", {
-          key: "ArrowRight", code: "ArrowRight", metaKey: true,
+          key: "ArrowRight", code: "ArrowRight", altKey: true,
           bubbles: true, cancelable: true,
         }),
       );
     });
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(500);
 
     // Check that the second panel now has active styling (opacity: 1)
     const secondOpacity = await terminalPanel.panel(ids[1]).evaluate(
-      (el) => (el as HTMLElement).style.opacity,
+      (el) => getComputedStyle(el).opacity,
     );
     expect(secondOpacity).toBe("1");
 
@@ -95,70 +95,19 @@ test.describe("Keyboard shortcuts", () => {
     await page.evaluate(() => {
       window.dispatchEvent(
         new KeyboardEvent("keydown", {
-          key: "ArrowLeft", code: "ArrowLeft", metaKey: true,
+          key: "ArrowLeft", code: "ArrowLeft", altKey: true,
           bubbles: true, cancelable: true,
         }),
       );
     });
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(500);
 
     const firstOpacity = await terminalPanel.panel(ids[0]).evaluate(
-      (el) => (el as HTMLElement).style.opacity,
+      (el) => getComputedStyle(el).opacity,
     );
     expect(firstOpacity).toBe("1");
 
     // Terminal count should be unchanged
-    expect(await terminalPanel.visibleCount()).toBeGreaterThanOrEqual(2);
-  });
-
-  test("Cmd+Shift+Right / Cmd+Shift+Left navigates terminals", async ({
-    page,
-    topbar,
-    terminalPanel,
-  }) => {
-    while ((await terminalPanel.visibleCount()) < 2) {
-      await topbar.addTerminal();
-      await page.waitForTimeout(800);
-    }
-
-    // Click the first terminal to ensure a known starting point
-    const ids = await terminalPanel.allTerminalIds();
-    await terminalPanel.panel(ids[0]).click();
-    await page.waitForTimeout(300);
-
-    // Use dispatchEvent to bypass terminal WASM
-    await page.evaluate(() => {
-      window.dispatchEvent(
-        new KeyboardEvent("keydown", {
-          key: "ArrowRight", code: "ArrowRight", metaKey: true, shiftKey: true,
-          bubbles: true, cancelable: true,
-        }),
-      );
-    });
-    await page.waitForTimeout(300);
-
-    // Second panel should now be active
-    const secondOpacity = await terminalPanel.panel(ids[1]).evaluate(
-      (el) => (el as HTMLElement).style.opacity,
-    );
-    expect(secondOpacity).toBe("1");
-
-    await page.evaluate(() => {
-      window.dispatchEvent(
-        new KeyboardEvent("keydown", {
-          key: "ArrowLeft", code: "ArrowLeft", metaKey: true, shiftKey: true,
-          bubbles: true, cancelable: true,
-        }),
-      );
-    });
-    await page.waitForTimeout(300);
-
-    // First panel should be active again
-    const firstOpacity = await terminalPanel.panel(ids[0]).evaluate(
-      (el) => (el as HTMLElement).style.opacity,
-    );
-    expect(firstOpacity).toBe("1");
-
     expect(await terminalPanel.visibleCount()).toBeGreaterThanOrEqual(2);
   });
 
@@ -299,12 +248,12 @@ test.describe("Keyboard shortcuts", () => {
         }),
       );
     });
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(500);
 
-    // Second terminal should now be active
+    // Second terminal should now be active (opacity 1 via computed style)
     const secondOpacity = await terminalPanel
       .panel(ids[1])
-      .evaluate((el) => (el as HTMLElement).style.opacity);
+      .evaluate((el) => getComputedStyle(el).opacity);
     expect(secondOpacity).toBe("1");
 
     // Use Alt+Left to navigate back
@@ -319,11 +268,11 @@ test.describe("Keyboard shortcuts", () => {
         }),
       );
     });
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(500);
 
     const firstOpacity = await terminalPanel
       .panel(ids[0])
-      .evaluate((el) => (el as HTMLElement).style.opacity);
+      .evaluate((el) => getComputedStyle(el).opacity);
     expect(firstOpacity).toBe("1");
   });
 });

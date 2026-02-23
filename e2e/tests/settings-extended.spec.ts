@@ -65,17 +65,17 @@ test.describe("Settings — extended coverage", () => {
       return;
     }
 
-    // Record initial state of first toggle
+    // Record initial state of first toggle via background color (toggle uses inline style)
     const firstToggle = toggles.first();
-    const initialClasses = await firstToggle.getAttribute("class");
+    const initialBg = await firstToggle.evaluate((el) => getComputedStyle(el).backgroundColor);
 
     // Click to toggle
     await firstToggle.click();
-    await page.waitForTimeout(200);
-    const afterClasses = await firstToggle.getAttribute("class");
+    await page.waitForTimeout(300);
+    const afterBg = await firstToggle.evaluate((el) => getComputedStyle(el).backgroundColor);
 
-    // Classes should change (visual state changed)
-    expect(afterClasses).not.toBe(initialClasses);
+    // Background color should change (accent <-> tertiary)
+    expect(afterBg).not.toBe(initialBg);
 
     // Close and reopen settings — toggle should persist
     await settings.close();
@@ -87,8 +87,8 @@ test.describe("Settings — extended coverage", () => {
     await settings.switchSection("Notifications");
     await page.waitForTimeout(200);
 
-    const reopenedClasses = await toggles.first().getAttribute("class");
-    expect(reopenedClasses).toBe(afterClasses);
+    const reopenedBg = await toggles.first().evaluate((el) => getComputedStyle(el).backgroundColor);
+    expect(reopenedBg).toBe(afterBg);
   });
 
   test("theme persists across page reload", async ({ page, settings }) => {
@@ -156,20 +156,24 @@ test.describe("Settings — extended coverage", () => {
     await settings.switchSection("Notifications");
     await page.waitForTimeout(200);
 
-    const slider = settings.idleSlider();
+    const slider = settings.idleSlider().first();
     await expect(slider).toBeVisible();
 
     const initialValue = parseInt(await slider.inputValue());
     const min = parseInt((await slider.getAttribute("min")) ?? "5000");
     const max = parseInt((await slider.getAttribute("max")) ?? "30000");
 
-    // Set to a different value using fill (forces the value)
+    // Set to a different value using evaluate + dispatchEvent (fill doesn't work on range inputs)
     const newValue = initialValue === min ? min + 1000 : min;
-    await slider.fill(String(newValue));
-    await page.waitForTimeout(200);
+    await slider.evaluate((el, val) => {
+      const input = el as HTMLInputElement;
+      const nativeInputValueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+      nativeInputValueSetter.call(input, String(val));
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    }, newValue);
+    await page.waitForTimeout(300);
 
     const updatedValue = parseInt(await slider.inputValue());
-    // Value should have changed (or at least be within valid range)
     expect(updatedValue).toBeGreaterThanOrEqual(min);
     expect(updatedValue).toBeLessThanOrEqual(max);
   });

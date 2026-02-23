@@ -8,6 +8,7 @@ export default defineConfig({
   forbidOnly: CI,
   retries: CI ? 2 : 0,
   workers: 1,
+  timeout: 30_000,
   reporter: [["html", { open: CI ? "never" : "on-failure" }]],
   use: {
     baseURL: "http://localhost:1420",
