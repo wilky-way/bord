@@ -110,6 +110,7 @@ export default function SettingsPanel(props: Props) {
 
               <label class="text-xs font-medium text-[var(--text-secondary)] mt-5 mb-2 block">Terminal Font</label>
               <FontPicker />
+
             </Show>
 
             <Show when={section() === "notifications"}>
@@ -151,7 +152,7 @@ function ToggleRow(props: { label: string; description: string; checked: boolean
         <div class="text-[11px] text-[var(--text-secondary)] mt-0.5">{props.description}</div>
       </div>
       <button
-        class="relative w-8 h-[18px] rounded-full transition-colors shrink-0 ml-3"
+        class="relative w-9 h-5 rounded-full transition-colors duration-200 shrink-0 ml-3"
         style={{
           background: props.checked
             ? "var(--accent)"
@@ -160,9 +161,9 @@ function ToggleRow(props: { label: string; description: string; checked: boolean
         onClick={() => props.onChange(!props.checked)}
       >
         <span
-          class="absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow transition-transform"
+          class="absolute top-[2px] w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200"
           style={{
-            transform: props.checked ? "translateX(16px)" : "translateX(2px)",
+            transform: props.checked ? "translateX(18px)" : "translateX(2px)",
           }}
         />
       </button>

@@ -37,6 +37,12 @@ const replayDoneTerminals = new Set<string>();
 const NOTIFICATION_COOLDOWN_MS = 30_000;
 const lastNotifiedAt = new Map<string, number>();
 
+// Minimum time a terminal must be in active state before an idle transition
+// triggers a notification. Prevents false positives when resuming a Claude
+// session (startup text takes ~2s → active duration < 5s → suppressed).
+const MIN_ACTIVE_DURATION_MS = 5_000;
+const activeStartedAt = new Map<string, number>();
+
 const CURSOR_STORAGE_KEY = "bord:terminal-cursors";
 const MAX_CURSOR_ENTRIES = 20;
 
@@ -118,16 +124,22 @@ export function connectTerminal(
           if (!alreadyKnown) {
             knownIdleTerminals.add(ptyId);
             const bytes = outputBytesSinceActive.get(ptyId) ?? 0;
-            if (bytes >= OUTPUT_THRESHOLD_BYTES) {
+            const activeStart = activeStartedAt.get(ptyId);
+            const activeDuration = activeStart ? Date.now() - activeStart : 0;
+            if (bytes >= OUTPUT_THRESHOLD_BYTES && activeDuration >= MIN_ACTIVE_DURATION_MS) {
               handleIdleEvent(ptyId);
             }
             outputBytesSinceActive.set(ptyId, 0);
+            activeStartedAt.delete(ptyId);
           }
           return;
         }
         if (ctrl.type === "active") {
           knownIdleTerminals.delete(ptyId);
           outputBytesSinceActive.set(ptyId, 0);
+          if (!activeStartedAt.has(ptyId)) {
+            activeStartedAt.set(ptyId, Date.now());
+          }
           return;
         }
       } catch {
@@ -140,6 +152,10 @@ export function connectTerminal(
       const dataLen = event.data instanceof ArrayBuffer ? event.data.byteLength
         : typeof event.data === "string" ? event.data.length : 0;
       outputBytesSinceActive.set(ptyId, (outputBytesSinceActive.get(ptyId) ?? 0) + dataLen);
+      // Start active timer on first post-replay output if not already set
+      if (!activeStartedAt.has(ptyId)) {
+        activeStartedAt.set(ptyId, Date.now());
+      }
     }
     outputCoalescer.enqueue(ptyId, Date.now());
   };
@@ -154,6 +170,7 @@ export function connectTerminal(
     outputBytesSinceActive.delete(ptyId);
     replayDoneTerminals.delete(ptyId);
     lastNotifiedAt.delete(ptyId);
+    activeStartedAt.delete(ptyId);
   };
 }
 

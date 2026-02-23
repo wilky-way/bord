@@ -42,21 +42,12 @@ export default function App() {
         e.preventDefault();
         setSettingsOpen(true);
       }
-      // Cmd+Shift+Arrow: Navigate between terminals (explicit)
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "ArrowLeft") {
+      // Option+Arrow: Navigate between terminals
+      if (e.altKey && !e.metaKey && !e.ctrlKey && e.key === "ArrowLeft") {
         e.preventDefault();
         activateAdjacentTerminal("prev");
       }
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "ArrowRight") {
-        e.preventDefault();
-        activateAdjacentTerminal("next");
-      }
-      // Cmd+Arrow: Navigate between terminals (fallback when no terminal intercepts)
-      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === "ArrowLeft" && !e.defaultPrevented) {
-        e.preventDefault();
-        activateAdjacentTerminal("prev");
-      }
-      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === "ArrowRight" && !e.defaultPrevented) {
+      if (e.altKey && !e.metaKey && !e.ctrlKey && e.key === "ArrowRight") {
         e.preventDefault();
         activateAdjacentTerminal("next");
       }

@@ -35,13 +35,10 @@ export function createTerminalKeyHandler(
     // --- Option (Alt) key sequences for macOS ---
     if (alt && !meta && !e.ctrlKey) {
       switch (e.key) {
+        // Option+Arrow Left/Right: navigate terminals (handled by App.tsx global handler)
         case "ArrowLeft":
-          e.preventDefault();
-          sendToTerminal(ptyId, "\x1bb"); // word left
-          return true;
         case "ArrowRight":
           e.preventDefault();
-          sendToTerminal(ptyId, "\x1bf"); // word right
           return true;
         case "Backspace":
           e.preventDefault();
@@ -134,9 +131,7 @@ export function createTerminalKeyHandler(
             sendToTerminal(ptyId, "\x01");
             return true;
           }
-          // Cmd+Shift+Left: navigate terminals (handled by App.tsx global handler)
-          e.preventDefault();
-          return true;
+          break;
 
         // Cmd+Right: End (Ctrl+E)
         case "ArrowRight":
@@ -145,9 +140,7 @@ export function createTerminalKeyHandler(
             sendToTerminal(ptyId, "\x05");
             return true;
           }
-          // Cmd+Shift+Right: navigate terminals (handled by App.tsx global handler)
-          e.preventDefault();
-          return true;
+          break;
 
         // Cmd+Backspace: Kill line (Ctrl+U)
         case "Backspace":
