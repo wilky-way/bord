@@ -11,6 +11,7 @@ import { fontSize, fontFamily } from "../../store/settings";
 interface Props {
   ptyId: string;
   onTitleChange?: (title: string) => void;
+  onCwdChange?: (cwd: string) => void;
 }
 
 /** Scan binary PTY data for OSC 0/2 title sequences (ESC ] 0; <title> BEL) */
@@ -25,6 +26,33 @@ function extractOscTitle(data: Uint8Array): string | null {
     for (let j = i + 4; j < data.length; j++) {
       if (data[j] === 0x07 || (data[j] === 0x1b && data[j + 1] === 0x5c)) {
         return j > i + 4 ? new TextDecoder().decode(data.subarray(i + 4, j)) : null;
+      }
+    }
+  }
+  return null;
+}
+
+/** Scan binary PTY data for OSC 7 CWD sequences (ESC ] 7 ; file://host/path BEL) */
+function extractOsc7Cwd(data: Uint8Array): string | null {
+  for (let i = 0; i < data.length - 4; i++) {
+    // ESC ]
+    if (data[i] !== 0x1b || data[i + 1] !== 0x5d) continue;
+    // OSC 7, followed by ;
+    if (data[i + 2] !== 0x37 || data[i + 3] !== 0x3b) continue;
+    // Find terminator: BEL (0x07) or ST (ESC \)
+    for (let j = i + 4; j < data.length; j++) {
+      if (data[j] === 0x07 || (data[j] === 0x1b && data[j + 1] === 0x5c)) {
+        if (j > i + 4) {
+          const uri = new TextDecoder().decode(data.subarray(i + 4, j));
+          try {
+            const url = new URL(uri);
+            return decodeURIComponent(url.pathname);
+          } catch {
+            const match = uri.match(/^file:\/\/[^/]*(\/.*)$/);
+            return match ? decodeURIComponent(match[1]) : null;
+          }
+        }
+        return null;
       }
     }
   }
@@ -84,6 +112,10 @@ export default function TerminalView(props: Props) {
           if (props.onTitleChange) {
             const title = extractOscTitle(bytes);
             if (title) props.onTitleChange(title);
+          }
+          if (props.onCwdChange) {
+            const cwd = extractOsc7Cwd(bytes);
+            if (cwd) props.onCwdChange(cwd);
           }
         } else if (typeof data === "string") {
           writer.write(data);

@@ -12,6 +12,8 @@ interface RingBuffer {
 
 const DEFAULT_IDLE_THRESHOLD_MS = 8000;
 
+const CWD_POLL_INTERVAL_MS = 3_000;
+
 interface PtySession {
   id: string;
   proc: ReturnType<typeof Bun.spawn>;
@@ -21,6 +23,8 @@ interface PtySession {
   idleTimer: Timer | null;
   idleThresholdMs: number;
   isIdle: boolean;
+  cwdPollTimer: Timer | null;
+  lastKnownCwd: string;
 }
 
 function createRingBuffer(): RingBuffer {
@@ -90,6 +94,45 @@ function shellEscape(arg: string): string {
 
 const sessions = new Map<string, PtySession>();
 
+/** Get the current working directory of a process by PID (macOS + Linux). */
+async function getProcessCwd(pid: number): Promise<string | null> {
+  try {
+    if (process.platform === "darwin") {
+      const proc = Bun.spawn(["lsof", "-a", "-p", String(pid), "-d", "cwd", "-Fn"], {
+        stdout: "pipe",
+        stderr: "ignore",
+      });
+      const text = await new Response(proc.stdout).text();
+      // lsof output: lines starting with 'n' contain the path
+      for (const line of text.split("\n")) {
+        if (line.startsWith("n/")) return line.slice(1);
+      }
+    } else {
+      // Linux: readlink /proc/<pid>/cwd
+      const link = await Bun.file(`/proc/${pid}/cwd`).text().catch(() => null);
+      if (link) return link.trim();
+    }
+  } catch {
+    // Process may have exited
+  }
+  return null;
+}
+
+function startCwdPolling(session: PtySession) {
+  session.cwdPollTimer = setInterval(async () => {
+    const pid = session.proc?.pid;
+    if (!pid) return;
+    const cwd = await getProcessCwd(pid);
+    if (cwd && cwd !== session.lastKnownCwd) {
+      session.lastKnownCwd = cwd;
+      const msg = JSON.stringify({ type: "cwd", path: cwd });
+      for (const [ws] of session.subscribers) {
+        if (ws.readyState === 1) ws.send(msg);
+      }
+    }
+  }, CWD_POLL_INTERVAL_MS);
+}
+
 export function createPty(
   id: string,
   cwd: string = process.env.HOME ?? "/",
@@ -106,6 +149,8 @@ export function createPty(
     idleTimer: null,
     idleThresholdMs: DEFAULT_IDLE_THRESHOLD_MS,
     isIdle: false,
+    cwdPollTimer: null,
+    lastKnownCwd: cwd,
   };
 
   const shell = process.env.SHELL || "zsh";
@@ -173,6 +218,7 @@ export function createPty(
 
   session.proc = proc;
   sessions.set(id, session);
+  startCwdPolling(session);
   return session;
 }
 
@@ -271,6 +317,10 @@ export async function destroyPty(id: string): Promise<boolean> {
   if (session.idleTimer) {
     clearTimeout(session.idleTimer);
     session.idleTimer = null;
+  }
+  if (session.cwdPollTimer) {
+    clearInterval(session.cwdPollTimer);
+    session.cwdPollTimer = null;
   }
 
   for (const [ws] of session.subscribers) {

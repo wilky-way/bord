@@ -1,7 +1,7 @@
 import { createSignal, createEffect, onMount, onCleanup, Show } from "solid-js";
 import { Portal, Dynamic } from "solid-js/web";
 import TerminalView from "./TerminalView";
-import { removeTerminal, setActiveTerminal, stashTerminal, setTerminalTitle, setTerminalMuted, setTerminalOscTitle } from "../../store/terminals";
+import { removeTerminal, setActiveTerminal, stashTerminal, setTerminalTitle, setTerminalMuted, setTerminalOscTitle, setTerminalDynamicCwd } from "../../store/terminals";
 import { state } from "../../store/core";
 import { toggleGitPanel, closeGitPanel } from "../../store/git";
 import { PROVIDER_ICONS } from "../../lib/providers";
@@ -24,6 +24,8 @@ export default function TerminalPanel(props: Props) {
   const [editing, setEditing] = createSignal(false);
   const [editValue, setEditValue] = createSignal("");
   const terminal = () => state.terminals.find((t) => t.id === props.id);
+  const effectiveCwd = () => terminal()?.dynamicCwd ?? props.cwd;
+  const workspaceName = () => state.workspaces.find((w) => w.id === terminal()?.workspaceId)?.name;
   const displayTitle = () => terminal()?.customTitle || terminal()?.sessionTitle || title();
   const [branch, setBranch] = createSignal<string | null>(null);
   const [dirty, setDirty] = createSignal(false);
@@ -121,10 +123,11 @@ export default function TerminalPanel(props: Props) {
 
   async function fetchGitInfo() {
     try {
+      const cwd = effectiveCwd();
       const [status, ab, stats] = await Promise.all([
-        api.gitStatus(props.cwd),
-        api.gitAheadBehind(props.cwd),
-        api.gitDiffStats(props.cwd),
+        api.gitStatus(cwd),
+        api.gitAheadBehind(cwd),
+        api.gitDiffStats(cwd),
       ]);
       setBranch(status.branch || null);
       setDirty(status.staged.length > 0 || status.unstaged.length > 0 || status.untracked.length > 0);
@@ -150,6 +153,20 @@ export default function TerminalPanel(props: Props) {
   });
   onCleanup(() => clearInterval(interval));
 
+  // Re-fetch git info when CWD changes (debounced to avoid spam during rapid cd)
+  let cwdDebounce: ReturnType<typeof setTimeout>;
+  createEffect(() => {
+    const _cwd = effectiveCwd(); // track dependency
+    clearTimeout(cwdDebounce);
+    cwdDebounce = setTimeout(() => {
+      fetchGitInfo();
+      // Restart the polling interval so we don't double-fetch
+      clearInterval(interval);
+      interval = setInterval(fetchGitInfo, 10_000);
+    }, 300);
+  });
+  onCleanup(() => clearTimeout(cwdDebounce));
+
   createEffect(() => {
     if (props.isActive && panelRef) {
       panelRef.scrollIntoView({ inline: "nearest", behavior: "instant" });
@@ -159,7 +176,7 @@ export default function TerminalPanel(props: Props) {
   async function handlePush() {
     setPushing(true);
     try {
-      const result = await api.gitPush(props.cwd);
+      const result = await api.gitPush(effectiveCwd());
       if (result.ok) {
         setPushDone(true);
         setAhead(0);
@@ -244,8 +261,11 @@ export default function TerminalPanel(props: Props) {
               {displayTitle()}
             </span>
           </Show>
+          <Show when={workspaceName()}>
+            <span class="text-[9px] text-[var(--text-secondary)] opacity-40 uppercase tracking-wider truncate">{workspaceName()}</span>
+          </Show>
           <span class="text-[10px] text-[var(--text-secondary)] opacity-50 truncate">
-            {props.cwd}
+            {effectiveCwd()}
           </span>
           <WarmupIndicator
             armed={!!terminal()?.notificationsArmed}
@@ -274,7 +294,7 @@ export default function TerminalPanel(props: Props) {
               {pushing() ? "..." : pushDone() ? "ok" : `${ahead()}`}
             </button>
           </Show>
-          <EditorButton cwd={props.cwd} size="md" />
+          <EditorButton cwd={effectiveCwd()} size="md" />
           <button
             data-action="stash-terminal"
             class="text-[var(--text-secondary)] hover:text-[var(--accent)] text-xs w-6 h-6 flex items-center justify-center rounded-[var(--btn-radius)] hover:bg-[var(--bg-tertiary)] transition-colors"
@@ -310,6 +330,9 @@ export default function TerminalPanel(props: Props) {
             setTitle(newTitle);
             setTerminalOscTitle(props.id, newTitle);
           }}
+          onCwdChange={(newCwd: string) => {
+            setTerminalDynamicCwd(props.id, newCwd);
+          }}
         />
       </div>
 
@@ -342,7 +365,7 @@ export default function TerminalPanel(props: Props) {
                 <div class="absolute top-0 right-[2px] w-[2px] h-full opacity-0 group-hover/resize:opacity-100 bg-[var(--accent)] transition-opacity" />
               </div>
               <div class="flex flex-col" style={{ "max-height": "calc(100vh - 60px)" }}>
-                <GitPanel cwd={props.cwd} onClose={() => closeGitPanel()} />
+                <GitPanel cwd={effectiveCwd()} onClose={() => closeGitPanel()} />
               </div>
             </div>
           </div>

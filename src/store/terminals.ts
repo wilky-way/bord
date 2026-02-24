@@ -35,6 +35,14 @@ export function setTerminalMuted(id: string, value: boolean) {
   setState("terminals", (t) => t.id === id, "muted", value);
 }
 
+export function setTerminalDynamicCwd(id: string, cwd: string) {
+  setState("terminals", (t) => t.id === id, "dynamicCwd", cwd);
+}
+
+export function getEffectiveCwd(terminal: TerminalInstance): string {
+  return terminal.dynamicCwd ?? terminal.cwd;
+}
+
 export function setTerminalLastSeen(id: string) {
   setState("terminals", (t) => t.id === id, "lastSeenAt", Date.now());
 }

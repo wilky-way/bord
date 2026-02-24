@@ -6,6 +6,7 @@ import DockerPanel from "../docker/DockerPanel";
 import WorkspaceList from "../workspace/WorkspaceList";
 import EditorButton from "../shared/EditorButton";
 import SettingsPanel from "../settings/SettingsPanel";
+import GitPanel from "../git/GitPanel";
 import { buildNewSessionCommand, buildResumeCommand, PROVIDER_ICONS, PROVIDER_LABELS } from "../../lib/providers";
 import { isFeatureEnabled, isProviderEnabled } from "../../store/features";
 import { addTerminal, setActiveTerminal, setTerminalMuted, unstashTerminal } from "../../store/terminals";
@@ -14,6 +15,7 @@ import { notificationIndex } from "../../lib/notifications/index";
 import { api } from "../../lib/api";
 import { isTauriRuntime, pickWorkspaceDirectory } from "../../lib/workspace-picker";
 import { settingsOpen, setSettingsOpen } from "../../store/settings";
+import { toggleSidebarMode } from "../../store/ui";
 import type { Provider, SessionInfo, TerminalInstance } from "../../store/types";
 
 function SectionHeader(props: {
@@ -73,6 +75,44 @@ export default function Sidebar() {
   let expandedHoverLeaveTimer: ReturnType<typeof setTimeout> | undefined;
   let expandedHoverRequestId = 0;
   let lastPointerDownInStashZone = false;
+
+  // Sidebar resize state
+  const [sidebarResizing, setSidebarResizing] = createSignal(false);
+
+  function handleSidebarResize(e: MouseEvent) {
+    e.preventDefault();
+    setSidebarResizing(true);
+    const startX = e.clientX;
+    const startWidth = state.sidebarWidth;
+
+    function onMove(e: MouseEvent) {
+      const delta = e.clientX - startX;
+      const newWidth = Math.max(200, Math.min(600, startWidth + delta));
+      setState("sidebarWidth", newWidth);
+    }
+
+    function onUp() {
+      setSidebarResizing(false);
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    }
+
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }
+
+  // Persist sidebar width to localStorage
+  const SIDEBAR_WIDTH_KEY = "bord:sidebar-width";
+  onMount(() => {
+    const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
+    if (saved) {
+      const parsed = parseInt(saved, 10);
+      if (parsed >= 200 && parsed <= 600) setState("sidebarWidth", parsed);
+    }
+  });
+  createEffect(() => {
+    localStorage.setItem(SIDEBAR_WIDTH_KEY, String(state.sidebarWidth));
+  });
 
   // Close context menu on any click outside
   const dismissCtxMenu = () => setCtxMenu(null);
@@ -382,7 +422,7 @@ export default function Sidebar() {
   }
 
   const panel = () => (
-    <div class="flex flex-col h-full w-72 bg-[var(--bg-secondary)] min-w-0">
+    <div class="flex flex-col h-full bg-[var(--bg-secondary)] min-w-0" style={{ width: `${state.sidebarWidth - 64}px` }}>
       <div class="relative px-3 py-2 border-b border-[var(--border)]">
         <div class="flex items-start justify-between gap-2">
             <div class="min-w-0">
@@ -550,10 +590,32 @@ export default function Sidebar() {
                 <path d="M9 12h4" />
               </svg>
             </button>
+            <Show when={isFeatureEnabled("git")}>
+              <button
+                class="w-7 h-7 rounded-[var(--btn-radius)] flex items-center justify-center transition-colors"
+                classList={{
+                  "text-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_20%,transparent)]": state.sidebarMode === "git",
+                  "text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--bg-tertiary)]": state.sidebarMode !== "git",
+                }}
+                onClick={() => toggleSidebarMode()}
+                title="Toggle git panel"
+              >
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                  <path fill-rule="evenodd" d="M11.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5zm-2.25.75a2.25 2.25 0 1 1 3 2.122V6A2.5 2.5 0 0 1 10 8.5H6a1 1 0 0 0-1 1v1.128a2.251 2.251 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.5 0v1.836A2.492 2.492 0 0 1 6 7h4a1 1 0 0 0 1-1v-.628A2.25 2.25 0 0 1 9.5 3.25zM4.25 12a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5zM3.5 3.25a.75.75 0 1 1 1.5 0 .75.75 0 0 1-1.5 0z" />
+                </svg>
+              </button>
+            </Show>
           </>
         }
       />
 
+      <Show when={state.sidebarMode === "git" && panelWorkspace()}>
+        <div class="flex-1 min-h-0 overflow-hidden">
+          <GitPanel cwd={panelWorkspace()!.path} />
+        </div>
+      </Show>
+
+      <Show when={state.sidebarMode === "sessions"}>
       <div class="flex-1 min-h-0 flex flex-col">
         <Show when={isFeatureEnabled("sessions")}>
         <SectionHeader
@@ -756,6 +818,7 @@ export default function Sidebar() {
           </Show>
         </div>
       </Show>
+      </Show>
     </div>
   );
 
@@ -764,7 +827,7 @@ export default function Sidebar() {
       ref={sidebarRef}
       data-bord-sidebar
       class="relative h-full shrink-0 bg-[var(--bg-secondary)] border-r border-[var(--border)]"
-      style={{ width: state.sidebarOpen ? "22rem" : "4rem" }}
+      style={{ width: state.sidebarOpen ? `${state.sidebarWidth}px` : "4rem" }}
     >
       <div class="hidden" aria-hidden="true">
         <WorkspaceList />
@@ -889,6 +952,17 @@ export default function Sidebar() {
           <div data-bord-sidebar-panel="expanded" class="h-full border-l border-[var(--border)]">{panel()}</div>
         </Show>
       </div>
+
+      {/* Sidebar resize handle */}
+      <Show when={state.sidebarOpen}>
+        <div
+          class="absolute top-0 right-0 w-[5px] h-full cursor-col-resize z-10 group/sbresize"
+          classList={{ "bg-[var(--accent)]": sidebarResizing() }}
+          onMouseDown={handleSidebarResize}
+        >
+          <div class="absolute top-0 right-[1px] w-[2px] h-full opacity-0 group-hover/sbresize:opacity-100 bg-[var(--accent)] transition-opacity" />
+        </div>
+      </Show>
 
       <Show when={expandedHoverWorkspace() && !(hovering() && !state.sidebarOpen)}>
         <div

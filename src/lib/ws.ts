@@ -1,4 +1,4 @@
-import { setTerminalLastOutput, setTerminalArmed } from "../store/terminals";
+import { setTerminalLastOutput, setTerminalArmed, setTerminalDynamicCwd } from "../store/terminals";
 import { state } from "../store/core";
 import { addNotification, getSettings } from "./notifications/store";
 import { getWsBase } from "./server";
@@ -150,6 +150,10 @@ export function connectTerminal(
             const delay = getSettings().warmupDurationMs;
             armingTimers.set(ptyId, setTimeout(() => tryArm(ptyId), delay));
           }
+          return;
+        }
+        if (ctrl.type === "cwd" && typeof ctrl.path === "string") {
+          setTerminalDynamicCwd(ptyId, ctrl.path);
           return;
         }
       } catch {

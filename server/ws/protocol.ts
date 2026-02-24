@@ -51,8 +51,13 @@ export interface ReplayDoneMessage {
   type: "replay-done";
 }
 
+export interface CwdMessage {
+  type: "cwd";
+  path: string;
+}
+
 export type ClientControlMessage = ResizeMessage | PingMessage | ConfigureMessage;
-export type ServerControlMessage = CursorMessage | PongMessage | IdleMessage | ActiveMessage | ReplayDoneMessage;
+export type ServerControlMessage = CursorMessage | PongMessage | IdleMessage | ActiveMessage | ReplayDoneMessage | CwdMessage;
 export type ControlMessage = ClientControlMessage | ServerControlMessage;
 
 export function isControlMessage(data: unknown): data is ControlMessage {

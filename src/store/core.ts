@@ -12,6 +12,8 @@ const [state, setState] = createStore<AppState>({
   bellMuted: false,
   activeProvider: "claude",
   sidebarCollapsed: { workspaces: false, sessions: false, docker: false },
+  sidebarMode: "sessions",
+  sidebarWidth: 352,
 });
 
 export { state, setState };

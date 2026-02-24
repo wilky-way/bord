@@ -7,6 +7,7 @@ import { addTerminal, removeTerminal, activateAdjacentTerminal } from "./store/t
 import { state, setState } from "./store/core";
 import { toggleGitPanel } from "./store/git";
 import { setSettingsOpen } from "./store/settings";
+import { toggleSidebarMode } from "./store/ui";
 import { initUpdater } from "./lib/updater";
 import { loadFeatures } from "./store/features";
 
@@ -53,8 +54,15 @@ export default function App() {
         e.preventDefault();
         activateAdjacentTerminal("next");
       }
+      // Cmd+Shift+G: Toggle sidebar git panel
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "g") {
+        e.preventDefault();
+        toggleSidebarMode();
+        if (!state.sidebarOpen) setState("sidebarOpen", true);
+        return;
+      }
       // Cmd+G / Ctrl+G: Toggle git panel on active terminal
-      if ((e.metaKey || e.ctrlKey) && e.key === "g") {
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === "g") {
         e.preventDefault();
         toggleGitPanel(state.activeTerminalId);
       }

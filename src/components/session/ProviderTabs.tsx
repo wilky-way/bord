@@ -42,7 +42,10 @@ export default function ProviderTabs(props: Props) {
           );
         }}
       </For>
-      <Show when={props.actions}>{props.actions}</Show>
+      <Show when={props.actions}>
+        <div class="w-px h-4 bg-[var(--border)] opacity-60" />
+        {props.actions}
+      </Show>
     </div>
   );
 }
