@@ -372,6 +372,7 @@ export default function TerminalPanel(props: Props) {
         <Portal>
           <div
             ref={popoverRef}
+            data-git-panel
             class="fixed z-[9999]"
             style={{ top: `${popoverPos().top}px`, left: `${popoverPos().left}px`, width: `${popoverWidth()}px` }}
           >

@@ -32,7 +32,7 @@ export const sel = {
   chooseEditorButton: 'button[title="Choose editor"]',
 
   // GitPanel.tsx (Portal-rendered)
-  gitPanelPortal: ".fixed.z-\\[9999\\]",
+  gitPanelPortal: "[data-git-panel]",
 
   // TopBar.tsx — global mute
   globalMuteButton: 'button[title="Mute notifications"], button[title="Unmute notifications"]',

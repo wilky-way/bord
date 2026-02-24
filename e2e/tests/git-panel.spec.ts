@@ -22,7 +22,7 @@ test.describe("Git panel (G1-G7)", () => {
 
   test("G1: toggle git panel open and closed", async ({ page, terminalPanel, gitPanel }) => {
     // Wait for branch badge to appear
-    const toggleBtn = page.locator(sel.toggleGitPanel).first();
+    const toggleBtn = page.locator(sel.terminalPanel()).first().locator(sel.toggleGitPanel);
     await toggleBtn.waitFor({ state: "visible", timeout: 10_000 });
 
     // Open
@@ -41,7 +41,7 @@ test.describe("Git panel (G1-G7)", () => {
     gitPanel,
   }) => {
     // Open git panel
-    const toggleBtn = page.locator(sel.toggleGitPanel).first();
+    const toggleBtn = page.locator(sel.terminalPanel()).first().locator(sel.toggleGitPanel);
     await toggleBtn.waitFor({ state: "visible", timeout: 10_000 });
     await toggleBtn.click();
     await page.waitForTimeout(1000);
@@ -62,7 +62,7 @@ test.describe("Git panel (G1-G7)", () => {
   });
 
   test("G3: clicking a file shows diff content", async ({ page, gitPanel }) => {
-    const toggleBtn = page.locator(sel.toggleGitPanel).first();
+    const toggleBtn = page.locator(sel.terminalPanel()).first().locator(sel.toggleGitPanel);
     await toggleBtn.waitFor({ state: "visible", timeout: 10_000 });
     await toggleBtn.click();
     await page.waitForTimeout(1000);
@@ -85,7 +85,7 @@ test.describe("Git panel (G1-G7)", () => {
   });
 
   test("G4: stage and unstage a file", async ({ page, gitPanel }) => {
-    const toggleBtn = page.locator(sel.toggleGitPanel).first();
+    const toggleBtn = page.locator(sel.terminalPanel()).first().locator(sel.toggleGitPanel);
     await toggleBtn.waitFor({ state: "visible", timeout: 10_000 });
     await toggleBtn.click();
     await page.waitForTimeout(1000);
@@ -112,7 +112,7 @@ test.describe("Git panel (G1-G7)", () => {
   });
 
   test("G5: commit flow — type message and submit", async ({ page, gitPanel }) => {
-    const toggleBtn = page.locator(sel.toggleGitPanel).first();
+    const toggleBtn = page.locator(sel.terminalPanel()).first().locator(sel.toggleGitPanel);
     await toggleBtn.waitFor({ state: "visible", timeout: 10_000 });
     await toggleBtn.click();
     await page.waitForTimeout(1000);
@@ -134,7 +134,7 @@ test.describe("Git panel (G1-G7)", () => {
   });
 
   test("G6: push badge shows ahead count", async ({ page, gitPanel }) => {
-    const toggleBtn = page.locator(sel.toggleGitPanel).first();
+    const toggleBtn = page.locator(sel.terminalPanel()).first().locator(sel.toggleGitPanel);
     await toggleBtn.waitFor({ state: "visible", timeout: 10_000 });
     await toggleBtn.click();
     await page.waitForTimeout(1000);
@@ -149,7 +149,7 @@ test.describe("Git panel (G1-G7)", () => {
   });
 
   test("G7: RepoNavigator shows parent/sibling repos", async ({ page, gitPanel }) => {
-    const toggleBtn = page.locator(sel.toggleGitPanel).first();
+    const toggleBtn = page.locator(sel.terminalPanel()).first().locator(sel.toggleGitPanel);
     await toggleBtn.waitFor({ state: "visible", timeout: 10_000 });
     await toggleBtn.click();
     await page.waitForTimeout(1000);
@@ -171,7 +171,7 @@ test.describe("Git panel (G1-G7)", () => {
     page,
     gitPanel,
   }) => {
-    const toggleBtn = page.locator(sel.toggleGitPanel).first();
+    const toggleBtn = page.locator(sel.terminalPanel()).first().locator(sel.toggleGitPanel);
     await toggleBtn.waitFor({ state: "visible", timeout: 10_000 });
     await toggleBtn.click();
     await page.waitForTimeout(1000);
@@ -191,7 +191,7 @@ test.describe("Git panel (G1-G7)", () => {
   });
 
   test("G4b: Stage All / Unstage All buttons", async ({ page, gitPanel }) => {
-    const toggleBtn = page.locator(sel.toggleGitPanel).first();
+    const toggleBtn = page.locator(sel.terminalPanel()).first().locator(sel.toggleGitPanel);
     const gitBadgeVisible = await toggleBtn.isVisible({ timeout: 10_000 }).catch(() => false);
     if (!gitBadgeVisible) {
       test.skip();
@@ -240,7 +240,7 @@ test.describe("Git panel (G1-G7)", () => {
     page,
     gitPanel,
   }) => {
-    const toggleBtn = page.locator(sel.toggleGitPanel).first();
+    const toggleBtn = page.locator(sel.terminalPanel()).first().locator(sel.toggleGitPanel);
     await toggleBtn.waitFor({ state: "visible", timeout: 10_000 });
     await toggleBtn.click();
     await page.waitForTimeout(1000);
@@ -268,7 +268,7 @@ test.describe("Git panel (G1-G7)", () => {
   });
 
   test("G5c: Commit execution clears staged files", async ({ page, gitPanel }) => {
-    const toggleBtn = page.locator(sel.toggleGitPanel).first();
+    const toggleBtn = page.locator(sel.terminalPanel()).first().locator(sel.toggleGitPanel);
     await toggleBtn.waitFor({ state: "visible", timeout: 10_000 });
     await toggleBtn.click();
     await page.waitForTimeout(1000);
@@ -301,7 +301,7 @@ test.describe("Git panel (G1-G7)", () => {
   });
 
   test("G6b: Push execution clears ahead count", async ({ page, gitPanel }) => {
-    const toggleBtn = page.locator(sel.toggleGitPanel).first();
+    const toggleBtn = page.locator(sel.terminalPanel()).first().locator(sel.toggleGitPanel);
     await toggleBtn.waitFor({ state: "visible", timeout: 10_000 });
     await toggleBtn.click();
     await page.waitForTimeout(1000);
@@ -333,7 +333,7 @@ test.describe("Git panel (G1-G7)", () => {
     page,
     gitPanel,
   }) => {
-    const toggleBtn = page.locator(sel.toggleGitPanel).first();
+    const toggleBtn = page.locator(sel.terminalPanel()).first().locator(sel.toggleGitPanel);
     await toggleBtn.waitFor({ state: "visible", timeout: 10_000 });
     await toggleBtn.click();
     await page.waitForTimeout(1000);
@@ -387,7 +387,7 @@ test.describe("Git panel (G1-G7)", () => {
   });
 
   test("G8: Pull badge shows behind count", async ({ page, gitPanel }) => {
-    const toggleBtn = page.locator(sel.toggleGitPanel).first();
+    const toggleBtn = page.locator(sel.terminalPanel()).first().locator(sel.toggleGitPanel);
     await toggleBtn.waitFor({ state: "visible", timeout: 10_000 });
     await toggleBtn.click();
     await page.waitForTimeout(1000);
@@ -403,7 +403,7 @@ test.describe("Git panel (G1-G7)", () => {
   });
 
   test("G9: Branch switch button opens branch picker", async ({ page, gitPanel }) => {
-    const toggleBtn = page.locator(sel.toggleGitPanel).first();
+    const toggleBtn = page.locator(sel.terminalPanel()).first().locator(sel.toggleGitPanel);
     await toggleBtn.waitFor({ state: "visible", timeout: 10_000 });
     await toggleBtn.click();
     await page.waitForTimeout(1000);
@@ -424,7 +424,7 @@ test.describe("Git panel (G1-G7)", () => {
   });
 
   test("G10: Reset repo button returns to terminal's repo", async ({ page, gitPanel }) => {
-    const toggleBtn = page.locator(sel.toggleGitPanel).first();
+    const toggleBtn = page.locator(sel.terminalPanel()).first().locator(sel.toggleGitPanel);
     await toggleBtn.waitFor({ state: "visible", timeout: 10_000 });
     await toggleBtn.click();
     await page.waitForTimeout(1000);
@@ -466,7 +466,7 @@ test.describe("Git panel (G1-G7)", () => {
   });
 
   test("G11: DiffViewer next hunk disabled at last hunk", async ({ page, gitPanel }) => {
-    const toggleBtn = page.locator(sel.toggleGitPanel).first();
+    const toggleBtn = page.locator(sel.terminalPanel()).first().locator(sel.toggleGitPanel);
     await toggleBtn.waitFor({ state: "visible", timeout: 10_000 });
     await toggleBtn.click();
     await page.waitForTimeout(1000);

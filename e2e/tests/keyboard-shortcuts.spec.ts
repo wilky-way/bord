@@ -157,7 +157,7 @@ test.describe("Keyboard shortcuts", () => {
     }
 
     // Wait for the branch badge to appear on the terminal titlebar
-    const branchBadge = page.locator(sel.toggleGitPanel).first();
+    const branchBadge = page.locator(sel.terminalPanel()).first().locator(sel.toggleGitPanel);
     await branchBadge.waitFor({ state: "visible", timeout: 10_000 });
 
     // Click the terminal panel to ensure it's active (sets activeTerminalId in store)

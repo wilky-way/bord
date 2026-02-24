@@ -76,7 +76,7 @@ export class TerminalPanelPO {
 
   /** Click the git panel toggle button on a terminal. */
   async openGitPanel() {
-    await this.page.locator(sel.toggleGitPanel).first().click();
+    await this.page.locator(sel.terminalPanel()).first().locator(sel.toggleGitPanel).click();
   }
 
   /** Get the terminal ID of the first visible panel. */

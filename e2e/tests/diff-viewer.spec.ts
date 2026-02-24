@@ -21,7 +21,7 @@ test.describe("Diff viewer (DV1-DV3)", () => {
   });
 
   test("DV-1: clicking file shows diff with colored lines", async ({ page, gitPanel }) => {
-    const toggleBtn = page.locator(sel.toggleGitPanel).first();
+    const toggleBtn = page.locator(sel.terminalPanel()).first().locator(sel.toggleGitPanel);
     await toggleBtn.waitFor({ state: "visible", timeout: 10_000 });
     await toggleBtn.click();
     await page.waitForTimeout(1000);
@@ -48,7 +48,7 @@ test.describe("Diff viewer (DV1-DV3)", () => {
   });
 
   test("DV-2: hunk counter shows N/M hunks text", async ({ page, gitPanel }) => {
-    const toggleBtn = page.locator(sel.toggleGitPanel).first();
+    const toggleBtn = page.locator(sel.terminalPanel()).first().locator(sel.toggleGitPanel);
     await toggleBtn.waitFor({ state: "visible", timeout: 10_000 });
     await toggleBtn.click();
     await page.waitForTimeout(1000);
@@ -71,7 +71,7 @@ test.describe("Diff viewer (DV1-DV3)", () => {
   });
 
   test("DV-3: next/prev hunk navigation buttons", async ({ page, gitPanel }) => {
-    const toggleBtn = page.locator(sel.toggleGitPanel).first();
+    const toggleBtn = page.locator(sel.terminalPanel()).first().locator(sel.toggleGitPanel);
     await toggleBtn.waitFor({ state: "visible", timeout: 10_000 });
     await toggleBtn.click();
     await page.waitForTimeout(1000);

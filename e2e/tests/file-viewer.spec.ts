@@ -220,7 +220,7 @@ test.describe("File viewer (FV1-FV6)", () => {
 
   test("FV6: git panel opens file in viewer", async ({ page, filePanel, gitPanel }) => {
     // Open git panel
-    const toggleBtn = page.locator(sel.toggleGitPanel).first();
+    const toggleBtn = page.locator(sel.terminalPanel()).first().locator(sel.toggleGitPanel);
     const gitVisible = await toggleBtn.isVisible({ timeout: 5000 }).catch(() => false);
     if (!gitVisible) {
       test.skip();

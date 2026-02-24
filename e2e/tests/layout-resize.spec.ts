@@ -86,6 +86,7 @@ test.describe("Layout & resize", () => {
 
     // Look for resize handle between panels
     // The TilingLayout renders resize handles between panels
+    // Target inside the first panel near its right edge (handle is at -right-[2px], partly clipped by overflow-hidden)
     const resizeHandles = page.locator('[style*="cursor: col-resize"], .cursor-col-resize');
     const handleCount = await resizeHandles.count();
 
@@ -96,20 +97,25 @@ test.describe("Layout & resize", () => {
         // Capture width before drag
         const widthBefore = (await firstPanel.boundingBox())!.width;
 
-        // Drag handle to the right by 50px
-        await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
+        // Target the left portion of the handle (which is inside the panel and not clipped)
+        const targetX = handleBox.x + 1;
+        const targetY = handleBox.y + handleBox.height / 2;
+
+        // Drag handle to the right by 100px with more steps for reliability
+        await page.mouse.move(targetX, targetY);
+        await page.waitForTimeout(100);
         await page.mouse.down();
-        await page.mouse.move(handleBox.x + handleBox.width / 2 + 50, handleBox.y + handleBox.height / 2, {
-          steps: 5,
-        });
+        await page.waitForTimeout(50);
+        await page.mouse.move(targetX + 100, targetY, { steps: 10 });
+        await page.waitForTimeout(50);
         await page.mouse.up();
-        await page.waitForTimeout(300);
+        await page.waitForTimeout(500);
 
         // Capture width after drag
         const widthAfter = (await firstPanel.boundingBox())!.width;
 
-        // First panel should have grown
-        expect(widthAfter).toBeGreaterThan(widthBefore);
+        // First panel should have grown (allow small tolerance for rounding)
+        expect(widthAfter).toBeGreaterThan(widthBefore + 5);
 
         // Verify panels still exist
         expect(await terminalPanel.visibleCount()).toBeGreaterThanOrEqual(2);

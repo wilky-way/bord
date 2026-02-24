@@ -30,7 +30,7 @@ test.describe("Error states", () => {
       }
 
       // Check if git toggle button exists (branch badge)
-      const gitToggle = page.locator('button[title="Toggle git panel"]');
+      const gitToggle = page.locator('button[title="Toggle git panel"]').first();
       await page.waitForTimeout(2000); // Wait for git status fetch
 
       if (!(await gitToggle.isVisible())) {
