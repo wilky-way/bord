@@ -64,10 +64,10 @@ async function existingOpenCodeSessionDirs(): Promise<string[]> {
 
 /** Decode Claude project dir name back to an absolute path.
  *  `-` is ambiguous: it encodes both `/` separators AND literal hyphens in
- *  directory names (e.g. `agent-brain`).  We resolve the ambiguity by checking
- *  the filesystem: at each level, try the single-segment interpretation first;
- *  if it doesn't exist on disk, greedily merge subsequent segments with `-`
- *  until we find a component that does exist (or consume all remaining segments). */
+ *  directory names (e.g. `agent-brain`).  Default behavior treats each `-` as
+ *  a `/` separator.  We then check the filesystem: if the single-segment path
+ *  exists we use it; if not, we try merging subsequent segments with `-` to
+ *  find a hyphenated directory that actually exists on disk. */
 const _decodedCache = new Map<string, string>();
 export function decodeDirToPath(dir: string): string {
   const cached = _decodedCache.get(dir);
@@ -87,21 +87,23 @@ export function decodeDirToPath(dir: string): string {
       continue;
     }
 
-    // Try single part — if it exists as a directory on disk, accept it
+    // Default: treat single part as a path component (dash = separator)
     const singleCandidate = "/" + [...components, parts[i]].join("/");
     if (existsSync(singleCandidate)) {
+      // Path exists — accept single segment
       components.push(parts[i]);
       i++;
       continue;
     }
 
-    // Single part doesn't exist — try merging subsequent parts with `-`
+    // Single path doesn't exist — try merging subsequent parts with `-`
+    // to find a hyphenated directory that exists on disk
     let found = false;
     for (let len = 2; len <= remaining; len++) {
       const merged = parts.slice(i, i + len).join("-");
       const candidate = "/" + [...components, merged].join("/");
 
-      if (len === remaining || existsSync(candidate)) {
+      if (existsSync(candidate)) {
         components.push(merged);
         i += len;
         found = true;
@@ -110,7 +112,7 @@ export function decodeDirToPath(dir: string): string {
     }
 
     if (!found) {
-      // Shouldn't happen (len === remaining always matches), but be safe
+      // Nothing matched on disk — default to single segment (dash = separator)
       components.push(parts[i]);
       i++;
     }

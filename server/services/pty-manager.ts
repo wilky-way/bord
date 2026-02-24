@@ -119,6 +119,7 @@ export function createPty(
       ...cleanEnv,
       TERM: "xterm-256color",
       COLORTERM: "truecolor",
+      TERM_PROGRAM: "ghostty",
     },
     terminal: {
       cols,
