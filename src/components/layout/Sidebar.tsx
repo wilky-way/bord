@@ -626,7 +626,16 @@ export default function Sidebar() {
 
       <Show when={state.sidebarMode === "git" && panelWorkspace()}>
         <div class="flex-1 min-h-0 overflow-hidden">
-          <GitPanel cwd={panelWorkspace()!.path} />
+          <GitPanel
+            cwd={panelWorkspace()!.path}
+            onOpenFile={async (path) => {
+              const active = state.activeTerminalId;
+              const activeTerm = active ? state.terminals.find((t) => t.id === active) : null;
+              const isFileViewer = activeTerm?.terminalView === "file" || activeTerm?.terminalView === "filetree";
+              const termId = isFileViewer ? active! : await addTerminal(panelWorkspace()!.path);
+              if (termId) openFileInTerminal(termId, path);
+            }}
+          />
         </div>
       </Show>
 

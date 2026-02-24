@@ -396,7 +396,7 @@ export default function TerminalPanel(props: Props) {
                 <div class="absolute top-0 right-[2px] w-[2px] h-full opacity-0 group-hover/resize:opacity-100 bg-[var(--accent)] transition-opacity" />
               </div>
               <div class="flex flex-col" style={{ "max-height": "calc(100vh - 60px)" }}>
-                <GitPanel cwd={effectiveCwd()} onClose={() => closeGitPanel()} />
+                <GitPanel cwd={effectiveCwd()} onClose={() => closeGitPanel()} onOpenFile={(path) => openFileInTerminal(props.id, path)} />
               </div>
             </div>
           </div>

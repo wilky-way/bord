@@ -10,6 +10,7 @@ import type { GitStatus } from "../../store/types";
 interface GitPanelProps {
   cwd: string;
   onClose?: () => void;
+  onOpenFile?: (absolutePath: string) => void;
 }
 
 export default function GitPanel(props: GitPanelProps) {
@@ -186,7 +187,11 @@ export default function GitPanel(props: GitPanelProps) {
   function openFile(file: string) {
     const cwd = effectiveCwd();
     if (!cwd) return;
-    api.openInEditor(cwd, getPreferredEditor(), file);
+    if (props.onOpenFile) {
+      props.onOpenFile(cwd + "/" + file);
+    } else {
+      api.openInEditor(cwd, getPreferredEditor(), file);
+    }
   }
 
   function toggleBranchDropdown() {
