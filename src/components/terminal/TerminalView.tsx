@@ -5,6 +5,7 @@ import { createTerminalWriter } from "../../lib/terminal-writer";
 import { setTerminalConnected } from "../../store/terminals";
 import { terminalTheme } from "../../lib/theme";
 import { createTerminalKeyHandler } from "../../lib/terminal-shortcuts";
+import { createTerminalWheelHandler } from "../../lib/terminal-wheel";
 import { fontSize, fontFamily } from "../../store/settings";
 // Theme is read at terminal creation time — changing themes applies to new terminals only
 
@@ -89,6 +90,9 @@ export default function TerminalView(props: Props) {
     // Attach keyboard shortcut handler
     if (typeof terminal.attachCustomKeyEventHandler === "function") {
       terminal.attachCustomKeyEventHandler(createTerminalKeyHandler(props.ptyId, terminal));
+    }
+    if (typeof terminal.attachCustomWheelEventHandler === "function") {
+      terminal.attachCustomWheelEventHandler(createTerminalWheelHandler(props.ptyId, terminal));
     }
 
     setReady(true);
