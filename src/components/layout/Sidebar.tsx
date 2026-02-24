@@ -627,7 +627,7 @@ export default function Sidebar() {
                 "text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--bg-tertiary)]": state.sidebarMode !== "files",
               }}
               onClick={() => setSidebarMode(state.sidebarMode === "files" ? "sessions" : "files")}
-              title="File tree"
+              title="Browse files"
             >
               <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
                 <path d="M1.5 1h5l1 2H14.5a1 1 0 011 1v9a1 1 0 01-1 1h-13a1 1 0 01-1-1V2a1 1 0 011-1z" />

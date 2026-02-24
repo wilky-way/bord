@@ -84,43 +84,31 @@ test.describe("Layout & resize", () => {
       return;
     }
 
-    // Look for resize handle between panels
-    // The TilingLayout renders resize handles between panels
-    // Target inside the first panel near its right edge (handle is at -right-[2px], partly clipped by overflow-hidden)
-    const resizeHandles = page.locator('[style*="cursor: col-resize"], .cursor-col-resize');
-    const handleCount = await resizeHandles.count();
+    // The resize handle is inside each ResizablePanel wrapper (parent of [data-terminal-id])
+    // Use the first panel's bounding box to calculate the handle position
+    // Handle is at -right-[2px] w-[5px], so it starts 3px inside the panel's right edge
+    const widthBefore = firstBox.width;
+    const handleX = firstBox.x + firstBox.width - 2; // Center of the visible handle portion
+    const handleY = firstBox.y + firstBox.height / 2;
 
-    if (handleCount > 0) {
-      const handle = resizeHandles.first();
-      const handleBox = await handle.boundingBox();
-      if (handleBox) {
-        // Capture width before drag
-        const widthBefore = (await firstPanel.boundingBox())!.width;
+    // Drag the handle to the right by 100px
+    await page.mouse.move(handleX, handleY);
+    await page.waitForTimeout(100);
+    await page.mouse.down();
+    await page.waitForTimeout(50);
+    await page.mouse.move(handleX + 100, handleY, { steps: 10 });
+    await page.waitForTimeout(50);
+    await page.mouse.up();
+    await page.waitForTimeout(500);
 
-        // Target the left portion of the handle (which is inside the panel and not clipped)
-        const targetX = handleBox.x + 1;
-        const targetY = handleBox.y + handleBox.height / 2;
+    // Capture width after drag
+    const widthAfter = (await firstPanel.boundingBox())!.width;
 
-        // Drag handle to the right by 100px with more steps for reliability
-        await page.mouse.move(targetX, targetY);
-        await page.waitForTimeout(100);
-        await page.mouse.down();
-        await page.waitForTimeout(50);
-        await page.mouse.move(targetX + 100, targetY, { steps: 10 });
-        await page.waitForTimeout(50);
-        await page.mouse.up();
-        await page.waitForTimeout(500);
+    // First panel should have grown
+    expect(widthAfter).toBeGreaterThan(widthBefore);
 
-        // Capture width after drag
-        const widthAfter = (await firstPanel.boundingBox())!.width;
-
-        // First panel should have grown (allow small tolerance for rounding)
-        expect(widthAfter).toBeGreaterThan(widthBefore + 5);
-
-        // Verify panels still exist
-        expect(await terminalPanel.visibleCount()).toBeGreaterThanOrEqual(2);
-      }
-    }
+    // Verify panels still exist
+    expect(await terminalPanel.visibleCount()).toBeGreaterThanOrEqual(2);
   });
 
   test("add terminal via + button → new panel appears", async ({ page, topbar, terminalPanel }) => {

@@ -15,7 +15,7 @@ export class FilePanelPO {
         .locator(sel.terminalPanel(terminalId))
         .locator(sel.fileTreeButton);
     }
-    return this.page.locator(sel.fileTreeButton).first();
+    return this.terminalArea().locator(sel.fileTreeButton).first();
   }
 
   /** Scope to the terminal panel area (excludes sidebar file trees). */
@@ -112,7 +112,7 @@ export class FilePanelPO {
   /** Sidebar file tree button. */
   sidebarFilesButton(): Locator {
     // The sidebar has its own "File tree" button in the action bar
-    return this.page.locator('[data-bord-sidebar] button[title="File tree"]');
+    return this.page.locator('[data-bord-sidebar] button[title="Browse files"]');
   }
 
   /** Check if file tree is visible. */
