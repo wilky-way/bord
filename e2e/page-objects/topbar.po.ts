@@ -39,14 +39,14 @@ export class TopBarPO {
     return this.page.locator(sel.densityButton(n));
   }
 
-  /** Toggle the global mute button. */
+  /** Toggle the global mute button (scoped to first match = topbar). */
   async toggleGlobalMute() {
-    await this.page.locator(sel.globalMuteButton).click();
+    await this.page.locator(sel.globalMuteButton).first().click();
   }
 
-  /** Get the title attribute of the global mute button. */
+  /** Get the title attribute of the global mute button (scoped to first match = topbar). */
   async getGlobalMuteTitle(): Promise<string> {
-    return (await this.page.locator(sel.globalMuteButton).getAttribute("title")) ?? "";
+    return (await this.page.locator(sel.globalMuteButton).first().getAttribute("title")) ?? "";
   }
 
   /** Check if the add terminal button is disabled. */

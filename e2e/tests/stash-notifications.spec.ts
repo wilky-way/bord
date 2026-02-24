@@ -190,8 +190,7 @@ test.describe("Stash & notifications (N1-N5)", () => {
   });
 
   test("N4: notification settings toggle exists", async ({ page, settings }) => {
-    await page.keyboard.press("Meta+,");
-    await page.waitForTimeout(300);
+    await settings.open();
     expect(await settings.isOpen()).toBe(true);
 
     await settings.switchSection("Notifications");

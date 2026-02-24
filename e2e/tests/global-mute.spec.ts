@@ -15,7 +15,7 @@ test.describe("Global mute", () => {
   });
 
   test("GM-1: global mute button visible in topbar", async ({ page }) => {
-    const muteBtn = page.locator(sel.globalMuteButton);
+    const muteBtn = page.locator(sel.globalMuteButton).first();
     await expect(muteBtn).toBeVisible();
   });
 
@@ -50,8 +50,7 @@ test.describe("Global mute", () => {
     expect(mutedTitle).not.toBe(initialTitle);
 
     // Open and close settings
-    await page.keyboard.press("Meta+,");
-    await page.waitForTimeout(300);
+    await settings.open();
     expect(await settings.isOpen()).toBe(true);
 
     await settings.close();

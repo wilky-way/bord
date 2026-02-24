@@ -15,9 +15,17 @@ export class SettingsPO {
     return this.modal.isVisible();
   }
 
+  /** Open settings by clicking the Settings button in the sidebar rail. */
+  async open() {
+    if (await this.isOpen()) return;
+    await this.page.locator('button[title="Settings"]').click();
+    await this.modal.waitFor({ state: "visible", timeout: 5000 });
+  }
+
   /** Close the settings modal via the X button. */
   async close() {
     await this.modal.locator(sel.settingsCloseButton).click();
+    await this.modal.waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
   }
 
   /** Close the settings modal via Escape key. */

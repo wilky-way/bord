@@ -15,8 +15,7 @@ test.describe("Feature flags", () => {
   });
 
   test("FF-1: Features tab exists in settings", async ({ page, settings }) => {
-    await page.keyboard.press("Meta+,");
-    await page.waitForTimeout(300);
+    await settings.open();
     expect(await settings.isOpen()).toBe(true);
 
     const featuresNav = settings.modal.locator('button:has-text("Features")');
@@ -36,9 +35,7 @@ test.describe("Feature flags", () => {
     }
 
     // Open settings and disable git
-    await page.keyboard.press("Meta+,");
-    await page.waitForTimeout(300);
-
+    await settings.open();
     await settings.switchSection("Features");
     await page.waitForTimeout(300);
 
@@ -49,34 +46,44 @@ test.describe("Feature flags", () => {
       return;
     }
 
-    // Toggle git off
-    await gitToggle.click();
-    await page.waitForTimeout(500);
+    try {
+      // Toggle git off
+      await gitToggle.click();
+      await page.waitForTimeout(500);
 
-    // Verify toggle visual changed (background should now be tertiary, not accent)
-    const bgAfter = await gitToggle.evaluate((el) => getComputedStyle(el).backgroundColor);
+      // Close settings
+      await settings.close();
+      await page.waitForTimeout(300);
 
-    // Close settings
-    await settings.close();
-    await page.waitForTimeout(500);
-
-    // Verify /api/git/status returns error when git is disabled
-    const resp = await page.request.get("http://localhost:4200/api/git/status?cwd=/tmp");
-    expect(resp.status()).toBe(404);
-
-    // Re-enable git
-    await page.keyboard.press("Meta+,");
-    await page.waitForTimeout(300);
-    await settings.switchSection("Features");
-    await page.waitForTimeout(300);
-    await gitToggle.click();
-    await page.waitForTimeout(300);
-    await settings.close();
+      // Verify /api/git/status returns error when git is disabled
+      const resp = await page.request.get("http://localhost:4200/api/git/status?cwd=/tmp");
+      expect(resp.status()).toBe(404);
+    } finally {
+      // Always re-enable git
+      await settings.open();
+      await settings.switchSection("Features");
+      await page.waitForTimeout(300);
+      const toggle = settings.modal.locator('label:has-text("Git integration") button');
+      // Check current state via background color — accent means enabled
+      const bg = await toggle.evaluate((el) => getComputedStyle(el).backgroundColor).catch(() => "");
+      // If bg doesn't look like accent (enabled), click to re-enable
+      // We can't easily know accent color, so just check if API returns 404
+      await settings.close();
+      await page.waitForTimeout(200);
+      const check = await page.request.get("http://localhost:4200/api/git/status?cwd=/tmp").catch(() => null);
+      if (check && check.status() === 404) {
+        await settings.open();
+        await settings.switchSection("Features");
+        await page.waitForTimeout(300);
+        await toggle.click();
+        await page.waitForTimeout(300);
+        await settings.close();
+      }
+    }
   });
 
   test("FF-3: toggle git off -> /api/git/* returns error, re-enable restores", async ({ page, settings }) => {
-    await page.keyboard.press("Meta+,");
-    await page.waitForTimeout(300);
+    await settings.open();
     await settings.switchSection("Features");
     await page.waitForTimeout(300);
 
@@ -86,29 +93,41 @@ test.describe("Feature flags", () => {
       return;
     }
 
-    // Disable git
-    await gitToggle.click();
-    await page.waitForTimeout(500);
-    await settings.close();
-    await page.waitForTimeout(300);
+    try {
+      // Disable git
+      await gitToggle.click();
+      await page.waitForTimeout(500);
+      await settings.close();
+      await page.waitForTimeout(300);
 
-    // API should be gated
-    const resp = await page.request.get("http://localhost:4200/api/git/status?cwd=/tmp");
-    expect(resp.status()).toBe(404);
+      // API should be gated
+      const resp = await page.request.get("http://localhost:4200/api/git/status?cwd=/tmp");
+      expect(resp.status()).toBe(404);
 
-    // Re-enable
-    await page.keyboard.press("Meta+,");
-    await page.waitForTimeout(300);
-    await settings.switchSection("Features");
-    await page.waitForTimeout(300);
-    await gitToggle.click();
-    await page.waitForTimeout(300);
-    await settings.close();
-    await page.waitForTimeout(300);
+      // Re-enable
+      await settings.open();
+      await settings.switchSection("Features");
+      await page.waitForTimeout(300);
+      await gitToggle.click();
+      await page.waitForTimeout(300);
+      await settings.close();
+      await page.waitForTimeout(300);
 
-    // API should work again (may return 400 for bad cwd but not 404)
-    const resp2 = await page.request.get("http://localhost:4200/api/git/status?cwd=/tmp");
-    expect(resp2.status()).not.toBe(404);
+      // API should work again (may return 400 for bad cwd but not 404)
+      const resp2 = await page.request.get("http://localhost:4200/api/git/status?cwd=/tmp");
+      expect(resp2.status()).not.toBe(404);
+    } finally {
+      // Ensure git is re-enabled
+      const check = await page.request.get("http://localhost:4200/api/git/status?cwd=/tmp").catch(() => null);
+      if (check && check.status() === 404) {
+        await settings.open();
+        await settings.switchSection("Features");
+        await page.waitForTimeout(300);
+        await gitToggle.click();
+        await page.waitForTimeout(300);
+        await settings.close();
+      }
+    }
   });
 
   test("FF-4: toggle git off and back on -> app survives round-trip", async ({
@@ -123,8 +142,7 @@ test.describe("Feature flags", () => {
     }
 
     // Disable git
-    await page.keyboard.press("Meta+,");
-    await page.waitForTimeout(300);
+    await settings.open();
     await settings.switchSection("Features");
     await page.waitForTimeout(300);
 
@@ -134,24 +152,40 @@ test.describe("Feature flags", () => {
       return;
     }
 
-    await gitToggle.click();
-    await page.waitForTimeout(500);
+    try {
+      await gitToggle.click();
+      await page.waitForTimeout(500);
 
-    // Verify toggle visual changed (now disabled — bg should differ from accent)
-    const bgDisabled = await gitToggle.evaluate((el) => getComputedStyle(el).backgroundColor);
+      // Verify toggle visual changed (now disabled — bg should differ from accent)
+      const bgDisabled = await gitToggle.evaluate((el) => getComputedStyle(el).backgroundColor);
 
-    // Re-enable git
-    await gitToggle.click();
-    await page.waitForTimeout(500);
+      // Re-enable git
+      await gitToggle.click();
+      await page.waitForTimeout(500);
 
-    const bgEnabled = await gitToggle.evaluate((el) => getComputedStyle(el).backgroundColor);
-    expect(bgEnabled).not.toBe(bgDisabled);
+      const bgEnabled = await gitToggle.evaluate((el) => getComputedStyle(el).backgroundColor);
+      expect(bgEnabled).not.toBe(bgDisabled);
 
-    await settings.close();
-    await page.waitForTimeout(500);
+      await settings.close();
+      await page.waitForTimeout(500);
 
-    // App should still be functional
-    expect(await terminalPanel.visibleCount()).toBeGreaterThanOrEqual(1);
+      // App should still be functional
+      expect(await terminalPanel.visibleCount()).toBeGreaterThanOrEqual(1);
+    } finally {
+      // Ensure git is re-enabled and settings closed
+      if (await settings.isOpen()) {
+        await settings.close().catch(() => {});
+      }
+      const check = await page.request.get("http://localhost:4200/api/git/status?cwd=/tmp").catch(() => null);
+      if (check && check.status() === 404) {
+        await settings.open();
+        await settings.switchSection("Features");
+        await page.waitForTimeout(300);
+        await gitToggle.click();
+        await page.waitForTimeout(300);
+        await settings.close();
+      }
+    }
   });
 
   test("FF-5: toggle docker off -> Docker section disappears from sidebar", async ({
@@ -169,8 +203,7 @@ test.describe("Feature flags", () => {
     const hadDocker = await dockerHeader.isVisible();
 
     // Open settings and toggle docker off
-    await page.keyboard.press("Meta+,");
-    await page.waitForTimeout(300);
+    await settings.open();
     await settings.switchSection("Features");
     await page.waitForTimeout(300);
 
@@ -194,8 +227,7 @@ test.describe("Feature flags", () => {
     }
 
     // Re-enable docker
-    await page.keyboard.press("Meta+,");
-    await page.waitForTimeout(300);
+    await settings.open();
     await settings.switchSection("Features");
     await page.waitForTimeout(300);
     await dockerToggle.click();
@@ -205,8 +237,7 @@ test.describe("Feature flags", () => {
 
   test("FF-6: toggle docker back on -> restores", async ({ page, settings, sidebar }) => {
     // Disable docker
-    await page.keyboard.press("Meta+,");
-    await page.waitForTimeout(300);
+    await settings.open();
     await settings.switchSection("Features");
     await page.waitForTimeout(300);
 
@@ -222,8 +253,7 @@ test.describe("Feature flags", () => {
     await page.waitForTimeout(300);
 
     // Re-enable docker
-    await page.keyboard.press("Meta+,");
-    await page.waitForTimeout(300);
+    await settings.open();
     await settings.switchSection("Features");
     await page.waitForTimeout(300);
     await dockerToggle.click();
@@ -242,8 +272,7 @@ test.describe("Feature flags", () => {
   });
 
   test("FF-7: Providers sub-section exists in Features", async ({ page, settings }) => {
-    await page.keyboard.press("Meta+,");
-    await page.waitForTimeout(300);
+    await settings.open();
     await settings.switchSection("Features");
     await page.waitForTimeout(300);
 
@@ -270,8 +299,7 @@ test.describe("Feature flags", () => {
     }
 
     // Open settings and disable Gemini provider
-    await page.keyboard.press("Meta+,");
-    await page.waitForTimeout(300);
+    await settings.open();
     await settings.switchSection("Features");
     await page.waitForTimeout(300);
 
@@ -293,8 +321,7 @@ test.describe("Feature flags", () => {
     expect(await geminiTab.isVisible()).toBe(false);
 
     // Re-enable Gemini
-    await page.keyboard.press("Meta+,");
-    await page.waitForTimeout(300);
+    await settings.open();
     await settings.switchSection("Features");
     await page.waitForTimeout(300);
     await geminiToggle.click();
