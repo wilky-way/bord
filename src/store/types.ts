@@ -18,6 +18,9 @@ export interface TerminalInstance {
   createdAt: number; // Date.now() when terminal was spawned
   notificationsArmed?: boolean; // true when agent has worked long enough to trigger notifications on idle
   dynamicCwd?: string; // live CWD updated via OSC 7 — tracks shell's real current directory
+  terminalView?: "terminal" | "filetree" | "file"; // default "terminal"
+  openFiles?: Array<{ path: string; scrollTop: number }>; // max 2
+  activeFileIndex?: number; // 0 or 1
 }
 
 export interface Workspace {
@@ -54,6 +57,6 @@ export interface AppState {
   bellMuted: boolean; // global mute — suppresses all notifications across all terminals
   activeProvider: Provider;
   sidebarCollapsed: { workspaces: boolean; sessions: boolean; docker: boolean };
-  sidebarMode: "sessions" | "git"; // which view the sidebar content area shows
+  sidebarMode: "sessions" | "git" | "files"; // which view the sidebar content area shows
   sidebarWidth: number; // resizable sidebar width in pixels
 }

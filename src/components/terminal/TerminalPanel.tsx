@@ -1,13 +1,15 @@
 import { createSignal, createEffect, onMount, onCleanup, Show } from "solid-js";
 import { Portal, Dynamic } from "solid-js/web";
 import TerminalView from "./TerminalView";
-import { removeTerminal, setActiveTerminal, stashTerminal, setTerminalTitle, setTerminalMuted, setTerminalOscTitle, setTerminalDynamicCwd } from "../../store/terminals";
+import { removeTerminal, setActiveTerminal, stashTerminal, setTerminalTitle, setTerminalMuted, setTerminalOscTitle, setTerminalDynamicCwd, setTerminalView, openFileInTerminal } from "../../store/terminals";
 import { state } from "../../store/core";
 import { toggleGitPanel, closeGitPanel } from "../../store/git";
 import { PROVIDER_ICONS } from "../../lib/providers";
 import WarmupIndicator from "./WarmupIndicator";
 import EditorButton from "../shared/EditorButton";
 import GitPanel from "../git/GitPanel";
+import FileTree from "../files/FileTree";
+import FileViewer from "../files/FileViewer";
 import { api } from "../../lib/api";
 import { isFeatureEnabled } from "../../store/features";
 
@@ -25,6 +27,7 @@ export default function TerminalPanel(props: Props) {
   const [editValue, setEditValue] = createSignal("");
   const terminal = () => state.terminals.find((t) => t.id === props.id);
   const effectiveCwd = () => terminal()?.dynamicCwd ?? props.cwd;
+  const terminalView = () => terminal()?.terminalView ?? "terminal";
   const workspaceName = () => state.workspaces.find((w) => w.id === terminal()?.workspaceId)?.name;
   const displayTitle = () => terminal()?.customTitle || terminal()?.sessionTitle || title();
   const [branch, setBranch] = createSignal<string | null>(null);
@@ -275,6 +278,22 @@ export default function TerminalPanel(props: Props) {
           />
         </div>
         <div class="flex items-center gap-1 shrink-0">
+          {/* File tree toggle */}
+          <button
+            class="text-[var(--text-secondary)] hover:text-[var(--accent)] text-xs w-6 h-6 flex items-center justify-center rounded-[var(--btn-radius)] hover:bg-[var(--bg-tertiary)] transition-colors"
+            classList={{
+              "text-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_20%,transparent)]": terminalView() === "filetree" || terminalView() === "file",
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              setTerminalView(props.id, terminalView() === "terminal" ? "filetree" : "terminal");
+            }}
+            title="File tree"
+          >
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M1.5 1h5l1 2H14.5a1 1 0 011 1v9a1 1 0 01-1 1h-13a1 1 0 01-1-1V2a1 1 0 011-1z" />
+            </svg>
+          </button>
           {/* Push button - shows when ahead > 0 */}
           <Show when={ahead() > 0 || pushing() || pushDone()}>
             <button
@@ -321,19 +340,31 @@ export default function TerminalPanel(props: Props) {
         </div>
       </div>
 
-      {/* Terminal */}
+      {/* Content area — conditional on view mode */}
       <div class="flex-1 min-h-0 overflow-hidden relative">
-        <TerminalView
-          ptyId={props.id}
-          onTitleChange={(newTitle: string) => {
-            console.log("[OSC title]", props.id, newTitle);
-            setTitle(newTitle);
-            setTerminalOscTitle(props.id, newTitle);
-          }}
-          onCwdChange={(newCwd: string) => {
-            setTerminalDynamicCwd(props.id, newCwd);
-          }}
-        />
+        {/* TerminalView uses CSS hide to preserve ghostty-web WASM state */}
+        <div class={terminalView() === "terminal" ? "contents" : "hidden"}>
+          <TerminalView
+            ptyId={props.id}
+            onTitleChange={(newTitle: string) => {
+              console.log("[OSC title]", props.id, newTitle);
+              setTitle(newTitle);
+              setTerminalOscTitle(props.id, newTitle);
+            }}
+            onCwdChange={(newCwd: string) => {
+              setTerminalDynamicCwd(props.id, newCwd);
+            }}
+          />
+        </div>
+        <Show when={terminalView() === "filetree"}>
+          <FileTree
+            rootPath={effectiveCwd()}
+            onFileOpen={(path) => openFileInTerminal(props.id, path)}
+          />
+        </Show>
+        <Show when={terminalView() === "file"}>
+          <FileViewer terminalId={props.id} />
+        </Show>
       </div>
 
       {/* Git popover via Portal */}

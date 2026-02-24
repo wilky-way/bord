@@ -15,7 +15,9 @@ import { notificationIndex } from "../../lib/notifications/index";
 import { api } from "../../lib/api";
 import { isTauriRuntime, pickWorkspaceDirectory } from "../../lib/workspace-picker";
 import { settingsOpen, setSettingsOpen } from "../../store/settings";
-import { toggleSidebarMode } from "../../store/ui";
+import { toggleSidebarMode, setSidebarMode } from "../../store/ui";
+import FileTree from "../files/FileTree";
+import { openFileInTerminal } from "../../store/terminals";
 import type { Provider, SessionInfo, TerminalInstance } from "../../store/types";
 
 function SectionHeader(props: {
@@ -597,7 +599,7 @@ export default function Sidebar() {
                   "text-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_20%,transparent)]": state.sidebarMode === "git",
                   "text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--bg-tertiary)]": state.sidebarMode !== "git",
                 }}
-                onClick={() => toggleSidebarMode()}
+                onClick={() => setSidebarMode(state.sidebarMode === "git" ? "sessions" : "git")}
                 title="Toggle git panel"
               >
                 <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
@@ -605,6 +607,19 @@ export default function Sidebar() {
                 </svg>
               </button>
             </Show>
+            <button
+              class="w-7 h-7 rounded-[var(--btn-radius)] flex items-center justify-center transition-colors"
+              classList={{
+                "text-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_20%,transparent)]": state.sidebarMode === "files",
+                "text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--bg-tertiary)]": state.sidebarMode !== "files",
+              }}
+              onClick={() => setSidebarMode(state.sidebarMode === "files" ? "sessions" : "files")}
+              title="File tree"
+            >
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M1.5 1h5l1 2H14.5a1 1 0 011 1v9a1 1 0 01-1 1h-13a1 1 0 01-1-1V2a1 1 0 011-1z" />
+              </svg>
+            </button>
           </>
         }
       />
@@ -612,6 +627,22 @@ export default function Sidebar() {
       <Show when={state.sidebarMode === "git" && panelWorkspace()}>
         <div class="flex-1 min-h-0 overflow-hidden">
           <GitPanel cwd={panelWorkspace()!.path} />
+        </div>
+      </Show>
+
+      <Show when={state.sidebarMode === "files" && panelWorkspace()}>
+        <div class="flex-1 min-h-0 overflow-hidden">
+          <FileTree
+            rootPath={panelWorkspace()!.path}
+            onFileOpen={async (path) => {
+              // Reuse active terminal if it's already in file view, otherwise spawn a new one
+              const active = state.activeTerminalId;
+              const activeTerm = active ? state.terminals.find((t) => t.id === active) : null;
+              const isFileViewer = activeTerm?.terminalView === "file" || activeTerm?.terminalView === "filetree";
+              const termId = isFileViewer ? active! : await addTerminal(panelWorkspace()!.path);
+              if (termId) openFileInTerminal(termId, path);
+            }}
+          />
         </div>
       </Show>
 

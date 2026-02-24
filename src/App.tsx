@@ -7,7 +7,7 @@ import { addTerminal, removeTerminal, activateAdjacentTerminal } from "./store/t
 import { state, setState } from "./store/core";
 import { toggleGitPanel } from "./store/git";
 import { setSettingsOpen } from "./store/settings";
-import { toggleSidebarMode } from "./store/ui";
+import { toggleSidebarMode, setSidebarMode } from "./store/ui";
 import { initUpdater } from "./lib/updater";
 import { loadFeatures } from "./store/features";
 
@@ -65,6 +65,13 @@ export default function App() {
       if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === "g") {
         e.preventDefault();
         toggleGitPanel(state.activeTerminalId);
+      }
+      // Cmd+Shift+E: Toggle sidebar files mode
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "e") {
+        e.preventDefault();
+        setSidebarMode(state.sidebarMode === "files" ? "sessions" : "files");
+        if (!state.sidebarOpen) setState("sidebarOpen", true);
+        return;
       }
       // Cmd+B / Ctrl+B: Toggle sidebar expanded/collapsed
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "b") {

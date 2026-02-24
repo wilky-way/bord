@@ -206,4 +206,25 @@ export const api = {
       dirs: Array<{ name: string; path: string }>;
     }>(`/fs/browse${params}`);
   },
+
+  listDir: (path: string) =>
+    request<{
+      entries: Array<{
+        name: string; path: string;
+        type: "file" | "dir" | "symlink";
+        size: number; modified: number; isHidden: boolean;
+      }>;
+    }>(`/fs/list?path=${encodeURIComponent(path)}`),
+
+  readFile: (path: string) =>
+    request<{
+      content: string; truncated: boolean; size: number;
+      language: string; binary: boolean;
+    }>(`/fs/read?path=${encodeURIComponent(path)}`),
+
+  writeFile: (path: string, content: string) =>
+    request<{ ok: boolean; error?: string }>("/fs/write", {
+      method: "POST",
+      body: JSON.stringify({ path, content }),
+    }),
 };

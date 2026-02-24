@@ -39,6 +39,50 @@ export function setTerminalDynamicCwd(id: string, cwd: string) {
   setState("terminals", (t) => t.id === id, "dynamicCwd", cwd);
 }
 
+export function setTerminalView(id: string, view: "terminal" | "filetree" | "file") {
+  setState("terminals", (t) => t.id === id, "terminalView", view);
+}
+
+export function openFileInTerminal(id: string, path: string) {
+  const terminal = state.terminals.find((t) => t.id === id);
+  if (!terminal) return;
+  const files = terminal.openFiles ?? [];
+  const existingIdx = files.findIndex((f) => f.path === path);
+  if (existingIdx !== -1) {
+    setState("terminals", (t) => t.id === id, "activeFileIndex", existingIdx);
+    setState("terminals", (t) => t.id === id, "terminalView", "file");
+    return;
+  }
+  const newFiles = files.length >= 2
+    ? [files[1], { path, scrollTop: 0 }]
+    : [...files, { path, scrollTop: 0 }];
+  setState("terminals", (t) => t.id === id, "openFiles", newFiles);
+  setState("terminals", (t) => t.id === id, "activeFileIndex", newFiles.length - 1);
+  setState("terminals", (t) => t.id === id, "terminalView", "file");
+}
+
+export function closeFileInTerminal(id: string, fileIndex: number) {
+  const terminal = state.terminals.find((t) => t.id === id);
+  if (!terminal) return;
+  const files = [...(terminal.openFiles ?? [])];
+  files.splice(fileIndex, 1);
+  setState("terminals", (t) => t.id === id, "openFiles", files);
+  if (files.length === 0) {
+    setState("terminals", (t) => t.id === id, "terminalView", "filetree");
+    setState("terminals", (t) => t.id === id, "activeFileIndex", 0);
+  } else {
+    setState("terminals", (t) => t.id === id, "activeFileIndex", 0);
+  }
+}
+
+export function setActiveFileInTerminal(id: string, index: number) {
+  setState("terminals", (t) => t.id === id, "activeFileIndex", index);
+}
+
+export function setFileScrollTop(id: string, fileIndex: number, scrollTop: number) {
+  setState("terminals", (t) => t.id === id, "openFiles", fileIndex, "scrollTop", scrollTop);
+}
+
 export function getEffectiveCwd(terminal: TerminalInstance): string {
   return terminal.dynamicCwd ?? terminal.cwd;
 }
