@@ -12,6 +12,7 @@ import FileTree from "../files/FileTree";
 import FileViewer from "../files/FileViewer";
 import { api } from "../../lib/api";
 import { isFeatureEnabled } from "../../store/features";
+import { getFileOpenTarget, getPreferredEditor } from "../../lib/editor-preference";
 
 interface Props {
   id: string;
@@ -190,6 +191,17 @@ export default function TerminalPanel(props: Props) {
     }
   }
 
+  function openPath(path: string) {
+    if (getFileOpenTarget() === "editor") {
+      void api.openInEditor(effectiveCwd(), getPreferredEditor(), path).catch((err) => {
+        console.error("[bord] open file in editor failed:", err);
+      });
+      return;
+    }
+
+    openFileInTerminal(props.id, path);
+  }
+
   return (
     <div
       ref={panelRef}
@@ -355,7 +367,7 @@ export default function TerminalPanel(props: Props) {
               setTerminalDynamicCwd(props.id, newCwd);
             }}
             onFileLinkOpen={(path: string) => {
-              openFileInTerminal(props.id, path);
+              openPath(path);
             }}
             getCwd={() => effectiveCwd()}
           />
@@ -363,7 +375,7 @@ export default function TerminalPanel(props: Props) {
         <Show when={terminalView() === "filetree"}>
           <FileTree
             rootPath={effectiveCwd()}
-            onFileOpen={(path) => openFileInTerminal(props.id, path)}
+            onFileOpen={(path) => openPath(path)}
           />
         </Show>
         <Show when={terminalView() === "file"}>
@@ -401,7 +413,7 @@ export default function TerminalPanel(props: Props) {
                 <div class="absolute top-0 right-[2px] w-[2px] h-full opacity-0 group-hover/resize:opacity-100 bg-[var(--accent)] transition-opacity" />
               </div>
               <div class="flex flex-col" style={{ "max-height": "calc(100vh - 60px)" }}>
-                <GitPanel cwd={effectiveCwd()} onClose={() => closeGitPanel()} onOpenFile={(path) => openFileInTerminal(props.id, path)} />
+                <GitPanel cwd={effectiveCwd()} onClose={() => closeGitPanel()} onOpenFile={(path) => openPath(path)} />
               </div>
             </div>
           </div>

@@ -19,6 +19,7 @@ import { toggleSidebarMode, setSidebarMode } from "../../store/ui";
 import FileTree from "../files/FileTree";
 import { openFileInTerminal } from "../../store/terminals";
 import type { Provider, SessionInfo, TerminalInstance } from "../../store/types";
+import { getFileOpenTarget, getPreferredEditor } from "../../lib/editor-preference";
 
 function SectionHeader(props: {
   label: string;
@@ -307,6 +308,26 @@ export default function Sidebar() {
   const panelActiveAttentionCount = () => panelActiveTerminals().filter((terminal) => termHasNotif(terminal.id)).length;
   const panelStashedAttentionCount = () => panelStashedTerminals().filter((terminal) => termHasNotif(terminal.id)).length;
   const sidebarShortcut = () => (typeof navigator !== "undefined" && navigator.platform.includes("Mac") ? "Cmd" : "Ctrl");
+
+  async function openPathFromSidebar(path: string) {
+    const workspace = panelWorkspace();
+    if (!workspace) return;
+
+    if (getFileOpenTarget() === "editor") {
+      try {
+        await api.openInEditor(workspace.path, getPreferredEditor(), path);
+      } catch (err) {
+        console.error("[bord] open file in editor failed:", err);
+      }
+      return;
+    }
+
+    const active = state.activeTerminalId;
+    const activeTerm = active ? state.terminals.find((t) => t.id === active) : null;
+    const isFileViewer = activeTerm?.terminalView === "file" || activeTerm?.terminalView === "filetree";
+    const termId = isFileViewer ? active! : await addTerminal(workspace.path);
+    if (termId) openFileInTerminal(termId, path);
+  }
 
   const normalizeWorkspacePath = (value: string) => value.replace(/\/+$/, "") || "/";
 
@@ -642,11 +663,7 @@ export default function Sidebar() {
           <GitPanel
             cwd={panelWorkspace()!.path}
             onOpenFile={async (path) => {
-              const active = state.activeTerminalId;
-              const activeTerm = active ? state.terminals.find((t) => t.id === active) : null;
-              const isFileViewer = activeTerm?.terminalView === "file" || activeTerm?.terminalView === "filetree";
-              const termId = isFileViewer ? active! : await addTerminal(panelWorkspace()!.path);
-              if (termId) openFileInTerminal(termId, path);
+              await openPathFromSidebar(path);
             }}
           />
         </div>
@@ -657,12 +674,7 @@ export default function Sidebar() {
           <FileTree
             rootPath={panelWorkspace()!.path}
             onFileOpen={async (path) => {
-              // Reuse active terminal if it's already in file view, otherwise spawn a new one
-              const active = state.activeTerminalId;
-              const activeTerm = active ? state.terminals.find((t) => t.id === active) : null;
-              const isFileViewer = activeTerm?.terminalView === "file" || activeTerm?.terminalView === "filetree";
-              const termId = isFileViewer ? active! : await addTerminal(panelWorkspace()!.path);
-              if (termId) openFileInTerminal(termId, path);
+              await openPathFromSidebar(path);
             }}
           />
         </div>

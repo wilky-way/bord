@@ -8,6 +8,7 @@ import { checkForUpdates, updateAvailable, updateVersion, updateStatus, installU
 import { getFeatures, updateFeatures } from "../../store/features";
 import { listProviders } from "../../lib/providers";
 import type { BordTheme } from "../../lib/themes";
+import { getFileOpenTarget, getPreferredEditor, setFileOpenTarget, setPreferredEditor, type Editor } from "../../lib/editor-preference";
 
 interface Props {
   open: boolean;
@@ -175,7 +176,7 @@ function ToggleRow(props: { label: string; description: string; checked: boolean
         role="switch"
         aria-checked={props.checked}
         aria-label={props.label}
-        class="relative w-9 h-5 rounded-full transition-colors duration-200 shrink-0 ml-3"
+        class="relative w-9 h-5 rounded-full transition-colors duration-200 shrink-0 ml-3 appearance-none border-0 p-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--bg-secondary)]"
         style={{
           background: props.checked
             ? "var(--accent)"
@@ -184,9 +185,9 @@ function ToggleRow(props: { label: string; description: string; checked: boolean
         onClick={() => props.onChange(!props.checked)}
       >
         <span
-          class="absolute top-[2px] w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200"
+          class="absolute top-[2px] left-[2px] w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200"
           style={{
-            transform: props.checked ? "translateX(18px)" : "translateX(2px)",
+            transform: props.checked ? "translateX(16px)" : "translateX(0)",
           }}
         />
       </button>
@@ -328,6 +329,71 @@ function FontPicker() {
   );
 }
 
+function FileOpenSettings() {
+  const target = () => getFileOpenTarget();
+  const editor = () => getPreferredEditor();
+  const editorOptions: Array<{ id: Editor; label: string }> = [
+    { id: "cursor", label: "Cursor" },
+    { id: "vscode", label: "VS Code" },
+    { id: "zed", label: "Zed" },
+  ];
+
+  return (
+    <div>
+      <label class="text-xs font-medium text-[var(--text-secondary)] mb-2 block">File opening</label>
+      <p class="text-[11px] text-[var(--text-secondary)] mb-2">
+        Choose where files open when selected from terminal links, git changes, and file trees.
+      </p>
+
+      <div class="grid grid-cols-2 gap-2">
+        <button
+          class="text-xs px-2.5 py-2 rounded-md border transition-colors text-left"
+          classList={{
+            "border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_18%,transparent)] text-[var(--text-primary)]": target() === "terminal",
+            "border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]": target() !== "terminal",
+          }}
+          onClick={() => setFileOpenTarget("terminal")}
+        >
+          <div class="font-medium">Open in Bord tabs</div>
+          <div class="text-[10px] mt-0.5 opacity-80">Use the built-in file viewer</div>
+        </button>
+
+        <button
+          class="text-xs px-2.5 py-2 rounded-md border transition-colors text-left"
+          classList={{
+            "border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_18%,transparent)] text-[var(--text-primary)]": target() === "editor",
+            "border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]": target() !== "editor",
+          }}
+          onClick={() => setFileOpenTarget("editor")}
+        >
+          <div class="font-medium">Open in preferred IDE</div>
+          <div class="text-[10px] mt-0.5 opacity-80">Use your external editor</div>
+        </button>
+      </div>
+
+      <div class="mt-3">
+        <label class="text-xs font-medium text-[var(--text-secondary)] mb-1 block">Preferred IDE</label>
+        <div class="grid grid-cols-3 gap-2">
+          <For each={editorOptions}>
+            {(option) => (
+              <button
+                class="text-xs px-2 py-1.5 rounded-md border transition-colors"
+                classList={{
+                  "border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_18%,transparent)] text-[var(--text-primary)]": editor() === option.id,
+                  "border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]": editor() !== option.id,
+                }}
+                onClick={() => setPreferredEditor(option.id)}
+              >
+                {option.label}
+              </button>
+            )}
+          </For>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function FeatureSettings() {
   const flags = () => getFeatures();
   const providers = () => listProviders();
@@ -360,6 +426,8 @@ function FeatureSettings() {
         </div>
       </div>
 
+      <FileOpenSettings />
+
       <div>
         <label class="text-xs font-medium text-[var(--text-secondary)] mb-2 block">Providers</label>
         <div class="space-y-1">
@@ -384,7 +452,7 @@ function FeatureSettings() {
                     role="switch"
                     aria-checked={isEnabled()}
                     aria-label={provider.label}
-                    class="relative w-9 h-5 rounded-full transition-colors duration-200 shrink-0 ml-3"
+                    class="relative w-9 h-5 rounded-full transition-colors duration-200 shrink-0 ml-3 appearance-none border-0 p-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--bg-secondary)]"
                     classList={{ "opacity-40 cursor-not-allowed": isLastEnabled() }}
                     disabled={isLastEnabled()}
                     style={{
@@ -399,9 +467,9 @@ function FeatureSettings() {
                     title={isLastEnabled() ? "At least one provider must remain enabled" : ""}
                   >
                     <span
-                      class="absolute top-[2px] w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200"
+                      class="absolute top-[2px] left-[2px] w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200"
                       style={{
-                        transform: isEnabled() ? "translateX(18px)" : "translateX(2px)",
+                        transform: isEnabled() ? "translateX(16px)" : "translateX(0)",
                       }}
                     />
                   </button>
