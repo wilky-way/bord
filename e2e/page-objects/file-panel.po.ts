@@ -18,29 +18,34 @@ export class FilePanelPO {
     return this.page.locator(sel.fileTreeButton).first();
   }
 
-  /** File tree root container (visible when in filetree view). */
+  /** Scope to the terminal panel area (excludes sidebar file trees). */
+  private terminalArea(): Locator {
+    return this.page.locator(sel.terminalPanel());
+  }
+
+  /** File tree root container scoped to terminal panel (visible when in filetree view). */
   fileTree(): Locator {
-    return this.page.locator(sel.fileTreeRoot);
+    return this.terminalArea().locator(sel.fileTreeRoot).first();
   }
 
   /** File tree toolbar. */
   fileTreeToolbar(): Locator {
-    return this.page.locator(sel.fileTreeToolbar);
+    return this.terminalArea().locator(sel.fileTreeToolbar).first();
   }
 
   /** Hidden files toggle button (.*). */
   hiddenToggle(): Locator {
-    return this.page.locator(sel.fileTreeToolbar).locator('button[title="Toggle hidden files"]');
+    return this.fileTreeToolbar().locator('button[title="Toggle hidden files"]');
   }
 
   /** Directory entry in the file tree by name. */
   dirEntry(name: string): Locator {
-    return this.page.locator(sel.fileTreeRoot).locator(`div:has(> svg) >> text="${name}"`);
+    return this.fileTree().locator(`div:has(> svg) >> text="${name}"`);
   }
 
   /** File entry in the file tree by name. */
   fileEntry(name: string): Locator {
-    return this.page.locator(sel.fileTreeRoot).locator(`text="${name}"`);
+    return this.fileTree().locator(`text="${name}"`);
   }
 
   /** Click to expand/collapse a directory. */
@@ -53,14 +58,14 @@ export class FilePanelPO {
     await this.fileEntry(name).dblclick();
   }
 
-  /** File viewer root container. */
+  /** File viewer root container scoped to terminal panel. */
   fileViewer(): Locator {
-    return this.page.locator(sel.fileViewerRoot);
+    return this.terminalArea().locator(sel.fileViewerRoot).first();
   }
 
   /** File viewer tab bar. */
   fileViewerTabs(): Locator {
-    return this.page.locator(sel.fileViewerTabs);
+    return this.terminalArea().locator(sel.fileViewerTabs).first();
   }
 
   /** Active tab (has accent border). */
