@@ -190,6 +190,34 @@ function moveMouseToMainArea() {
   wait(260);
 }
 
+/** Dismiss the workspace hover preview by calling the SolidJS signal setter directly. */
+function dismissFlyout() {
+  moveMouseToMainArea();
+  evalJs(
+    "(() => { if (typeof window.__dismissHoverPreview === 'function') { window.__dismissHoverPreview(); return 'dismissed'; } return 'no-hook'; })()",
+    true,
+  );
+  wait(200);
+}
+
+/** Suppress the hover preview at the SolidJS signal level — blocks any future hover triggers. */
+function suppressHoverPreview() {
+  evalJs(
+    "(() => { if (typeof window.__suppressHoverPreview === 'function') { window.__suppressHoverPreview(); return 'suppressed'; } return 'no-hook'; })()",
+    true,
+  );
+  wait(100);
+}
+
+/** Restore hover preview after suppression. */
+function restoreHoverPreview() {
+  evalJs(
+    "(() => { if (typeof window.__restoreHoverPreview === 'function') { window.__restoreHoverPreview(); return 'restored'; } return 'no-hook'; })()",
+    true,
+  );
+  wait(100);
+}
+
 function hoverExpandedWorkspacePreview(name: string) {
   ensureSidebarExpanded();
 
@@ -659,6 +687,83 @@ async function main() {
     evalJs("(() => { document.body.click(); return 'ok'; })()", true);
     wait(200);
 
+    // --- File tree & viewer screenshots ---
+    suppressHoverPreview();
+
+    // Force single-column layout so only the active terminal is visible (hides secondary panels)
+    const prevColumns = evalJs("(() => { const { state, setState } = window.__bord || {}; if (!state) return '0'; const prev = state.layoutColumns; setState('layoutColumns', 1); return String(prev); })()", true).trim();
+    wait(300);
+
+    // Sidebar file tree mode
+    selectWorkspace(fixtureWeb.name);
+    ensureSidebarExpanded();
+    dismissFlyout();
+
+    evalJs(
+      "(() => { const btns = [...document.querySelectorAll('[data-bord-sidebar] button[title=\"File tree\"]')].filter(b => b instanceof HTMLElement && b.getClientRects().length > 0); if (!btns[0]) return 'missing'; btns[0].click(); return 'ok'; })()",
+      true,
+    );
+    wait(800);
+
+    // Expand src/ directory in sidebar file tree
+    evalJs(
+      "(() => { const tree = document.querySelector('[data-bord-sidebar] [data-file-tree]'); if (!tree) return 'missing'; const entries = [...tree.querySelectorAll('div.flex.items-center.cursor-pointer')]; const srcDir = entries.find(e => (e.textContent || '').trim().startsWith('src')); if (!srcDir) return 'no-src'; srcDir.click(); return 'ok'; })()",
+      true,
+    );
+    wait(600);
+    dismissFlyout();
+    screenshot("sidebar-file-tree.png");
+
+    // Open a .ts file from sidebar → opens in terminal file view
+    evalJs(
+      "(() => { const tree = document.querySelector('[data-bord-sidebar] [data-file-tree]'); if (!tree) return 'missing'; const entries = [...tree.querySelectorAll('div.flex.items-center.cursor-pointer')]; const tsFile = entries.find(e => /\\.(ts|js)$/.test((e.textContent || '').trim())); if (!tsFile) return 'no-ts'; tsFile.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); return 'ok'; })()",
+      true,
+    );
+    wait(1000);
+    dismissFlyout();
+    screenshot("file-viewer-syntax.png");
+
+    // Open a .md file and toggle preview
+    evalJs(
+      "(() => { const tree = document.querySelector('[data-bord-sidebar] [data-file-tree]'); if (!tree) return 'missing'; const entries = [...tree.querySelectorAll('div.flex.items-center.cursor-pointer')]; const mdFile = entries.find(e => /\\.md$/.test((e.textContent || '').trim())); if (!mdFile) { const rootEntries = [...tree.querySelectorAll('div.flex.items-center.cursor-pointer')]; const readme = rootEntries.find(e => (e.textContent || '').includes('README')); if (readme) { readme.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); return 'ok-readme'; } return 'no-md'; } mdFile.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); return 'ok'; })()",
+      true,
+    );
+    wait(800);
+
+    // Click Preview button
+    evalJs(
+      "(() => { const btn = document.querySelector('[data-md-preview-toggle]'); if (!btn) return 'missing'; btn.click(); return 'ok'; })()",
+      true,
+    );
+    wait(600);
+
+    dismissFlyout();
+    screenshot("file-viewer-markdown-preview.png");
+
+    // Terminal file tree (folder icon on terminal panel)
+    // Click file tree button on terminal title bar
+    evalJs(
+      "(() => { const panels = document.querySelectorAll('[data-terminal-id]'); if (!panels.length) return 'missing'; const panel = panels[0]; const btn = panel.querySelector('button[title=\"File tree\"]'); if (!btn) return 'no-btn'; btn.click(); return 'ok'; })()",
+      true,
+    );
+    wait(800);
+    dismissFlyout();
+    screenshot("file-tree-terminal.png");
+
+    // Return to terminal view for subsequent captures
+    evalJs(
+      "(() => { const panels = document.querySelectorAll('[data-terminal-id]'); if (!panels.length) return 'missing'; const panel = panels[0]; const btn = panel.querySelector('button[title=\"File tree\"]'); if (!btn) return 'no-btn'; btn.click(); return 'ok'; })()",
+      true,
+    );
+    wait(400);
+
+    // --- End file tree & viewer screenshots ---
+    restoreHoverPreview();
+
+    // Restore original layout columns
+    evalJs(`(() => { const { setState } = window.__bord || {}; if (setState) { setState('layoutColumns', ${prevColumns || 0}); return 'restored'; } return 'no-store'; })()`, true);
+    wait(300);
+
     selectWorkspace(fixtureWeb.name);
     ensureSidebarExpanded();
     ensureSectionExpanded("Sessions", "Refresh");
@@ -795,6 +900,39 @@ async function main() {
     // Git panel
     openGitDiff();
     hold(4, 240);
+    closeGitPanel();
+
+    // File tree — open from terminal title bar
+    evalJs(
+      "(() => { const panels = document.querySelectorAll('[data-terminal-id]'); if (!panels.length) return 'missing'; const panel = panels[0]; const btn = panel.querySelector('button[title=\"File tree\"]'); if (!btn) return 'no-btn'; btn.click(); return 'ok'; })()",
+      true,
+    );
+    wait(800);
+    hold(3, 220);
+
+    // Expand a directory
+    evalJs(
+      "(() => { const tree = document.querySelector('[data-file-tree]'); if (!tree) return 'missing'; const dirs = [...tree.querySelectorAll('div.flex.items-center:has(svg)')]; if (dirs[0]) dirs[0].click(); return 'ok'; })()",
+      true,
+    );
+    wait(500);
+    hold(3, 220);
+
+    // Open a file from tree
+    evalJs(
+      "(() => { const tree = document.querySelector('[data-file-tree]'); if (!tree) return 'missing'; const entries = [...tree.querySelectorAll('div.flex.items-center.cursor-pointer')]; const file = entries.find(e => /\\.(ts|js|json)$/.test((e.textContent || '').trim())); if (file) { file.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); return 'ok'; } return 'no-file'; })()",
+      true,
+    );
+    wait(800);
+    hold(4, 240);
+
+    // Return to terminal
+    evalJs(
+      "(() => { const panels = document.querySelectorAll('[data-terminal-id]'); if (!panels.length) return 'missing'; const panel = panels[0]; const btn = panel.querySelector('button[title=\"File tree\"]'); if (!btn) return 'no-btn'; btn.click(); return 'ok'; })()",
+      true,
+    );
+    wait(400);
+    hold(3, 220);
 
     const totalFrames = frame - 1;
     const preferredStart = 1;

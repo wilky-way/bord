@@ -6,6 +6,7 @@ import { GitPanelPO } from "../page-objects/git-panel.po";
 import { SettingsPO } from "../page-objects/settings.po";
 import { SessionListPO } from "../page-objects/session-list.po";
 import { StashTrayPO } from "../page-objects/stash-tray.po";
+import { FilePanelPO } from "../page-objects/file-panel.po";
 
 interface BordFixtures {
   sidebar: SidebarPO;
@@ -15,6 +16,7 @@ interface BordFixtures {
   settings: SettingsPO;
   sessionList: SessionListPO;
   stashTray: StashTrayPO;
+  filePanel: FilePanelPO;
 }
 
 export const test = base.extend<BordFixtures>({
@@ -38,6 +40,9 @@ export const test = base.extend<BordFixtures>({
   },
   stashTray: async ({ page }, use) => {
     await use(new StashTrayPO(page));
+  },
+  filePanel: async ({ page }, use) => {
+    await use(new FilePanelPO(page));
   },
 });
 

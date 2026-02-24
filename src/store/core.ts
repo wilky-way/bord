@@ -17,3 +17,6 @@ const [state, setState] = createStore<AppState>({
 });
 
 export { state, setState };
+
+// Expose store on window for QA/capture-media scripts
+(window as any).__bord = { state, setState };

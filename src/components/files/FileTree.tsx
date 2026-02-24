@@ -122,9 +122,9 @@ export default function FileTree(props: Props) {
   }
 
   return (
-    <div class="flex flex-col h-full bg-[var(--bg-primary)]">
+    <div class="flex flex-col h-full bg-[var(--bg-primary)]" data-file-tree>
       {/* Toolbar */}
-      <div class="flex items-center justify-between px-2 py-1 border-b border-[var(--border)] shrink-0">
+      <div class="flex items-center justify-between px-2 py-1 border-b border-[var(--border)] shrink-0" data-file-tree-toolbar>
         <span class="text-[10px] text-[var(--text-secondary)] uppercase tracking-wider">Files</span>
         <button
           class="text-[10px] px-1.5 py-0.5 rounded-[var(--btn-radius)] transition-colors"

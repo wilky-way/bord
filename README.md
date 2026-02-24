@@ -10,7 +10,7 @@ New to terminal internals? Read the [Terminal Ecosystem Primer](docs/how-to/term
 ## Install
 
 ### macOS (Homebrew)
-
+ 
 ```bash
 brew install --cask wilky-way/tap/bord
 ```
@@ -144,6 +144,24 @@ Shows Docker section expanded in sidebar for compose discovery and controls.
 
 Shows workspace-level editor launch controls.
 
+### File Browser & Editor
+
+![Sidebar file tree](./docs/media/sidebar-file-tree.png)
+
+Sidebar in files mode showing expanded workspace file tree.
+
+![File viewer with syntax highlighting](./docs/media/file-viewer-syntax.png)
+
+Terminal panel in file view — syntax-highlighted .ts file with tabs.
+
+![Markdown preview](./docs/media/file-viewer-markdown-preview.png)
+
+Markdown preview mode showing rendered content with mermaid diagram support.
+
+![Terminal file tree](./docs/media/file-tree-terminal.png)
+
+Terminal panel showing CWD-scoped file tree (folder icon active).
+
 ### Auto-Updates (Settings → About)
 
 ![Settings About panel with update check](./docs/media/settings-about-updates.png)
@@ -207,6 +225,17 @@ Rosé Pine — muted purple and gold.
 - **Push/pull** — push button appears on title bar when commits are ahead; one-click push
 - **Branch management** — list branches, checkout/switch
 - **Repo navigation** — jump to parent/sibling/child git repos from inside the panel
+
+### File Browser & Editor
+- **Workspace file tree** in sidebar — browse project files without leaving Bord
+- **Per-terminal file tree** scoped to terminal's CWD
+- **Built-in file viewer** with syntax highlighting (30+ languages via highlight.js)
+- **Tab system** — up to 5 open files per terminal panel
+- **Markdown preview** with mermaid diagram rendering
+- **Edit & save** — modify files inline, Cmd+S to save, dirty indicator on tabs
+- **Smart file opening** — sidebar file tree spawns/reuses viewer terminals
+- **Git integration** — double-click changed files in git panel to view/edit
+- **Keyboard shortcuts**: Cmd+Shift+E (sidebar files), Cmd+1-5 (switch tabs)
 
 ### Docker Panel
 - **Compose discovery** — scans workspace for compose files

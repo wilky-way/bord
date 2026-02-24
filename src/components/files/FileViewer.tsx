@@ -189,8 +189,64 @@ export default function FileViewer(props: Props) {
   async function renderMarkdown(text: string) {
     try {
       const { marked } = await import("marked");
-      const html = await marked(text);
+
+      // Custom renderer: mermaid code blocks → placeholder divs
+      const renderer = new marked.Renderer();
+      const originalCode = renderer.code.bind(renderer);
+      let mermaidCount = 0;
+      const mermaidSources: string[] = [];
+
+      renderer.code = function (token: { text: string; lang?: string; escaped?: boolean }) {
+        if (token.lang === "mermaid") {
+          const id = `mermaid-${mermaidCount++}`;
+          mermaidSources.push(token.text);
+          return `<div class="mermaid-placeholder" data-mermaid-id="${id}" data-mermaid-idx="${mermaidSources.length - 1}"></div>`;
+        }
+        return originalCode(token);
+      };
+
+      const html = await marked(text, { renderer });
       setMdHtml(html);
+
+      // Post-render: initialize mermaid on placeholder divs
+      if (mermaidSources.length > 0) {
+        requestAnimationFrame(async () => {
+          try {
+            const mermaid = (await import("mermaid")).default;
+
+            // Resolve CSS variables to actual hex values — mermaid doesn't support var() refs
+            const cs = getComputedStyle(document.documentElement);
+            const v = (name: string) => cs.getPropertyValue(name).trim() || undefined;
+
+            mermaid.initialize({
+              startOnLoad: false,
+              theme: "dark",
+              themeVariables: {
+                primaryColor: v("--accent"),
+                primaryTextColor: v("--text-primary"),
+                primaryBorderColor: v("--border"),
+                lineColor: v("--text-secondary"),
+                secondaryColor: v("--bg-secondary"),
+                tertiaryColor: v("--bg-tertiary"),
+              },
+            });
+
+            const placeholders = document.querySelectorAll(".mermaid-placeholder");
+            for (const el of placeholders) {
+              const idx = parseInt(el.getAttribute("data-mermaid-idx") ?? "0");
+              const id = el.getAttribute("data-mermaid-id") ?? "mermaid-0";
+              const source = mermaidSources[idx];
+              if (source) {
+                const { svg } = await mermaid.render(id, source);
+                el.innerHTML = svg;
+                el.classList.add("mermaid-rendered");
+              }
+            }
+          } catch (e) {
+            console.error("Mermaid render failed:", e);
+          }
+        });
+      }
     } catch {
       setMdHtml(`<pre>${escapeHtml(text)}</pre>`);
     }
@@ -239,9 +295,9 @@ export default function FileViewer(props: Props) {
   const basename = (path: string) => path.split("/").pop() ?? path;
 
   return (
-    <div class="flex flex-col h-full bg-[var(--bg-primary)]">
+    <div class="flex flex-col h-full bg-[var(--bg-primary)]" data-file-viewer>
       {/* Tab bar */}
-      <div class="flex items-center h-8 border-b border-[var(--border)] shrink-0 px-1 gap-0.5">
+      <div class="flex items-center h-8 border-b border-[var(--border)] shrink-0 px-1 gap-0.5" data-file-viewer-tabs>
         <For each={openFiles()}>
           {(file, idx) => (
             <button
@@ -250,6 +306,7 @@ export default function FileViewer(props: Props) {
                 "bg-[var(--bg-secondary)] text-[var(--text-primary)] border-b-2 border-[var(--accent)]": idx() === activeFileIndex(),
                 "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]": idx() !== activeFileIndex(),
               }}
+              data-file-tab={basename(file.path)}
               onClick={() => setActiveFileInTerminal(props.terminalId, idx())}
             >
               <span class="truncate">{basename(file.path)}</span>
@@ -279,6 +336,7 @@ export default function FileViewer(props: Props) {
               "text-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_20%,transparent)]": mdPreview(),
               "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]": !mdPreview(),
             }}
+            data-md-preview-toggle
             onClick={() => {
               const next = !mdPreview();
               setMdPreview(next);
@@ -459,6 +517,17 @@ export default function FileViewer(props: Props) {
         }
         .prose-viewer th { background: var(--bg-secondary); font-weight: 600; }
         .prose-viewer hr { border: none; border-top: 1px solid var(--border); margin: 1.5em 0; }
+        .prose-viewer .mermaid-placeholder {
+          margin: 1em 0;
+          padding: 16px;
+          background: var(--bg-secondary);
+          border-radius: 6px;
+          overflow-x: auto;
+        }
+        .prose-viewer .mermaid-rendered svg {
+          max-width: 100%;
+          height: auto;
+        }
       `}</style>
     </div>
   );

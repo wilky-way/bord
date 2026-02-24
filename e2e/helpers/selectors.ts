@@ -49,4 +49,16 @@ export const sel = {
 
   // GitPanel.tsx — branch switch
   branchSwitchButton: 'button[title="Switch branch"]',
+
+  // FileTree / FileViewer
+  fileTreeButton: 'button[title="File tree"]',
+  fileTreeRoot: "[data-file-tree]",
+  fileTreeToolbar: "[data-file-tree-toolbar]",
+  fileViewerRoot: "[data-file-viewer]",
+  fileViewerTabs: "[data-file-viewer-tabs]",
+  fileTab: (name: string) => `[data-file-tab="${name}"]`,
+  mdPreviewToggle: "[data-md-preview-toggle]",
+  backToTreeButton: 'button[title="Back to file tree"]',
+  closeViewerButton: 'button[title="Close file viewer"]',
+  proseViewer: ".prose-viewer",
 } as const;

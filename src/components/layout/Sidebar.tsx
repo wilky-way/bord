@@ -61,7 +61,20 @@ export default function Sidebar() {
 
   const [hovering, setHovering] = createSignal(false);
   const [previewWorkspaceId, setPreviewWorkspaceId] = createSignal<string | null>(null);
-  const [expandedHoverWorkspaceId, setExpandedHoverWorkspaceId] = createSignal<string | null>(null);
+  const [expandedHoverWorkspaceId, _setExpandedHoverWorkspaceId] = createSignal<string | null>(null);
+  const [hoverSuppressed, setHoverSuppressed] = createSignal(false);
+
+  // Guarded setter: ignores writes when suppressed (for QA/capture-media scripts)
+  const setExpandedHoverWorkspaceId = (v: string | null) => {
+    if (v !== null && hoverSuppressed()) return;
+    _setExpandedHoverWorkspaceId(v);
+  };
+
+  // Expose controls for QA/capture-media scripts
+  (window as any).__dismissHoverPreview = () => _setExpandedHoverWorkspaceId(null);
+  (window as any).__suppressHoverPreview = () => { setHoverSuppressed(true); _setExpandedHoverWorkspaceId(null); };
+  (window as any).__restoreHoverPreview = () => setHoverSuppressed(false);
+
   const [expandedHoverTop, setExpandedHoverTop] = createSignal(16);
   const [expandedHoverTab, setExpandedHoverTab] = createSignal<"all" | "sessions" | "active" | "stashed">("sessions");
   const [expandedHoverProvider, setExpandedHoverProvider] = createSignal<Provider>(state.activeProvider);
@@ -1006,6 +1019,7 @@ export default function Sidebar() {
 
       <Show when={expandedHoverWorkspace() && !(hovering() && !state.sidebarOpen)}>
         <div
+          data-workspace-hover-preview
           class="absolute z-50 left-[4.5rem] w-[20.25rem] rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] shadow-[0_14px_40px_rgba(0,0,0,0.45)] popover-appear overflow-hidden"
           style={{ top: `${expandedHoverTop()}px` }}
           onMouseEnter={cancelExpandedHoverClose}
