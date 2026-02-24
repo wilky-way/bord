@@ -188,9 +188,15 @@ function sendOsNotification(n: Notification) {
   } catch { /* OS notification not available */ }
 }
 
-export function requestOsNotificationPermission() {
-  if (typeof Notification === "undefined") return;
-  if (globalThis.Notification.permission === "default") {
-    globalThis.Notification.requestPermission();
+export async function requestOsNotificationPermission(): Promise<NotificationPermission | "unsupported"> {
+  if (typeof Notification === "undefined") return "unsupported";
+
+  const current = globalThis.Notification.permission;
+  if (current === "granted" || current === "denied") return current;
+
+  try {
+    return await globalThis.Notification.requestPermission();
+  } catch {
+    return globalThis.Notification.permission;
   }
 }

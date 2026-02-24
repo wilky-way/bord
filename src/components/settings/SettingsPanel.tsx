@@ -171,6 +171,10 @@ function ToggleRow(props: { label: string; description: string; checked: boolean
         <div class="text-[11px] text-[var(--text-secondary)] mt-0.5">{props.description}</div>
       </div>
       <button
+        type="button"
+        role="switch"
+        aria-checked={props.checked}
+        aria-label={props.label}
         class="relative w-9 h-5 rounded-full transition-colors duration-200 shrink-0 ml-3"
         style={{
           background: props.checked
@@ -219,9 +223,14 @@ function NotificationSettings() {
           label="Desktop notifications"
           description="Show OS notifications when the app is not focused"
           checked={s().osNotificationsEnabled}
-          onChange={(v) => {
-            if (v) requestOsNotificationPermission();
-            updateSettings({ osNotificationsEnabled: v });
+          onChange={async (v) => {
+            if (!v) {
+              updateSettings({ osNotificationsEnabled: false });
+              return;
+            }
+
+            const permission = await requestOsNotificationPermission();
+            updateSettings({ osNotificationsEnabled: permission === "granted" });
           }}
         />
       </div>
@@ -371,8 +380,13 @@ function FeatureSettings() {
                     </div>
                   </div>
                   <button
+                    type="button"
+                    role="switch"
+                    aria-checked={isEnabled()}
+                    aria-label={provider.label}
                     class="relative w-9 h-5 rounded-full transition-colors duration-200 shrink-0 ml-3"
                     classList={{ "opacity-40 cursor-not-allowed": isLastEnabled() }}
+                    disabled={isLastEnabled()}
                     style={{
                       background: isEnabled()
                         ? "var(--accent)"

@@ -104,4 +104,20 @@ describe("featureRoutes", () => {
     const body = await res!.json();
     expect(body.docker).toBe(false);
   });
+
+  test("PUT keeps at least one provider enabled", async () => {
+    const [req, url] = makeReq("PUT", "http://localhost/api/features", {
+      providers: {
+        claude: false,
+        codex: false,
+        opencode: false,
+        gemini: false,
+      },
+    });
+
+    const res = await featureRoutes(req, url);
+    const body = await res!.json();
+    expect(Object.values(body.providers).some(Boolean)).toBe(true);
+    expect(body.providers.claude).toBe(true);
+  });
 });

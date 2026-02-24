@@ -587,8 +587,9 @@ bun run build:server
 
 ### Automated
 
-- Run current unit tests: `bun test src/lib/providers.test.ts`
-- Note: broad app-level unit and Playwright suites are planned but not fully implemented yet.
+- Run the full unit suite: `bun run test:unit`
+- Run the full Playwright suite: `bun run test:e2e`
+- Current baseline: route/service/store/lib unit coverage + end-to-end UI coverage across workspace, settings, git, docker, sessions, files, and notifications flows.
 
 ### Fixture lab + media automation
 
@@ -625,6 +626,7 @@ bord/
 │   │   ├── editor.ts         # POST /api/editor/open
 │   │   ├── fs.ts             # GET /api/fs/browse
 │   │   ├── git.ts            # /api/git/* (status, diff, stage, commit, push, pull, branches, checkout)
+│   │   ├── features.ts       # GET/PUT /api/features (feature flags + provider toggles)
 │   │   ├── clipboard.ts      # POST /api/clipboard/image (image paste to temp file)
 │   │   ├── health.ts         # GET /api/health
 │   │   ├── pty.ts            # POST/GET/DELETE /api/pty

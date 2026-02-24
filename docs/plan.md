@@ -1,6 +1,6 @@
 # Bord Execution Plan (Living)
 
-Last updated: 2026-02-21
+Last updated: 2026-02-24
 Owner: OpenCode + Wilky
 
 ## Goal
@@ -36,19 +36,14 @@ This document is the source of truth for:
 - Git panel is a floating popover, not yet a full in-card terminal replacement overlay
 - Provider parity: Gemini exists in UI but scanner currently returns no sessions
 - Sidebar collapse sections exist, but not yet the compact left rail + hover flyout model switch UX
-- Native desktop notifications are not fully implemented (current attention model is in-app + chime)
+- Native desktop notifications are partially implemented (permission-aware web notifications; native desktop parity still in progress)
 - Layout density behavior is good, but strict "uniform resize all cards" semantics need extra polish around min-width constraints
 
 ### Missing
 
 - WYSIWYG prompt composer that pipes prompts into active terminal session
-- Settings surface for theme/composer/notification toggles
-- Theme picker (catppuccin variants, gruvbox, one dark, ghostty-like sets)
 - Return-to-workspace action based on live cwd tracking after `cd` away
-- Release updater flow (poll github releases, prompt install)
-- Playwright E2E suite
-- Broader unit test baseline
-- Readme media set (screenshots + gifs for shipped flows)
+- Full Gemini session discovery/resume parity
 
 ## Key Behavioral Notes
 
@@ -187,13 +182,13 @@ Acceptance criteria:
 6. Notification attention/mute behavior
 7. Open in VS Code/Cursor flows
 
-### Unit tests (target)
+### Unit tests (current focus)
 
 - Provider command parsing and resume command generation
 - Workspace visibility filtering and terminal ownership rules
 - Notification state transitions
 
-### Playwright smoke tests (target)
+### Playwright coverage (current focus)
 
 - Create/select workspace and spawn terminal
 - Stash terminal and restore from tray
@@ -240,3 +235,5 @@ Capture and store under `docs/media/`:
 - 2026-02-21: Added fixture automation scripts (`scripts/fixtures/*`) using real `claude` and `codex` session seeding plus media capture automation (`scripts/qa/capture-media.ts`).
 - 2026-02-22: Captured initial media set in `docs/media/` (overview, minimap, density, sessions, git panel, docker panel, editor controls) from fixture-based walkthrough.
 - 2026-02-22: Hardened media capture for minimap tooltip visibility and storyboarded showcase replay; regenerated `docs/media/showcase-workflow.webm` and refreshed screenshot set.
+- 2026-02-24: Ran full automated regression (`bun run test:unit`, `bun run test:e2e`) with green baseline (unit suites pass, Playwright 157 passed / 9 skipped).
+- 2026-02-24: Hardened settings/provider controls: permission-aware OS notification toggle handling, switch accessibility semantics, active-provider reconciliation, and server-side provider invariant (at least one enabled).

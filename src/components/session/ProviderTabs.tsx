@@ -14,13 +14,16 @@ export default function ProviderTabs(props: Props) {
   const visibleProviders = () => ALL_PROVIDERS.filter((p) => isProviderEnabled(p));
 
   return (
-    <div class="flex items-center justify-center gap-3 py-1.5">
+    <div class="flex items-center justify-center gap-3 py-1.5" role="tablist" aria-label="Session providers">
       <For each={visibleProviders()}>
         {(provider) => {
           const Icon = PROVIDER_ICONS[provider];
           const isActive = () => state.activeProvider === provider;
           return (
             <button
+              type="button"
+              role="tab"
+              aria-selected={isActive()}
               class="relative flex items-center justify-center w-7 h-7 rounded transition-opacity"
               classList={{
                 "opacity-100": isActive(),

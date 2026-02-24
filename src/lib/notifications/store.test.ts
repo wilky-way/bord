@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, mock } from "bun:test";
+import { describe, test, expect, beforeEach, afterAll, mock } from "bun:test";
 import { createRoot } from "solid-js";
 
 // Mock playSound before importing the store
@@ -15,9 +15,11 @@ import {
   clearForTerminal,
   getSettings,
   updateSettings,
+  requestOsNotificationPermission,
 } from "./store";
 
 const storage = (globalThis as any).__testStorage as Map<string, string>;
+const originalNotification = (globalThis as any).Notification;
 
 // Helper to clear all notifications by pruning with an empty set of live terminals,
 // then re-adding to start fresh
@@ -41,6 +43,11 @@ describe("notification store", () => {
   beforeEach(() => {
     storage.clear();
     clearNotifications();
+    (globalThis as any).Notification = originalNotification;
+  });
+
+  afterAll(() => {
+    (globalThis as any).Notification = originalNotification;
   });
 
   test("addNotification creates a notification", () => {
@@ -260,5 +267,31 @@ describe("notification store", () => {
       expect(parsed[0].viewed).toBe(true);
       dispose();
     });
+  });
+
+  test("requestOsNotificationPermission returns unsupported when Notification API is missing", async () => {
+    (globalThis as any).Notification = undefined;
+    const permission = await requestOsNotificationPermission();
+    expect(permission).toBe("unsupported");
+  });
+
+  test("requestOsNotificationPermission requests permission when default", async () => {
+    (globalThis as any).Notification = {
+      permission: "default",
+      requestPermission: () => Promise.resolve("granted"),
+    };
+
+    const permission = await requestOsNotificationPermission();
+    expect(permission).toBe("granted");
+  });
+
+  test("requestOsNotificationPermission returns existing denied permission", async () => {
+    (globalThis as any).Notification = {
+      permission: "denied",
+      requestPermission: () => Promise.resolve("granted"),
+    };
+
+    const permission = await requestOsNotificationPermission();
+    expect(permission).toBe("denied");
   });
 });

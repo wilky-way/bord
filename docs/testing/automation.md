@@ -12,16 +12,20 @@ Prerequisite:
 
 ```bash
 # Build fixture repos + git states + real claude/codex sessions
-bun run scripts/fixtures/setup-demo.ts
+bun run fixtures:setup
 
 # Register fixture workspaces into running Bord server
-bun run scripts/fixtures/register-workspaces.ts
+bun run fixtures:register
 
 # Capture screenshots and short interaction video with agent-browser
-bun run scripts/qa/capture-media.ts
+bun run qa:capture-media
+
+# Run automated verification suites
+bun run test:unit
+bun run test:e2e
 
 # Optional cleanup
-bun run scripts/fixtures/cleanup-demo.ts
+bun run fixtures:cleanup
 ```
 
 ## Capture Outputs

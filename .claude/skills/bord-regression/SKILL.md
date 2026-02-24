@@ -10,32 +10,50 @@ Run a full Bord regression pass with fixture data, media capture, and evidence l
 
 ## Workflow
 
-1. Start app:
+1. Reset runtime and sync branch:
+
+```bash
+# Stop old dev processes (if running)
+lsof -tiTCP:1420 -sTCP:LISTEN | xargs kill 2>/dev/null || true
+lsof -tiTCP:4200 -sTCP:LISTEN | xargs kill 2>/dev/null || true
+
+git checkout main
+git pull --ff-only
+```
+
+2. Start app:
 
 ```bash
 bun run dev
 ```
 
-2. Ensure fixtures + workspaces are ready:
+3. Ensure fixtures + workspaces are ready:
 
 ```bash
-bun run scripts/fixtures/setup-demo.ts
-bun run scripts/fixtures/register-workspaces.ts
+bun run fixtures:setup
+bun run fixtures:register
 ```
 
-3. Capture media artifacts:
+4. Run automated regression:
 
 ```bash
-bun run scripts/qa/capture-media.ts
+bun run test:unit
+bun run test:e2e
 ```
 
-4. Execute manual matrix:
+5. (Optional) Capture media artifacts:
+
+```bash
+bun run qa:capture-media
+```
+
+6. Execute manual matrix for any unautomated edge cases:
 
 ```text
 docs/testing/manual-matrix.md
 ```
 
-5. Record outcomes:
+7. Record outcomes:
 
 ```text
 docs/testing/evidence.md
@@ -45,3 +63,4 @@ docs/testing/evidence.md
 
 - Screenshots/videos in `docs/media/`
 - Pass/fail notes in `docs/testing/evidence.md`
+- Automated baseline in terminal output (`bun run test:unit`, `bun run test:e2e`)

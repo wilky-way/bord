@@ -1,6 +1,6 @@
 # Bord Roadmap
 
-Last updated: 2026-02-21
+Last updated: 2026-02-24
 
 This roadmap reflects actual implementation status in the repo today. For execution details and acceptance criteria, see `docs/plan.md`.
 
@@ -24,6 +24,10 @@ This roadmap reflects actual implementation status in the repo today. For execut
 - [x] Open workspace/file in VS Code or Cursor
 - [x] App rename from cockpit to bord
 - [x] Theme system with 15 curated themes, settings panel, and localStorage persistence
+- [x] Feature flags in settings (git/docker/sessions/providers) persisted via `/api/features`
+- [x] In-app updater flow (launch check, settings check, update banner + install/relaunch)
+- [x] Playwright end-to-end suite for core UI flows
+- [x] Unit test baseline across routes/services/store/lib modules
 
 ## Partial / Needs Polish
 
@@ -41,7 +45,7 @@ This roadmap reflects actual implementation status in the repo today. For execut
 - [x] Create living execution plan (`docs/plan.md`)
 - [x] Update README to match shipped/partial features and current shortcuts
 - [x] Add fixture-lab/how-to/testing documentation and media capture workflow
-- [ ] Keep roadmap synced to code after each phase
+- [x] Keep roadmap synced to current implementation and test coverage
 
 ### Phase 1 - Core UX Parity
 
@@ -66,9 +70,9 @@ This roadmap reflects actual implementation status in the repo today. For execut
 
 ### Phase 4 - Distribution and Quality
 
-- [ ] Auto-update checks from GitHub releases with user prompt/flow
-- [ ] Playwright smoke tests for core app flows
-- [ ] Unit tests for provider parsing, store behavior, and notification transitions
+- [x] Auto-update checks from GitHub releases with user prompt/flow
+- [x] Playwright smoke coverage for core app flows (expanded beyond smoke)
+- [x] Unit tests for provider parsing, store behavior, routes/services, and notification transitions
 
 ## Deferred / Low Priority
 

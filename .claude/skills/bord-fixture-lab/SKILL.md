@@ -11,8 +11,8 @@ Set up a deterministic Bord demo and QA environment using real Claude/Codex sess
 ## Commands
 
 ```bash
-bun run scripts/fixtures/setup-demo.ts
-bun run scripts/fixtures/register-workspaces.ts
+bun run fixtures:setup
+bun run fixtures:register
 ```
 
 ## Expected Outputs
@@ -30,5 +30,5 @@ bun run scripts/fixtures/register-workspaces.ts
 ## Cleanup
 
 ```bash
-bun run scripts/fixtures/cleanup-demo.ts
+bun run fixtures:cleanup
 ```

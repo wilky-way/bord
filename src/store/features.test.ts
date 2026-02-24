@@ -35,11 +35,13 @@ import {
   isFeatureEnabled,
   isProviderEnabled,
 } from "./features";
+import { state, setState } from "./core";
 
 describe("loadFeatures", () => {
   beforeEach(() => {
     mockGetFeatures.mockClear();
     mockUpdateFeatures.mockClear();
+    setState("activeProvider", "claude");
   });
 
   test("populates from API", async () => {
@@ -86,6 +88,7 @@ describe("updateFeatures", () => {
   beforeEach(() => {
     mockGetFeatures.mockClear();
     mockUpdateFeatures.mockClear();
+    setState("activeProvider", "claude");
   });
 
   test("sends partial patch to API", async () => {
@@ -143,6 +146,21 @@ describe("updateFeatures", () => {
       expect(f.git).toBe(false);
       dispose();
     });
+  });
+
+  test("reconciles active provider when it becomes disabled", async () => {
+    setState("activeProvider", "claude");
+    mockUpdateFeatures.mockImplementationOnce(() =>
+      Promise.resolve({
+        git: true,
+        docker: true,
+        sessions: true,
+        providers: { claude: false, codex: true, opencode: true, gemini: true },
+      })
+    );
+
+    await updateFeatures({ providers: { claude: false } });
+    expect(state.activeProvider).toBe("codex");
   });
 });
 

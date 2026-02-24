@@ -68,6 +68,14 @@ Use this matrix with fixture environment from `docs/how-to/fixture-lab.md`.
 | E1 | Open preferred editor | Click primary editor button | Workspace opens in preferred editor |
 | E2 | Switch editor | Use dropdown and select other editor | New editor becomes default |
 
+## Settings + Feature Flags
+
+| ID | Scenario | Steps | Expected |
+|---|---|---|---|
+| X1 | OS notification permission handling | In Settings -> Notifications, toggle Desktop notifications on when browser permission is denied/default | Setting only remains on when permission is granted |
+| X2 | Active provider fallback | Select non-default provider tab, disable it in Settings -> Features -> Providers | Active provider auto-falls back to next enabled provider |
+| X3 | Last-provider lockout | Disable providers until one remains enabled | Final provider toggle is disabled and cannot be turned off |
+
 ## Evidence
 
 Record results in `docs/testing/evidence.md` with:

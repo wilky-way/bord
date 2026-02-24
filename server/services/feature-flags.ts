@@ -38,11 +38,21 @@ export function getFeatureFlags(): FeatureFlags {
 
 export function updateFeatureFlags(patch: Partial<FeatureFlags>): FeatureFlags {
   const current = getFeatureFlags();
+  const providers = { ...current.providers, ...(patch.providers ?? {}) };
+
+  if (!Object.values(providers).some(Boolean)) {
+    const fallback =
+      Object.entries(current.providers).find(([, enabled]) => enabled)?.[0] ??
+      Object.keys(DEFAULT_FLAGS.providers)[0] ??
+      Object.keys(providers)[0];
+    if (fallback) providers[fallback] = true;
+  }
+
   const updated: FeatureFlags = {
     git: patch.git ?? current.git,
     docker: patch.docker ?? current.docker,
     sessions: patch.sessions ?? current.sessions,
-    providers: { ...current.providers, ...(patch.providers ?? {}) },
+    providers,
   };
   const db = getDb();
   db.run(

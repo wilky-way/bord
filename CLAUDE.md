@@ -2,7 +2,7 @@
 
 ## What This Is
 
-Bord is a workspace-scoped terminal manager with tiling layout, git integration, and Claude session resume. It runs as a Tauri v2 desktop app (or standalone web app during development).
+Bord is a workspace-scoped terminal manager with tiling layout, git integration, docker controls, feature flags, auto-updates, and multi-provider session resume. It runs as a Tauri v2 desktop app (or standalone web app during development).
 
 **Tech stack:** SolidJS, Bun, Tauri v2, TypeScript, Tailwind CSS v4, SQLite (`bun:sqlite`), ghostty-web (WASM terminal emulator).
 
@@ -12,8 +12,9 @@ Bord is a workspace-scoped terminal manager with tiling layout, git integration,
 |------|---------|
 | `server/index.ts` | Bun.serve() entry — HTTP routes + WebSocket |
 | `server/services/pty-manager.ts` | PTY lifecycle, 2MB circular buffer, WS subscriber fan-out, server-side idle detection |
-| `server/services/session-scanner.ts` | Scans `~/.claude/projects/` for Claude sessions |
+| `server/services/session-scanner.ts` | Scans provider session stores for Claude/Codex/OpenCode/Gemini sessions |
 | `server/services/git-service.ts` | Shells out to `git` for status, diff, stage, commit, push, pull |
+| `server/services/feature-flags.ts` | Persists and evaluates feature/provider enablement flags |
 | `server/services/editor-service.ts` | Spawns `code .` or `cursor .` |
 | `server/ws/protocol.ts` | WebSocket control message types (resize, ping/pong, cursor, idle/active, configure) |
 | `server/ws/handler.ts` | WS upgrade, message dispatch, close handling |
@@ -23,6 +24,7 @@ Bord is a workspace-scoped terminal manager with tiling layout, git integration,
 | `src/store/types.ts` | All TypeScript interfaces: TerminalInstance, Workspace, SessionInfo, GitStatus, AppState |
 | `src/store/terminals.ts` | Terminal actions: add, remove, stash, unstash, move, navigate |
 | `src/store/settings.ts` | Font size signal (persisted, clamped 8–24), global settingsOpen state |
+| `src/store/features.ts` | Feature flags state (git/docker/sessions/providers) + active provider reconciliation |
 | `src/lib/api.ts` | Typed HTTP client wrapping all `/api/*` routes |
 | `src/lib/terminal-shortcuts.ts` | Terminal key handler — Cmd+C/V/K/A, Option+arrows, font size, bracketed paste, image paste |
 | `src/lib/ws.ts` | WebSocket connection manager, idle/active event handling, output volume tracking |
@@ -31,7 +33,7 @@ Bord is a workspace-scoped terminal manager with tiling layout, git integration,
 | `src/styles.css` | CSS variable defaults + Tailwind import (overridden at runtime by active theme) |
 | `src/lib/theme.ts` | Reactive theme manager — signals, localStorage persistence, CSS var application |
 | `src/lib/themes/index.ts` | 15 curated theme definitions (chrome + terminal palettes) |
-| `src/components/settings/SettingsPanel.tsx` | Settings modal with theme picker grid |
+| `src/components/settings/SettingsPanel.tsx` | Settings modal (appearance, notifications, features, about/updater) |
 
 ## Store Architecture
 
@@ -82,11 +84,16 @@ bun run build:server # Compiled Bun binary → dist/bord-server
 
 ## Testing
 
-No automated test suite yet. Manual verification:
+Automated suites:
+
+1. `bun run test:unit` — route/service/store/lib unit coverage
+2. `bun run test:e2e` — Playwright end-to-end coverage across workspace/session/git/docker/files/settings flows
+
+Manual verification (targeted smoke):
 
 1. `bun run dev` — confirm both server and UI start
 2. Add a workspace, verify terminals spawn in that workspace scope
-3. Stash a terminal, confirm it moves to stash and notification badge appears when agent goes idle
+3. Stash a terminal, confirm it moves to stash and notification badge behavior is correct
 4. Open git panel on a repo with changes, verify status/diff/stage/commit flow
-5. Click a Claude session card, confirm `--resume` terminal opens
-6. Test Cmd+N (new terminal), Cmd+Arrow (navigate), drag reorder, layout density buttons
+5. Click provider session cards (Claude/Codex/OpenCode), confirm resume terminal opens
+6. Test Cmd+N, Cmd+Arrow/Alt+Arrow navigation, drag reorder, and layout density controls

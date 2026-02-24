@@ -104,6 +104,20 @@ describe("updateFeatureFlags", () => {
     // Existing defaults still present
     expect(flags.providers.claude).toBe(true);
   });
+
+  test("keeps at least one provider enabled", () => {
+    const result = updateFeatureFlags({
+      providers: {
+        claude: false,
+        codex: false,
+        opencode: false,
+        gemini: false,
+      },
+    });
+
+    expect(Object.values(result.providers).some(Boolean)).toBe(true);
+    expect(result.providers.claude).toBe(true);
+  });
 });
 
 describe("isFeatureEnabled", () => {

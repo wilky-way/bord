@@ -2,7 +2,7 @@
 
 ## How It Works
 
-Bord uses **Tauri's built-in updater** with **GitHub Releases** as the update server. When you push a git tag like `v0.3.0`, a GitHub Actions workflow builds signed macOS binaries and publishes them as a release. Users running an older version see an in-app banner prompting them to update with one click.
+Bord uses **Tauri's built-in updater** with **GitHub Releases** as the update server. When you push a git tag like `v0.3.0`, a GitHub Actions workflow builds release artifacts for macOS, Windows, and Linux and publishes them as a release. Users running an older version see an in-app banner prompting them to update with one click.
 
 ### Flow
 
@@ -48,11 +48,10 @@ The tag push triggers the release workflow.
 
 Watch the workflow at: `https://github.com/wilky-way/bord/actions`
 
-The build takes ~10-15 minutes. It produces:
-- `.dmg` installer for macOS (arm64 + x86_64)
-- `.app.tar.gz` update bundle (what the in-app updater downloads)
-- `.sig` signature files (for update verification)
-- `latest.json` (the updater manifest — tells the app what version is newest)
+The build takes ~10-20 minutes. It produces platform installers/bundles, including:
+- macOS: `.dmg` installer (arm64 + x86_64) + updater artifacts (`.app.tar.gz`, `.sig`, `latest.json`)
+- Windows: `.msi` / `.exe` installer artifacts
+- Linux: `.deb` / `.rpm` packages
 
 ### 5. Verify the release
 
@@ -63,9 +62,11 @@ Check `https://github.com/wilky-way/bord/releases/latest` and confirm `latest.js
 The workflow at `.github/workflows/release.yml`:
 
 1. **Triggers** on any tag matching `v*`
-2. **Builds two macOS targets** in parallel:
+2. **Builds a multi-platform matrix** in parallel:
    - `aarch64-apple-darwin` (Apple Silicon)
    - `x86_64-apple-darwin` (Intel)
+   - `x86_64-pc-windows-msvc` (Windows)
+   - `x86_64-unknown-linux-gnu` (Linux, deb/rpm)
 3. **Installs Bun and Rust** toolchains
 4. **Builds the sidecar** (`bun run build:server` → `dist/bord-server`)
 5. **Runs `tauri-apps/tauri-action`** which:
@@ -116,14 +117,14 @@ These are set at: `https://github.com/wilky-way/bord/settings/secrets/actions`
 
 `GITHUB_TOKEN` is provided automatically by GitHub Actions.
 
-## Adding More Platforms Later
+## Adjusting Platform Matrix
 
-To add Windows or Linux builds, add entries to the build matrix in `release.yml`:
+The workflow already builds macOS, Windows, and Linux. To adjust targets, edit the build matrix in `release.yml`:
 
 ```yaml
 matrix:
   include:
-    # existing macOS entries...
+    # existing platform entries...
     - os: windows-latest
       target: x86_64-pc-windows-msvc
       args: "--target x86_64-pc-windows-msvc"
