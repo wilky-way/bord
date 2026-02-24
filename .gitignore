@@ -7,3 +7,11 @@ src-tauri/target/
 src-tauri/gen/schemas/
 playwright-report/
 test-results/
+
+# Local machine artifacts
+.DS_Store
+*.bun-build
+
+# Local-only worktrees and certs
+cert/
+tmp-opencode/
