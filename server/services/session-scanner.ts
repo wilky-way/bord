@@ -1,4 +1,5 @@
 import { readdir, readFile, stat } from "fs/promises";
+import { existsSync } from "node:fs";
 import { join } from "path";
 import { homedir } from "os";
 import { registerServerProvider } from "./provider-registry";
@@ -61,11 +62,63 @@ async function existingOpenCodeSessionDirs(): Promise<string[]> {
   return dirs;
 }
 
-/** Decode Claude project dir name back to an absolute path */
+/** Decode Claude project dir name back to an absolute path.
+ *  `-` is ambiguous: it encodes both `/` separators AND literal hyphens in
+ *  directory names (e.g. `agent-brain`).  We resolve the ambiguity by checking
+ *  the filesystem: at each level, try the single-segment interpretation first;
+ *  if it doesn't exist on disk, greedily merge subsequent segments with `-`
+ *  until we find a component that does exist (or consume all remaining segments). */
+const _decodedCache = new Map<string, string>();
 export function decodeDirToPath(dir: string): string {
-  // Dir names use `-` as separator. A leading `-` encodes the root `/`,
-  // so naive "/ " + dir.replace(/-/g, "/") produces "//Users/..." — collapse it.
-  return ("/" + dir.replace(/-/g, "/")).replace(/\/+/g, "/");
+  const cached = _decodedCache.get(dir);
+  if (cached) return cached;
+
+  const stripped = dir.startsWith("-") ? dir.slice(1) : dir;
+  const parts = stripped.split("-");
+  const components: string[] = [];
+  let i = 0;
+
+  while (i < parts.length) {
+    const remaining = parts.length - i;
+
+    if (remaining === 1) {
+      components.push(parts[i]);
+      i++;
+      continue;
+    }
+
+    // Try single part — if it exists as a directory on disk, accept it
+    const singleCandidate = "/" + [...components, parts[i]].join("/");
+    if (existsSync(singleCandidate)) {
+      components.push(parts[i]);
+      i++;
+      continue;
+    }
+
+    // Single part doesn't exist — try merging subsequent parts with `-`
+    let found = false;
+    for (let len = 2; len <= remaining; len++) {
+      const merged = parts.slice(i, i + len).join("-");
+      const candidate = "/" + [...components, merged].join("/");
+
+      if (len === remaining || existsSync(candidate)) {
+        components.push(merged);
+        i += len;
+        found = true;
+        break;
+      }
+    }
+
+    if (!found) {
+      // Shouldn't happen (len === remaining always matches), but be safe
+      components.push(parts[i]);
+      i++;
+    }
+  }
+
+  const result = "/" + components.join("/");
+  _decodedCache.set(dir, result);
+  return result;
 }
 
 async function readSessionIndex(
@@ -288,7 +341,7 @@ export async function scanClaudeSessions(projectPath?: string): Promise<SessionI
         const hasIndexMatch = [...index.values()].some((e) => e.projectPath === projectPath);
         if (!hasIndexMatch) {
           const decoded = decodeDirToPath(dir);
-          if (!decoded.includes(projectPath)) continue;
+          if (decoded !== projectPath) continue;
         }
       }
 
