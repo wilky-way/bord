@@ -19,8 +19,8 @@ export interface TerminalInstance {
   notificationsArmed?: boolean; // true when agent has worked long enough to trigger notifications on idle
   dynamicCwd?: string; // live CWD updated via OSC 7 — tracks shell's real current directory
   terminalView?: "terminal" | "filetree" | "file"; // default "terminal"
-  openFiles?: Array<{ path: string; scrollTop: number }>; // max 2
-  activeFileIndex?: number; // 0 or 1
+  openFiles?: Array<{ path: string; scrollTop: number }>; // max 5
+  activeFileIndex?: number;
 }
 
 export interface Workspace {

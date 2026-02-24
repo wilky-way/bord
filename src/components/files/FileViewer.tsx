@@ -212,15 +212,12 @@ export default function FileViewer(props: Props) {
         }
         return;
       }
-      // Cmd+1/2: switch tabs
-      if ((e.metaKey || e.ctrlKey) && e.key === "1") {
+      // Cmd+1-5: switch tabs
+      const tabKey = parseInt(e.key);
+      if ((e.metaKey || e.ctrlKey) && tabKey >= 1 && tabKey <= 5) {
         e.preventDefault();
-        if (openFiles().length > 0) setActiveFileInTerminal(props.terminalId, 0);
-        return;
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === "2") {
-        e.preventDefault();
-        if (openFiles().length > 1) setActiveFileInTerminal(props.terminalId, 1);
+        const idx = tabKey - 1;
+        if (openFiles().length > idx) setActiveFileInTerminal(props.terminalId, idx);
         return;
       }
     };

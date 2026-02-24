@@ -53,8 +53,8 @@ export function openFileInTerminal(id: string, path: string) {
     setState("terminals", (t) => t.id === id, "terminalView", "file");
     return;
   }
-  const newFiles = files.length >= 2
-    ? [files[1], { path, scrollTop: 0 }]
+  const newFiles = files.length >= 5
+    ? [...files.slice(1), { path, scrollTop: 0 }]
     : [...files, { path, scrollTop: 0 }];
   setState("terminals", (t) => t.id === id, "openFiles", newFiles);
   setState("terminals", (t) => t.id === id, "activeFileIndex", newFiles.length - 1);
