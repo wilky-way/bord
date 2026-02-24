@@ -6,6 +6,7 @@ import { setTerminalConnected } from "../../store/terminals";
 import { terminalTheme } from "../../lib/theme";
 import { createTerminalKeyHandler } from "../../lib/terminal-shortcuts";
 import { createTerminalWheelHandler } from "../../lib/terminal-wheel";
+import { createTerminalFileLinkProvider } from "../../lib/terminal-file-links";
 import { fontSize, fontFamily } from "../../store/settings";
 // Theme is read at terminal creation time — changing themes applies to new terminals only
 
@@ -13,6 +14,8 @@ interface Props {
   ptyId: string;
   onTitleChange?: (title: string) => void;
   onCwdChange?: (cwd: string) => void;
+  onFileLinkOpen?: (path: string) => void;
+  getCwd?: () => string | undefined;
 }
 
 /** Scan binary PTY data for OSC 0/2 title sequences (ESC ] 0; <title> BEL) */
@@ -93,6 +96,15 @@ export default function TerminalView(props: Props) {
     }
     if (typeof terminal.attachCustomWheelEventHandler === "function") {
       terminal.attachCustomWheelEventHandler(createTerminalWheelHandler(props.ptyId, terminal));
+    }
+    if (props.onFileLinkOpen) {
+      terminal.registerLinkProvider(createTerminalFileLinkProvider(
+        terminal,
+        (link) => {
+          props.onFileLinkOpen?.(link.path);
+        },
+        () => props.getCwd?.(),
+      ));
     }
 
     setReady(true);

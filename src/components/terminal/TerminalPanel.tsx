@@ -354,6 +354,10 @@ export default function TerminalPanel(props: Props) {
             onCwdChange={(newCwd: string) => {
               setTerminalDynamicCwd(props.id, newCwd);
             }}
+            onFileLinkOpen={(path: string) => {
+              openFileInTerminal(props.id, path);
+            }}
+            getCwd={() => effectiveCwd()}
           />
         </div>
         <Show when={terminalView() === "filetree"}>
