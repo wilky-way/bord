@@ -835,6 +835,29 @@ function openAnyVisibleTreeFile() {
   return result.includes("ok");
 }
 
+function openMarkdownFromVisibleTree() {
+  if (openFileFromVisibleTreeByRegex("^showcase-preview\\.md$")) return true;
+  if (openFileFromVisibleTreeByRegex("^README\\.md$")) return true;
+  return openFileFromVisibleTreeByRegex("\\.md$");
+}
+
+function markdownPreviewToggleVisible() {
+  const result = evalJs(
+    "(() => { const btn = [...document.querySelectorAll('[data-md-preview-toggle]')].find((el) => el instanceof HTMLElement && el.getClientRects().length > 0); return !!btn; })()",
+    true,
+  ).trim();
+  return result.includes("true");
+}
+
+function backToFileTreeFromViewer() {
+  const result = evalJs(
+    "(() => { const btn = [...document.querySelectorAll('[data-file-viewer] button[title=\"Back to file tree\"]')].find((el) => el instanceof HTMLElement && el.getClientRects().length > 0); if (!(btn instanceof HTMLElement)) return 'missing'; btn.click(); return 'ok'; })()",
+    true,
+  ).trim();
+  wait(500);
+  return result.includes("ok");
+}
+
 function markdownPreviewReady() {
   const result = evalJs(
     "(() => { const preview = document.querySelector('.prose-viewer'); if (!(preview instanceof HTMLElement)) return false; const hasQuote = !!preview.querySelector('blockquote'); const hasList = !!preview.querySelector('ul, ol'); const hasCode = !!preview.querySelector('pre code'); const hasMermaid = !!preview.querySelector('.mermaid-rendered, .mermaid-placeholder'); return hasQuote && hasList && hasCode && hasMermaid; })()",
@@ -1299,23 +1322,30 @@ async function main() {
     });
 
     // Open markdown and toggle preview
+    if (fileViewerVisible()) {
+      backToFileTreeFromViewer();
+    }
     expandVisibleTreeDirectory("docs");
-    let openedMarkdown = openFileFromVisibleTreeByRegex("showcase-preview\\.md$");
-    if (!openedMarkdown) {
-      openedMarkdown = openFileFromVisibleTreeByRegex("(readme|\\.md)$");
-    }
-    if (!openedMarkdown || !fileViewerVisible()) {
-      openAnyVisibleTreeFile();
-    }
+    let openedMarkdown = openMarkdownFromVisibleTree();
     wait(420);
 
-    // Click Preview button
-    evalJs(
-      "(() => { const btn = document.querySelector('[data-md-preview-toggle]'); if (!btn) return 'missing'; btn.click(); return 'ok'; })()",
-      true,
-    );
-    wait(720);
-    waitForMarkdownPreviewReady();
+    if ((!openedMarkdown || !markdownPreviewToggleVisible()) && fileViewerVisible()) {
+      backToFileTreeFromViewer();
+      expandVisibleTreeDirectory("docs");
+      openedMarkdown = openMarkdownFromVisibleTree();
+      wait(420);
+    }
+
+    if (!openedMarkdown || !markdownPreviewToggleVisible()) {
+      console.warn("[capture] markdown preview toggle missing; markdown file did not open cleanly");
+    } else {
+      evalJs(
+        "(() => { const btn = [...document.querySelectorAll('[data-md-preview-toggle]')].find((el) => el instanceof HTMLElement && el.getClientRects().length > 0); if (!(btn instanceof HTMLElement)) return 'missing'; btn.click(); return 'ok'; })()",
+        true,
+      );
+      wait(720);
+      waitForMarkdownPreviewReady();
+    }
 
     dismissFlyout();
     await captureShot("file-viewer-markdown-preview.png", {
