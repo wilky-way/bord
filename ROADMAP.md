@@ -27,7 +27,7 @@ This roadmap reflects actual implementation status in the repo today. For execut
 - [x] Open workspace/file in VS Code or Cursor
 - [x] App rename from cockpit to bord
 - [x] Theme system with 15 curated themes, settings panel, and localStorage persistence
-- [x] Built-in file icon packs (Bord Classic + Catppuccin) across file tree/tabs/git lists
+- [x] Built-in file icon packs (Bord Classic + Catppuccin + Material + vscode-icons) across file tree/tabs/git lists
 - [x] Feature flags in settings (git/docker/sessions/providers) persisted via `/api/features`
 - [x] In-app updater flow (launch check, settings check, update banner + install/relaunch)
 - [x] Playwright end-to-end suite for core UI flows
@@ -66,7 +66,7 @@ This roadmap reflects actual implementation status in the repo today. For execut
 - [x] Add settings surface (modal from gear icon, left nav with Appearance section)
 - [x] Add theme selector (15 curated: Catppuccin ×4, Dracula, Gruvbox, Nord, Tokyo Night ×2, One Dark, Solarized, Rosé Pine, Ayu Mirage, Monokai Pro, Night Owl)
 - [x] Keep terminal palette and app chrome synchronized per theme
-- [x] Add built-in icon pack selector (Bord Classic + Catppuccin)
+- [x] Add built-in icon pack selector (Bord Classic + Catppuccin + Material + vscode-icons)
 - [x] Add notification toggles to settings panel
 
 ### Phase 4 - Distribution and Quality

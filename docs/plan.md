@@ -29,7 +29,7 @@ This document is the source of truth for:
 - Stash terminals with attention and per-terminal mute + global bell mute
 - Git operations in-app (status, diff, stage/unstage, commit, push/pull, branches)
 - Workspace and terminal level git indicators
-- Built-in file icon packs (Bord Classic + Catppuccin) across file tree/tabs/git rows
+- Built-in file icon packs (Bord Classic + Catppuccin + Material + vscode-icons) across file tree/tabs/git rows
 - Open in VS Code/Cursor (workspace and file level)
 - Docker sidebar panel with compose discovery + start/stop/restart/pull + logs/shell
 - App rename to bord (runtime/UI/tauri config)
@@ -131,7 +131,7 @@ Acceptance criteria:
 
 Scope:
 - Add built-in icon pack selector in settings
-- Ship Bord Classic + Catppuccin packs
+- Ship Bord Classic + Catppuccin + Material + vscode-icons packs
 - Apply icons consistently in file tree, file tabs, and git changed-file rows
 
 Acceptance criteria:

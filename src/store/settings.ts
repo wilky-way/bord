@@ -77,7 +77,7 @@ const FILE_ICON_PACK_EXPLICIT_KEY = "bord:file-icon-pack-explicit";
 const DEFAULT_FILE_ICON_PACK: FileIconPackId = "catppuccin";
 
 function isFileIconPackId(value: string | null): value is FileIconPackId {
-  return value === "classic" || value === "catppuccin";
+  return value === "classic" || value === "catppuccin" || value === "material" || value === "vscode";
 }
 
 function loadFileIconPack(): FileIconPackId {

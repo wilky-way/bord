@@ -230,7 +230,7 @@ Rosé Pine — muted purple and gold.
 ### File Browser & Editor
 - **Workspace file tree** in sidebar — browse project files without leaving Bord
 - **Per-terminal file tree** scoped to terminal's CWD
-- **Built-in icon packs** — switch between Bord Classic and Catppuccin icon styles in settings
+- **Built-in icon packs** — switch between Bord Classic, Catppuccin, Material Icon Theme, and vscode-icons in settings
 - **Built-in file viewer** with syntax highlighting (30+ languages via highlight.js)
 - **Tab system** — up to 5 open files per terminal panel
 - **Markdown preview** with mermaid diagram rendering
@@ -239,7 +239,10 @@ Rosé Pine — muted purple and gold.
 - **Git integration** — double-click changed files in git panel to view/edit
 - **Keyboard shortcuts**: Cmd+Shift+E (sidebar files), Cmd+1-5 (switch tabs)
 
-Catppuccin icon assets are bundled from `catppuccin/vscode-icons` under MIT license (see `public/vendor/catppuccin-icons/LICENSE`).
+Bundled icon assets are included under MIT licenses:
+- Catppuccin: `public/vendor/catppuccin-icons/LICENSE`
+- Material Icon Theme: `public/vendor/material-icons/LICENSE`
+- vscode-icons: `public/vendor/vscode-icons/LICENSE`
 
 ### Docker Panel
 - **Compose discovery** — scans workspace for compose files

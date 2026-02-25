@@ -139,7 +139,7 @@ export default function SettingsPanel(props: Props) {
                 </For>
               </select>
               <p class="text-[10px] text-[var(--text-secondary)] mt-1">
-                Applies to file tree, file tabs, and git changed-file lists. Catppuccin uses bundled VS Code-style SVG icons.
+                Applies to file tree, file tabs, and git changed-file lists. Includes Catppuccin, Material Icon Theme, and vscode-icons bundles.
               </p>
 
             </Show>

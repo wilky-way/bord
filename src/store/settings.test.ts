@@ -120,8 +120,16 @@ describe("settings - fileIconPack", () => {
 
   test("setFileIconPack updates signal", () => {
     createRoot((dispose) => {
-      setFileIconPack("catppuccin");
-      expect(fileIconPack()).toBe("catppuccin");
+      setFileIconPack("material");
+      expect(fileIconPack()).toBe("material");
+      dispose();
+    });
+  });
+
+  test("setFileIconPack supports vscode pack", () => {
+    createRoot((dispose) => {
+      setFileIconPack("vscode");
+      expect(fileIconPack()).toBe("vscode");
       dispose();
     });
   });
