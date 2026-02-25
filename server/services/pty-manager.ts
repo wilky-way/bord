@@ -19,7 +19,7 @@ interface PtySession {
   proc: ReturnType<typeof Bun.spawn>;
   cwd: string;
   ring: RingBuffer;
-  subscribers: Map<ServerWebSocket<{ path: string }>, { cursor: number }>;
+  subscribers: Set<ServerWebSocket<{ path: string }>>;
   idleTimer: Timer | null;
   idleThresholdMs: number;
   isIdle: boolean;
@@ -126,7 +126,7 @@ function startCwdPolling(session: PtySession) {
     if (cwd && cwd !== session.lastKnownCwd) {
       session.lastKnownCwd = cwd;
       const msg = JSON.stringify({ type: "cwd", path: cwd });
-      for (const [ws] of session.subscribers) {
+      for (const ws of session.subscribers) {
         if (ws.readyState === 1) ws.send(msg);
       }
     }
@@ -145,7 +145,7 @@ export function createPty(
     proc: null as unknown as ReturnType<typeof Bun.spawn>,
     cwd,
     ring: createRingBuffer(),
-    subscribers: new Map(),
+    subscribers: new Set(),
     idleTimer: null,
     idleThresholdMs: DEFAULT_IDLE_THRESHOLD_MS,
     isIdle: false,
@@ -180,15 +180,14 @@ export function createPty(
         if (session.isIdle) {
           session.isIdle = false;
           const activeMsg = JSON.stringify({ type: "active" });
-          for (const [ws] of session.subscribers) {
+          for (const ws of session.subscribers) {
             if (ws.readyState === 1) ws.send(activeMsg);
           }
         }
 
-        for (const [ws, meta] of session.subscribers) {
+        for (const ws of session.subscribers) {
           if (ws.readyState === 1) {
             ws.sendBinary(data);
-            meta.cursor = session.ring.totalWritten;
           }
         }
 
@@ -197,14 +196,14 @@ export function createPty(
           session.isIdle = true;
           session.idleTimer = null;
           const idleMsg = JSON.stringify({ type: "idle" });
-          for (const [ws] of session.subscribers) {
+          for (const ws of session.subscribers) {
             if (ws.readyState === 1) ws.send(idleMsg);
           }
         }, session.idleThresholdMs);
       },
       exit() {
         // PTY stream closed - clean up subscribers
-        for (const [ws] of session.subscribers) {
+        for (const ws of session.subscribers) {
           ws.close(1000, "PTY exited");
         }
         session.subscribers.clear();
@@ -234,11 +233,25 @@ export function attachWs(
   const session = sessions.get(id);
   if (!session) return false;
 
-  session.subscribers.set(ws, { cursor: session.ring.totalWritten });
+  session.subscribers.add(ws);
+
+  const totalWritten = session.ring.totalWritten;
+  const requestedCursor = Math.max(0, clientCursor);
+  const replayStart = Math.min(
+    Math.max(requestedCursor, totalWritten - MAX_REPLAY_BURST),
+    totalWritten,
+  );
+  const replayTruncated = replayStart > requestedCursor;
+
+  ws.send(JSON.stringify({
+    type: "replay-start",
+    from: replayStart,
+    to: totalWritten,
+    truncated: replayTruncated,
+  }));
 
   // Replay buffered data if client needs it
-  if (clientCursor < session.ring.totalWritten) {
-    const replayStart = Math.max(clientCursor, session.ring.totalWritten - MAX_REPLAY_BURST);
+  if (replayStart < totalWritten) {
     const replay = ringRead(session.ring, replayStart);
     if (replay) {
       // Send in chunks to avoid overwhelming the WebSocket
@@ -250,7 +263,7 @@ export function attachWs(
   }
 
   // Send current cursor position so client can track
-  ws.send(JSON.stringify({ type: "cursor", cursor: session.ring.totalWritten }));
+  ws.send(JSON.stringify({ type: "cursor", cursor: totalWritten }));
 
   // Signal end of replay so client can distinguish replay bytes from live output
   ws.send(JSON.stringify({ type: "replay-done" }));
@@ -323,7 +336,7 @@ export async function destroyPty(id: string): Promise<boolean> {
     session.cwdPollTimer = null;
   }
 
-  for (const [ws] of session.subscribers) {
+  for (const ws of session.subscribers) {
     ws.close(1000, "PTY destroyed");
   }
   session.subscribers.clear();

@@ -56,8 +56,8 @@ export class SettingsPO {
 
   /** Get notification toggle buttons. */
   notificationToggles(): Locator {
-    // Toggle switches are rendered as buttons inside labels
-    return this.modal.locator("label.flex button");
+    // Toggle switches are rendered as buttons inside divs
+    return this.modal.locator("div.cursor-pointer button");
   }
 
   /** Get the idle threshold slider. */
@@ -67,11 +67,11 @@ export class SettingsPO {
 
   /** Get feature toggle buttons in the Features section. */
   featureToggles(): Locator {
-    return this.modal.locator("label.flex button");
+    return this.modal.locator("div.cursor-pointer button");
   }
 
   /** Get provider toggle buttons in the Features section (inside the Providers sub-section). */
   providerToggles(): Locator {
-    return this.modal.locator("label.flex button");
+    return this.modal.locator("div.cursor-pointer button");
   }
 }

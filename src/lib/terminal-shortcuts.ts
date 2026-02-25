@@ -25,28 +25,13 @@ export function createTerminalKeyHandler(
       return true;
     }
 
-    // --- Shift+Enter (Kitty protocol) ---
-    if (e.key === "Enter" && shift && !meta && !alt && !e.ctrlKey) {
-      e.preventDefault();
-      sendToTerminal(ptyId, "\x1b[13;2u");
-      return true;
-    }
-
-    // --- Option (Alt) key sequences for macOS ---
+    // --- Option (Alt) key sequences for app-level navigation ---
     if (alt && !meta && !e.ctrlKey) {
       switch (e.key) {
         // Option+Arrow Left/Right: navigate terminals (handled by App.tsx global handler)
         case "ArrowLeft":
         case "ArrowRight":
           e.preventDefault();
-          return true;
-        case "Backspace":
-          e.preventDefault();
-          sendToTerminal(ptyId, "\x1b\x7f"); // delete word back
-          return true;
-        case "d":
-          e.preventDefault();
-          sendToTerminal(ptyId, "\x1bd"); // delete word forward
           return true;
       }
     }
@@ -106,48 +91,6 @@ export function createTerminalKeyHandler(
           }
           break;
 
-        // Cmd+Up: Scroll to top
-        case "ArrowUp":
-          if (!shift) {
-            e.preventDefault();
-            terminal.scrollToTop();
-            return true;
-          }
-          break;
-
-        // Cmd+Down: Scroll to bottom
-        case "ArrowDown":
-          if (!shift) {
-            e.preventDefault();
-            terminal.scrollToBottom();
-            return true;
-          }
-          break;
-
-        // Cmd+Left: Home (Ctrl+A)
-        case "ArrowLeft":
-          if (!shift) {
-            e.preventDefault();
-            sendToTerminal(ptyId, "\x01");
-            return true;
-          }
-          break;
-
-        // Cmd+Right: End (Ctrl+E)
-        case "ArrowRight":
-          if (!shift) {
-            e.preventDefault();
-            sendToTerminal(ptyId, "\x05");
-            return true;
-          }
-          break;
-
-        // Cmd+Backspace: Kill line (Ctrl+U)
-        case "Backspace":
-          e.preventDefault();
-          sendToTerminal(ptyId, "\x15");
-          return true;
-
         // Cmd+= or Cmd+Shift+=: Increase font size
         case "=":
           e.preventDefault();
@@ -172,18 +115,6 @@ export function createTerminalKeyHandler(
           }
           break;
       }
-    }
-
-    // --- PageUp / PageDown ---
-    if (e.key === "PageUp" && !meta && !alt && !e.ctrlKey) {
-      e.preventDefault();
-      terminal.scrollPages(-1);
-      return true;
-    }
-    if (e.key === "PageDown" && !meta && !alt && !e.ctrlKey) {
-      e.preventDefault();
-      terminal.scrollPages(1);
-      return true;
     }
 
     // Pass through to ghostty-web default handling

@@ -166,7 +166,7 @@ function NavItem(props: { label: string; active: boolean; onClick: () => void; i
 
 function ToggleRow(props: { label: string; description: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
-    <label class="flex items-center justify-between py-2 cursor-pointer group">
+    <div class="flex items-center justify-between py-2 cursor-pointer group">
       <div>
         <div class="text-xs font-medium text-[var(--text-primary)]">{props.label}</div>
         <div class="text-[11px] text-[var(--text-secondary)] mt-0.5">{props.description}</div>
@@ -191,7 +191,7 @@ function ToggleRow(props: { label: string; description: string; checked: boolean
           }}
         />
       </button>
-    </label>
+    </div>
   );
 }
 
@@ -437,7 +437,7 @@ function FeatureSettings() {
               const isLastEnabled = () => isEnabled() && enabledProviderCount() <= 1;
               const Icon = provider.icon;
               return (
-                <label class="flex items-center justify-between py-2 cursor-pointer group">
+                <div class="flex items-center justify-between py-2 cursor-pointer group">
                   <div class="flex items-center gap-2">
                     <span class="flex items-center justify-center w-5 h-5" style={{ color: provider.color }}>
                       <Icon size={14} />
@@ -473,7 +473,7 @@ function FeatureSettings() {
                       }}
                     />
                   </button>
-                </label>
+                </div>
               );
             }}
           </For>

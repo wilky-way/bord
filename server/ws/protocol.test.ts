@@ -22,6 +22,10 @@ describe("isControlMessage", () => {
     expect(isControlMessage({ type: "cursor", cursor: 42 })).toBe(true);
   });
 
+  test("accepts valid replay-start message", () => {
+    expect(isControlMessage({ type: "replay-start", from: 10, to: 42, truncated: false })).toBe(true);
+  });
+
   test("accepts valid idle message", () => {
     expect(isControlMessage({ type: "idle" })).toBe(true);
   });

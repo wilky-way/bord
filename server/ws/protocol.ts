@@ -9,6 +9,7 @@
 //   { type: "configure", idleThresholdMs: number }
 //
 // Server → Client:
+//   { type: "replay-start", from: number, to: number, truncated: boolean }
 //   { type: "cursor", cursor: number }  - current buffer position after replay
 //   { type: "pong" }
 //   { type: "replay-done" }  - replay burst finished, live output follows
@@ -35,6 +36,13 @@ export interface CursorMessage {
   cursor: number;
 }
 
+export interface ReplayStartMessage {
+  type: "replay-start";
+  from: number;
+  to: number;
+  truncated: boolean;
+}
+
 export interface PongMessage {
   type: "pong";
 }
@@ -57,7 +65,7 @@ export interface CwdMessage {
 }
 
 export type ClientControlMessage = ResizeMessage | PingMessage | ConfigureMessage;
-export type ServerControlMessage = CursorMessage | PongMessage | IdleMessage | ActiveMessage | ReplayDoneMessage | CwdMessage;
+export type ServerControlMessage = ReplayStartMessage | CursorMessage | PongMessage | IdleMessage | ActiveMessage | ReplayDoneMessage | CwdMessage;
 export type ControlMessage = ClientControlMessage | ServerControlMessage;
 
 export function isControlMessage(data: unknown): data is ControlMessage {

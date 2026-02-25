@@ -40,7 +40,7 @@ test.describe("Feature flags", () => {
     await page.waitForTimeout(300);
 
     // Find the Git integration toggle
-    const gitToggle = settings.modal.locator('label:has-text("Git integration") button');
+    const gitToggle = settings.modal.locator(sel.featureToggle("Git integration"));
     if (!(await gitToggle.isVisible())) {
       test.skip();
       return;
@@ -63,7 +63,7 @@ test.describe("Feature flags", () => {
       await settings.open();
       await settings.switchSection("Features");
       await page.waitForTimeout(300);
-      const toggle = settings.modal.locator('label:has-text("Git integration") button');
+      const toggle = settings.modal.locator(sel.featureToggle("Git integration"));
       // Check current state via background color — accent means enabled
       const bg = await toggle.evaluate((el) => getComputedStyle(el).backgroundColor).catch(() => "");
       // If bg doesn't look like accent (enabled), click to re-enable
@@ -87,7 +87,7 @@ test.describe("Feature flags", () => {
     await settings.switchSection("Features");
     await page.waitForTimeout(300);
 
-    const gitToggle = settings.modal.locator('label:has-text("Git integration") button');
+    const gitToggle = settings.modal.locator(sel.featureToggle("Git integration"));
     if (!(await gitToggle.isVisible())) {
       test.skip();
       return;
@@ -146,7 +146,7 @@ test.describe("Feature flags", () => {
     await settings.switchSection("Features");
     await page.waitForTimeout(300);
 
-    const gitToggle = settings.modal.locator('label:has-text("Git integration") button');
+    const gitToggle = settings.modal.locator(sel.featureToggle("Git integration"));
     if (!(await gitToggle.isVisible())) {
       test.skip();
       return;
@@ -207,7 +207,7 @@ test.describe("Feature flags", () => {
     await settings.switchSection("Features");
     await page.waitForTimeout(300);
 
-    const dockerToggle = settings.modal.locator('label:has-text("Docker panel") button');
+    const dockerToggle = settings.modal.locator(sel.featureToggle("Docker panel"));
     if (!(await dockerToggle.isVisible())) {
       test.skip();
       return;
@@ -241,7 +241,7 @@ test.describe("Feature flags", () => {
     await settings.switchSection("Features");
     await page.waitForTimeout(300);
 
-    const dockerToggle = settings.modal.locator('label:has-text("Docker panel") button');
+    const dockerToggle = settings.modal.locator(sel.featureToggle("Docker panel"));
     if (!(await dockerToggle.isVisible())) {
       test.skip();
       return;
@@ -304,7 +304,7 @@ test.describe("Feature flags", () => {
     await page.waitForTimeout(300);
 
     // Find Gemini toggle in the Providers section
-    const geminiToggle = settings.modal.locator('label:has-text("Gemini") button');
+    const geminiToggle = settings.modal.locator(sel.featureToggle("Gemini"));
     if (!(await geminiToggle.isVisible())) {
       test.skip();
       return;

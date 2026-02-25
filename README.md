@@ -263,8 +263,7 @@ Rosé Pine — muted purple and gold.
 |----------|--------|
 | `Cmd+N` / `Cmd+T` | New terminal in active workspace |
 | `Cmd+W` | Close active terminal (won't close last) |
-| `Cmd+Shift+Left/Right` | Navigate between terminals |
-| `Cmd+Left/Right` | Navigate between terminals (fallback) |
+| `Alt+Left/Right` | Navigate between terminals |
 | `Cmd+G` | Toggle git panel for active terminal |
 | `Cmd+B` | Toggle sidebar |
 | `Cmd+,` | Open settings |
@@ -278,17 +277,10 @@ Rosé Pine — muted purple and gold.
 | `Cmd+A` | Select all terminal content |
 | `Cmd+K` | Clear terminal scrollback |
 | `Cmd+L` | Clear screen (Ctrl+L) |
-| `Cmd+Left/Right` | Jump to beginning/end of line |
-| `Cmd+Backspace` | Kill line backward |
-| `Cmd+Up/Down` | Scroll to top/bottom |
 | `Cmd+= / Cmd+-` | Increase/decrease font size |
 | `Cmd+0` | Reset font size |
-| `Option+Left/Right` | Move cursor by word |
-| `Option+Backspace` | Delete word backward |
-| `Option+D` | Delete word forward |
+| `Option+Left/Right` | Navigate terminals (app-level) |
 | `Shift+Tab` | Reverse tab (sends `\x1b[Z`) |
-| `Shift+Enter` | Kitty protocol Enter (`\x1b[13;2u`) |
-| `PageUp / PageDown` | Scroll terminal by page |
 
 ## Architecture
 

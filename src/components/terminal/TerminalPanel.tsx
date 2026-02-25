@@ -359,7 +359,6 @@ export default function TerminalPanel(props: Props) {
           <TerminalView
             ptyId={props.id}
             onTitleChange={(newTitle: string) => {
-              console.log("[OSC title]", props.id, newTitle);
               setTitle(newTitle);
               setTerminalOscTitle(props.id, newTitle);
             }}

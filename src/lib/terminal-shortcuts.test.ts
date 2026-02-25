@@ -126,51 +126,6 @@ describe("createTerminalKeyHandler", () => {
     expect(term.calls).toContain("selectAll");
   });
 
-  test("Cmd+Left sends Home (Ctrl+A)", () => {
-    const term = createMockTerminal();
-    const handler = createTerminalKeyHandler("pty-1", term as any);
-    const e = makeKeyEvent({ key: "ArrowLeft", metaKey: true });
-    const result = handler(e);
-    expect(result).toBe(true);
-    expect(sentData).toContain("\x01");
-  });
-
-  test("Cmd+Right sends End (Ctrl+E)", () => {
-    const term = createMockTerminal();
-    const handler = createTerminalKeyHandler("pty-1", term as any);
-    const e = makeKeyEvent({ key: "ArrowRight", metaKey: true });
-    const result = handler(e);
-    expect(result).toBe(true);
-    expect(sentData).toContain("\x05");
-  });
-
-  test("Cmd+Up scrolls to top", () => {
-    const term = createMockTerminal();
-    const handler = createTerminalKeyHandler("pty-1", term as any);
-    const e = makeKeyEvent({ key: "ArrowUp", metaKey: true });
-    const result = handler(e);
-    expect(result).toBe(true);
-    expect(term.calls).toContain("scrollToTop");
-  });
-
-  test("Cmd+Down scrolls to bottom", () => {
-    const term = createMockTerminal();
-    const handler = createTerminalKeyHandler("pty-1", term as any);
-    const e = makeKeyEvent({ key: "ArrowDown", metaKey: true });
-    const result = handler(e);
-    expect(result).toBe(true);
-    expect(term.calls).toContain("scrollToBottom");
-  });
-
-  test("Cmd+Backspace sends kill line (Ctrl+U)", () => {
-    const term = createMockTerminal();
-    const handler = createTerminalKeyHandler("pty-1", term as any);
-    const e = makeKeyEvent({ key: "Backspace", metaKey: true });
-    const result = handler(e);
-    expect(result).toBe(true);
-    expect(sentData).toContain("\x15");
-  });
-
   test("Shift+Tab sends escape sequence", () => {
     const term = createMockTerminal();
     const handler = createTerminalKeyHandler("pty-1", term as any);
@@ -178,33 +133,6 @@ describe("createTerminalKeyHandler", () => {
     const result = handler(e);
     expect(result).toBe(true);
     expect(sentData).toContain("\x1b[Z");
-  });
-
-  test("Shift+Enter sends Kitty protocol sequence", () => {
-    const term = createMockTerminal();
-    const handler = createTerminalKeyHandler("pty-1", term as any);
-    const e = makeKeyEvent({ key: "Enter", shiftKey: true });
-    const result = handler(e);
-    expect(result).toBe(true);
-    expect(sentData).toContain("\x1b[13;2u");
-  });
-
-  test("Option+Backspace sends delete word back", () => {
-    const term = createMockTerminal();
-    const handler = createTerminalKeyHandler("pty-1", term as any);
-    const e = makeKeyEvent({ key: "Backspace", altKey: true });
-    const result = handler(e);
-    expect(result).toBe(true);
-    expect(sentData).toContain("\x1b\x7f");
-  });
-
-  test("Option+d sends delete word forward", () => {
-    const term = createMockTerminal();
-    const handler = createTerminalKeyHandler("pty-1", term as any);
-    const e = makeKeyEvent({ key: "d", altKey: true });
-    const result = handler(e);
-    expect(result).toBe(true);
-    expect(sentData).toContain("\x1bd");
   });
 
   test("Option+ArrowLeft is handled (terminal navigation)", () => {
@@ -263,24 +191,6 @@ describe("createTerminalKeyHandler", () => {
       expect(fontSize()).toBe(13);
       dispose();
     });
-  });
-
-  test("PageUp scrolls up one page", () => {
-    const term = createMockTerminal();
-    const handler = createTerminalKeyHandler("pty-1", term as any);
-    const e = makeKeyEvent({ key: "PageUp" });
-    const result = handler(e);
-    expect(result).toBe(true);
-    expect(term.calls).toContain("scrollPages(-1)");
-  });
-
-  test("PageDown scrolls down one page", () => {
-    const term = createMockTerminal();
-    const handler = createTerminalKeyHandler("pty-1", term as any);
-    const e = makeKeyEvent({ key: "PageDown" });
-    const result = handler(e);
-    expect(result).toBe(true);
-    expect(term.calls).toContain("scrollPages(1)");
   });
 
   test("unhandled key returns false (pass through)", () => {

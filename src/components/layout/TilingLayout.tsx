@@ -40,18 +40,6 @@ export default function TilingLayout() {
     });
     ro.observe(containerRef);
     onCleanup(() => ro.disconnect());
-
-    // Capture-phase wheel listener — fires before ghostty's canvas handler
-    containerRef.addEventListener(
-      "wheel",
-      (e) => {
-        if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
-          e.stopPropagation();
-          containerRef!.scrollLeft += e.deltaX;
-        }
-      },
-      { capture: true },
-    );
   });
 
   const columns = () => state.layoutColumns || visibleTerminals().length;

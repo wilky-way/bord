@@ -7,6 +7,11 @@ import { createKeyedBatchCoalescer } from "./debounce";
 type MessageHandler = (data: ArrayBuffer | string) => void;
 type StatusHandler = (connected: boolean) => void;
 
+interface ConnectOptions {
+  onReplayStart?: (meta: { from: number; to: number; truncated: boolean }) => void;
+  onReplayDone?: () => void;
+}
+
 interface WsConnection {
   ws: WebSocket;
   onData: MessageHandler;
@@ -38,6 +43,8 @@ const lastNotifiedAt = new Map<string, number>();
 
 const CURSOR_STORAGE_KEY = "bord:terminal-cursors";
 const MAX_CURSOR_ENTRIES = 20;
+const liveCursorByTerminal = new Map<string, number>();
+const textEncoder = typeof TextEncoder !== "undefined" ? new TextEncoder() : null;
 
 function loadCursors(): Record<string, { cursor: number; scrollY: number }> {
   try {
@@ -69,6 +76,34 @@ export function getStoredCursor(ptyId: string): { cursor: number; scrollY: numbe
   return cursors[ptyId] ?? null;
 }
 
+const cursorPersistCoalescer = createKeyedBatchCoalescer<string, number>(
+  250,
+  (batch) => {
+    for (const [ptyId, cursor] of batch) {
+      saveCursor(ptyId, cursor);
+    }
+  },
+);
+
+function setLiveCursor(ptyId: string, cursor: number) {
+  const safeCursor = Math.max(0, Math.floor(cursor));
+  liveCursorByTerminal.set(ptyId, safeCursor);
+  cursorPersistCoalescer.enqueue(ptyId, safeCursor);
+}
+
+function payloadByteLength(data: ArrayBuffer | string): number {
+  if (data instanceof ArrayBuffer) return data.byteLength;
+  if (!data) return 0;
+  return textEncoder ? textEncoder.encode(data).byteLength : data.length;
+}
+
+function advanceLiveCursor(ptyId: string, data: ArrayBuffer | string) {
+  const bytes = payloadByteLength(data);
+  if (bytes <= 0) return;
+  const current = liveCursorByTerminal.get(ptyId) ?? getStoredCursor(ptyId)?.cursor ?? 0;
+  setLiveCursor(ptyId, current + bytes);
+}
+
 // Batch output timestamp updates at ~30fps to avoid setState churn
 const outputCoalescer = createKeyedBatchCoalescer<string, number>(
   33,
@@ -97,13 +132,40 @@ export function connectTerminal(
   ptyId: string,
   onData: MessageHandler,
   onStatus: StatusHandler,
+  options?: ConnectOptions,
 ): () => void {
+  const existing = connections.get(ptyId);
+  if (existing) {
+    const existingCursor = liveCursorByTerminal.get(ptyId);
+    if (typeof existingCursor === "number") {
+      saveCursor(ptyId, existingCursor);
+    }
+
+    existing.ws.onopen = null;
+    existing.ws.onclose = null;
+    existing.ws.onerror = null;
+    existing.ws.onmessage = null;
+    existing.ws.close();
+    connections.delete(ptyId);
+    knownIdleTerminals.delete(ptyId);
+    lastUserInputAt.delete(ptyId);
+    lastNotifiedAt.delete(ptyId);
+
+    const pending = armingTimers.get(ptyId);
+    if (pending) {
+      clearTimeout(pending);
+      armingTimers.delete(ptyId);
+    }
+  }
+
   // Use stored cursor for replay
   const stored = getStoredCursor(ptyId);
-  const cursorParam = stored?.cursor ? `?cursor=${stored.cursor}` : "";
+  const initialCursor = Math.max(0, stored?.cursor ?? 0);
+  const cursorParam = initialCursor > 0 ? `?cursor=${initialCursor}` : "";
   const url = `${getWsBase()}/ws/pty/${ptyId}${cursorParam}`;
   const ws = new WebSocket(url);
   ws.binaryType = "arraybuffer";
+  liveCursorByTerminal.set(ptyId, initialCursor);
 
   ws.onopen = () => onStatus(true);
   ws.onclose = () => onStatus(false);
@@ -113,11 +175,25 @@ export function connectTerminal(
     if (typeof event.data === "string") {
       try {
         const ctrl = JSON.parse(event.data);
+        if (
+          ctrl.type === "replay-start" &&
+          typeof ctrl.from === "number" &&
+          typeof ctrl.to === "number" &&
+          typeof ctrl.truncated === "boolean"
+        ) {
+          options?.onReplayStart?.({
+            from: ctrl.from,
+            to: ctrl.to,
+            truncated: ctrl.truncated,
+          });
+          return;
+        }
         if (ctrl.type === "cursor" && typeof ctrl.cursor === "number") {
-          saveCursor(ptyId, ctrl.cursor);
+          setLiveCursor(ptyId, ctrl.cursor);
           return; // Don't forward control frames to terminal
         }
         if (ctrl.type === "replay-done") {
+          options?.onReplayDone?.();
           return;
         }
         if (ctrl.type === "idle") {
@@ -156,11 +232,21 @@ export function connectTerminal(
           setTerminalDynamicCwd(ptyId, ctrl.path);
           return;
         }
+
+        if (typeof ctrl.type === "string") {
+          return;
+        }
       } catch {
         // Not JSON control frame, forward as terminal data
       }
     }
+
+    if (!(event.data instanceof ArrayBuffer) && typeof event.data !== "string") {
+      return;
+    }
+
     onData(event.data);
+    advanceLiveCursor(ptyId, event.data);
     outputCoalescer.enqueue(ptyId, Date.now());
   };
 
@@ -168,8 +254,14 @@ export function connectTerminal(
 
   // Return cleanup function
   return () => {
+    const cursor = liveCursorByTerminal.get(ptyId);
+    if (typeof cursor === "number") {
+      saveCursor(ptyId, cursor);
+    }
+
     ws.close();
     connections.delete(ptyId);
+    liveCursorByTerminal.delete(ptyId);
     knownIdleTerminals.delete(ptyId);
     lastUserInputAt.delete(ptyId);
     lastNotifiedAt.delete(ptyId);
@@ -222,9 +314,14 @@ export function sendToTerminal(ptyId: string, data: string | Uint8Array) {
 }
 
 export function sendResize(ptyId: string, cols: number, rows: number) {
+  if (!Number.isFinite(cols) || !Number.isFinite(rows)) return;
+
   const conn = connections.get(ptyId);
   if (!conn || conn.ws.readyState !== WebSocket.OPEN) return;
-  conn.ws.send(JSON.stringify({ type: "resize", cols, rows }));
+
+  const safeCols = Math.max(2, Math.min(1000, Math.floor(cols)));
+  const safeRows = Math.max(1, Math.min(500, Math.floor(rows)));
+  conn.ws.send(JSON.stringify({ type: "resize", cols: safeCols, rows: safeRows }));
 }
 
 export function sendConfigureToAll(idleThresholdMs: number) {

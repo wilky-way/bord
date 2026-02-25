@@ -46,7 +46,9 @@ export function handleWsMessage(ws: ServerWebSocket<WsData>, message: string | B
     try {
       const ctrl = JSON.parse(message);
       if (ctrl.type === "resize" && typeof ctrl.cols === "number" && typeof ctrl.rows === "number") {
-        resizePty(ptyId, ctrl.cols, ctrl.rows);
+        const cols = Math.max(2, Math.min(1000, Math.floor(ctrl.cols)));
+        const rows = Math.max(1, Math.min(500, Math.floor(ctrl.rows)));
+        resizePty(ptyId, cols, rows);
         return;
       }
       if (ctrl.type === "ping") {

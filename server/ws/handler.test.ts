@@ -120,6 +120,12 @@ describe("handleWsMessage", () => {
     expect(mockResizePty).toHaveBeenCalledWith("session-123", 120, 40);
   });
 
+  test("resize JSON clamps dimensions", () => {
+    const ws = createMockWs("/ws/pty/session-123");
+    handleWsMessage(ws as any, JSON.stringify({ type: "resize", cols: -5.7, rows: 9999 }));
+    expect(mockResizePty).toHaveBeenCalledWith("session-123", 2, 500);
+  });
+
   test("ping JSON responds with pong", () => {
     const ws = createMockWs("/ws/pty/session-123");
     handleWsMessage(ws as any, JSON.stringify({ type: "ping" }));

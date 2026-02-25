@@ -40,7 +40,7 @@ This roadmap reflects actual implementation status in the repo today. For execut
 
 ## Active Phases
 
-### Phase 0 - Documentation Alignment (In Progress)
+### Phase 0 - Documentation Alignment (Done)
 
 - [x] Create living execution plan (`docs/plan.md`)
 - [x] Update README to match shipped/partial features and current shortcuts
@@ -66,7 +66,8 @@ This roadmap reflects actual implementation status in the repo today. For execut
 - [x] Add settings surface (modal from gear icon, left nav with Appearance section)
 - [x] Add theme selector (15 curated: Catppuccin ×4, Dracula, Gruvbox, Nord, Tokyo Night ×2, One Dark, Solarized, Rosé Pine, Ayu Mirage, Monokai Pro, Night Owl)
 - [x] Keep terminal palette and app chrome synchronized per theme
-- [ ] Add composer/notification toggles to settings panel
+- [x] Add notification toggles to settings panel
+- [ ] Add composer toggle to settings panel
 
 ### Phase 4 - Distribution and Quality
 

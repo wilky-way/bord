@@ -11,12 +11,21 @@ import { toggleSidebarMode, setSidebarMode } from "./store/ui";
 import { initUpdater } from "./lib/updater";
 import { loadFeatures } from "./store/features";
 
+function isFormFieldTarget(target: EventTarget | null): boolean {
+  const el = target as HTMLElement | null;
+  if (!el) return false;
+  const tag = el.tagName;
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+}
+
 export default function App() {
   onMount(() => {
     initUpdater();
     loadFeatures();
 
     const onKeyDown = (e: KeyboardEvent) => {
+      if (isFormFieldTarget(e.target)) return;
+
       // Ctrl+N: New terminal in active workspace
       if ((e.ctrlKey || e.metaKey) && e.key === "n") {
         e.preventDefault();
