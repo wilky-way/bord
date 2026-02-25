@@ -305,6 +305,15 @@ function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
 
+function ensureSelectorVisible(selector: string, attempts = 8, delayMs = 180) {
+  for (let i = 0; i < attempts; i++) {
+    const rect = selectorRect(selector);
+    if (isValidRect(rect)) return true;
+    wait(delayMs);
+  }
+  return false;
+}
+
 function cropToRect(
   inputPath: string,
   outputPath: string,
@@ -783,20 +792,63 @@ function fileViewerVisible() {
   return result.includes("true");
 }
 
+function expandVisibleTreeDirectory(name: string) {
+  const result = evalJs(
+    `(() => {
+      const tree = [...document.querySelectorAll('[data-file-tree]')].find((el) => el instanceof HTMLElement && el.getClientRects().length > 0);
+      if (!(tree instanceof HTMLElement)) return 'missing-tree';
+
+      const rows = [...tree.querySelectorAll('div.flex.items-center.cursor-pointer')].filter((el) => el instanceof HTMLElement && el.getClientRects().length > 0);
+      const target = rows.find((row) => {
+        const label = ((row.querySelector('span.text-xs') as HTMLElement | null)?.textContent || row.textContent || '').trim().toLowerCase();
+        return label === ${JSON.stringify(name.toLowerCase())};
+      });
+      if (!(target instanceof HTMLElement)) return 'missing-dir';
+
+      const chevron = target.querySelector('svg');
+      const expanded = chevron instanceof SVGElement && ((chevron.getAttribute('style') || '').includes('rotate(90deg)') || (chevron as SVGElement).style.transform.includes('90deg'));
+      if (!expanded) target.click();
+      return 'ok';
+    })()`,
+    true,
+  ).trim();
+
+  wait(260);
+  return result.includes("ok");
+}
+
 function openFileFromVisibleTreeByRegex(pattern: string) {
-  evalJs(
+  const result = evalJs(
     `(() => { const tree = [...document.querySelectorAll('[data-file-tree]')].find((el) => el instanceof HTMLElement && el.getClientRects().length > 0); if (!(tree instanceof HTMLElement)) return 'missing-tree'; const rows = [...tree.querySelectorAll('div.flex.items-center.cursor-pointer')].filter((el) => el instanceof HTMLElement && el.getClientRects().length > 0); const rx = new RegExp(${JSON.stringify(pattern)}, 'i'); const match = rows.find((row) => rx.test((row.textContent || '').trim())); if (!(match instanceof HTMLElement)) return 'no-match'; match.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); return 'ok'; })()`,
     true,
-  );
+  ).trim();
   wait(420);
+  return result.includes("ok");
 }
 
 function openAnyVisibleTreeFile() {
-  evalJs(
+  const result = evalJs(
     "(() => { const tree = [...document.querySelectorAll('[data-file-tree]')].find((el) => el instanceof HTMLElement && el.getClientRects().length > 0); if (!(tree instanceof HTMLElement)) return 'missing-tree'; const rows = [...tree.querySelectorAll('div.flex.items-center.cursor-pointer')].filter((el) => el instanceof HTMLElement && el.getClientRects().length > 0); for (const row of rows) { const text = (row.textContent || '').trim(); if (!text || text === 'Files' || text === 'Loading...') continue; if (/\.[a-z0-9]+$/i.test(text)) { row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); return 'ok'; } } return 'no-file'; })()",
     true,
-  );
+  ).trim();
   wait(420);
+  return result.includes("ok");
+}
+
+function markdownPreviewReady() {
+  const result = evalJs(
+    "(() => { const preview = document.querySelector('.prose-viewer'); if (!(preview instanceof HTMLElement)) return false; const hasQuote = !!preview.querySelector('blockquote'); const hasList = !!preview.querySelector('ul, ol'); const hasCode = !!preview.querySelector('pre code'); const hasMermaid = !!preview.querySelector('.mermaid-rendered, .mermaid-placeholder'); return hasQuote && hasList && hasCode && hasMermaid; })()",
+    true,
+  ).trim();
+  return result.includes("true");
+}
+
+function waitForMarkdownPreviewReady(attempts = 10, delayMs = 180) {
+  for (let i = 0; i < attempts; i++) {
+    if (markdownPreviewReady()) return true;
+    wait(delayMs);
+  }
+  return false;
 }
 
 function horizontalScrollRight() {
@@ -967,6 +1019,13 @@ function openBrowser(url: string) {
   }
 }
 
+function enforceCaptureVisualDefaults() {
+  evalJs(
+    "(() => { localStorage.setItem('bord-theme', 'catppuccin-frappe'); localStorage.setItem('bord:file-icon-pack', 'catppuccin'); localStorage.setItem('bord:file-icon-pack-explicit', '1'); return 'ok'; })()",
+    true,
+  );
+}
+
 function tokensFor(
   manifest: Manifest,
   workspacePath: string,
@@ -1013,6 +1072,11 @@ async function main() {
 
   try {
     openBrowser(appUrl);
+    browser(["set", "viewport", "1720", "980"]);
+    wait(700);
+
+    enforceCaptureVisualDefaults();
+    browser(["open", appUrl]);
     browser(["set", "viewport", "1720", "980"]);
     wait(1200);
     ensureSidebarExpanded();
@@ -1093,8 +1157,12 @@ async function main() {
     hideMinimapTooltip();
 
     openGitDiff();
+    ensureSelectorVisible("[data-git-panel]", 6, 200);
     await captureShot("git-panel-diff-selected.png", {
-      profile: "context",
+      profile: "closeup",
+      selector: "[data-git-panel]",
+      minWidth: 1100,
+      minHeight: 760,
     });
     closeGitPanel();
 
@@ -1198,23 +1266,27 @@ async function main() {
       wait(420);
     }
 
-    // Expand src/ directory in sidebar file tree
-    evalJs(
-      "(() => { const tree = document.querySelector('[data-bord-sidebar] [data-file-tree]'); if (!tree) return 'missing'; const entries = [...tree.querySelectorAll('div.flex.items-center.cursor-pointer')]; const srcDir = entries.find(e => (e.textContent || '').trim().startsWith('src')); if (!srcDir) return 'no-src'; srcDir.click(); return 'ok'; })()",
-      true,
-    );
-    wait(600);
+    // Expand key folders for a denser sidebar tree capture
+    expandVisibleTreeDirectory("src");
+    expandVisibleTreeDirectory("components");
+    expandVisibleTreeDirectory("lib");
+    expandVisibleTreeDirectory("docs");
+    expandVisibleTreeDirectory("public");
+    wait(420);
     dismissFlyout();
     await captureShot("sidebar-file-tree.png", {
       profile: "closeup",
-      selector: "[data-file-tree]",
+      selector: "[data-bord-sidebar] [data-file-tree]",
       minWidth: 980,
       minHeight: 860,
     });
 
     // Open a code file from sidebar tree
-    openFileFromVisibleTreeByRegex("\\.(ts|tsx|js|jsx|json)$");
-    if (!fileViewerVisible()) {
+    let openedCode = openFileFromVisibleTreeByRegex("terminal-tile\\.(ts|tsx)$");
+    if (!openedCode) {
+      openedCode = openFileFromVisibleTreeByRegex("\\.(ts|tsx|js|jsx|json)$");
+    }
+    if (!openedCode || !fileViewerVisible()) {
       openAnyVisibleTreeFile();
     }
     wait(420);
@@ -1227,8 +1299,12 @@ async function main() {
     });
 
     // Open markdown and toggle preview
-    openFileFromVisibleTreeByRegex("(readme|\\.md)$");
-    if (!fileViewerVisible()) {
+    expandVisibleTreeDirectory("docs");
+    let openedMarkdown = openFileFromVisibleTreeByRegex("showcase-preview\\.md$");
+    if (!openedMarkdown) {
+      openedMarkdown = openFileFromVisibleTreeByRegex("(readme|\\.md)$");
+    }
+    if (!openedMarkdown || !fileViewerVisible()) {
       openAnyVisibleTreeFile();
     }
     wait(420);
@@ -1238,14 +1314,15 @@ async function main() {
       "(() => { const btn = document.querySelector('[data-md-preview-toggle]'); if (!btn) return 'missing'; btn.click(); return 'ok'; })()",
       true,
     );
-    wait(600);
+    wait(720);
+    waitForMarkdownPreviewReady();
 
     dismissFlyout();
     await captureShot("file-viewer-markdown-preview.png", {
       profile: "closeup",
       selector: "[data-file-viewer]",
       minWidth: 1000,
-      minHeight: 760,
+      minHeight: 820,
     });
 
     // Terminal file tree (folder icon on terminal panel)
@@ -1255,10 +1332,12 @@ async function main() {
       true,
     );
     wait(800);
+    ensureSidebarCollapsed();
+    ensureSelectorVisible("[data-terminal-id] [data-file-tree]", 6, 160);
     dismissFlyout();
     await captureShot("file-tree-terminal.png", {
       profile: "closeup",
-      selector: "[data-file-tree]",
+      selector: "[data-terminal-id] [data-file-tree]",
       minWidth: 1020,
       minHeight: 760,
     });
@@ -1302,8 +1381,44 @@ async function main() {
       }
     };
 
-    // --- Showcase sequence: open sessions, explore features ---
+    // --- Showcase sequence: 4 tabs, density cycle, then horizontal scroll ---
 
+    ensureSidebarCollapsed();
+    ensureVisibleTerminalCount(4);
+    wait(650);
+    hold(4, 220);
+
+    clickButton("4x", true);
+    wait(420);
+    hold(4, 210);
+
+    clickButton("3x", true);
+    wait(420);
+    hold(4, 210);
+
+    clickButton("2x", true);
+    wait(420);
+    hold(4, 210);
+
+    clickButton("1x", true);
+    wait(560);
+    hold(4, 210);
+
+    horizontalScrollRight();
+    hold(6, 170);
+    wait(260);
+    hold(2, 170);
+
+    horizontalScrollLeft();
+    hold(6, 170);
+    wait(260);
+    hold(2, 170);
+
+    clickButton("3x", true);
+    wait(400);
+    hold(3, 210);
+
+    // Continue showcase with session/provider workflow
     ensureProvider("Claude");
     refreshSessions();
     openSessionByToken(claudeTokens[0]);
@@ -1318,33 +1433,6 @@ async function main() {
     revealMinimapProviderTooltip();
     hold(3, 200);
     moveMouseToMainArea();
-
-    // Layout density cycling
-    clickButton("4x", true);
-    wait(400);
-    hold(3, 200);
-
-    clickButton("2x", true);
-    wait(400);
-    hold(3, 200);
-
-    clickButton("1x", true);
-    wait(500);
-    hold(3, 200);
-
-    // Scroll through terminals in 1x
-    horizontalScrollRight();
-    wait(900);
-    hold(3, 200);
-
-    horizontalScrollLeft();
-    wait(900);
-    hold(3, 200);
-
-    // Back to multi-column
-    clickButton("3x", true);
-    wait(400);
-    hold(3, 200);
 
     // Switch to Docker workspace, peek Docker panel
     selectWorkspace(fixtureDocker.name);

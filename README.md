@@ -96,6 +96,7 @@ Detailed architecture: [`docs/architecture.md`](./docs/architecture.md)
 bun run fixtures:setup
 bun run fixtures:register
 bun run qa:capture-media
+bun run qa:capture-media:parallel
 ```
 
 Capture profiles (via env var):

@@ -83,6 +83,12 @@ function ffmpegBinary() {
   return process.env.BORD_FFMPEG_PATH ?? "ffmpeg";
 }
 
+function enforceCaptureVisualDefaults() {
+  evalJs(
+    "(() => { localStorage.setItem('bord-theme', 'catppuccin-frappe'); localStorage.setItem('bord:file-icon-pack', 'catppuccin'); localStorage.setItem('bord:file-icon-pack-explicit', '1'); return 'ok'; })()",
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Tiling container helpers
 // ---------------------------------------------------------------------------
@@ -196,7 +202,12 @@ async function main() {
       ab(["open", appUrl]);
     }
     ab(["set", "viewport", "1520", "920"]);
-    wait(2000);
+    wait(1200);
+
+    enforceCaptureVisualDefaults();
+    ab(["open", appUrl]);
+    ab(["set", "viewport", "1520", "920"]);
+    wait(1200);
 
     // Create or reuse workspace
     const workspaces = (await fetch(`${apiUrl}/api/workspaces`).then((r) =>

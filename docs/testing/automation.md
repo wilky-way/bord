@@ -26,6 +26,9 @@ bun run fixtures:register
 # Capture screenshots and short interaction video with agent-browser
 bun run qa:capture-media
 
+# Capture media + horizontal scroll in parallel (uses separate browser sessions)
+bun run qa:capture-media:parallel
+
 # Run automated verification suites
 bun run test:unit
 bun run test:e2e
@@ -66,3 +69,4 @@ Generated media files (default mixed profile):
 - `BORD_APP_URL` - UI URL for media capture (default `http://localhost:1420`)
 - `AGENT_BROWSER_SESSION` - browser session name for capture script
 - `BORD_CAPTURE_MODE` - `mixed`, `context`, or `closeup` (default `mixed`)
+- `BORD_SKIP_FIXTURES=1` - skip fixture setup/register in parallel capture wrapper
