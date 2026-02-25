@@ -36,12 +36,78 @@ interface RunOptions {
   timeout?: number;
 }
 
+type CaptureProfile = "context" | "closeup";
+type CaptureMode = "mixed" | "context" | "closeup";
+
+interface CaptureOptions {
+  profile?: CaptureProfile;
+  selector?: string;
+  padding?: number;
+  minWidth?: number;
+  minHeight?: number;
+  allowFlyout?: boolean;
+  allowStash?: boolean;
+  allowSettings?: boolean;
+  allowMinimapTooltip?: boolean;
+}
+
+interface CaptureRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  viewportWidth: number;
+  viewportHeight: number;
+}
+
 const repoRoot = process.cwd();
 const mediaDir = join(repoRoot, "docs", "media");
 const fixtureRoot = process.env.BORD_FIXTURE_ROOT ?? join(homedir(), "Developer", "bord-fixtures");
 const manifestPath = join(fixtureRoot, "fixture-manifest.json");
 const appUrl = process.env.BORD_APP_URL ?? "http://localhost:1420";
 const session = process.env.AGENT_BROWSER_SESSION ?? `bord-media-${Date.now()}`;
+const captureMode = (
+  process.env.BORD_CAPTURE_MODE === "context" ||
+  process.env.BORD_CAPTURE_MODE === "closeup" ||
+  process.env.BORD_CAPTURE_MODE === "mixed"
+    ? process.env.BORD_CAPTURE_MODE
+    : "mixed"
+) as CaptureMode;
+const overlaySettleMs = 220;
+
+function resolveProfile(profile?: CaptureProfile): CaptureProfile {
+  if (captureMode === "context") return "context";
+  if (captureMode === "closeup") return "closeup";
+  return profile ?? "context";
+}
+
+function parseJson<T>(value: string): T | null {
+  const raw = value.trim();
+  if (!raw) return null;
+
+  const normalize = (parsed: unknown): unknown => {
+    if (typeof parsed !== "string") return parsed;
+    const nested = parsed.trim();
+    if (!nested) return parsed;
+    if (!nested.startsWith("{") && !nested.startsWith("[")) return parsed;
+    try {
+      return JSON.parse(nested);
+    } catch {
+      return parsed;
+    }
+  };
+
+  try {
+    return normalize(JSON.parse(raw)) as T;
+  } catch {
+    try {
+      const unquoted = raw.replace(/^"|"$/g, "").replace(/\\"/g, '"');
+      return normalize(JSON.parse(unquoted)) as T;
+    } catch {
+      return null;
+    }
+  }
+}
 
 function stripAnsi(value: string) {
   return value.replace(/\x1B\[[0-9;]*m/g, "");
@@ -92,6 +158,231 @@ function screenshot(name: string) {
 
 function screenshotAbsolute(path: string) {
   browser(["screenshot", path]);
+}
+
+function settingsModalVisible() {
+  const result = evalJs(
+    "(() => { const modal = document.querySelector('.fixed.inset-0.z-50'); if (!(modal instanceof HTMLElement)) return false; const style = window.getComputedStyle(modal); return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0'; })()",
+    true,
+  ).trim();
+  return result.includes("true");
+}
+
+function hideMinimapTooltip() {
+  evalJs(
+    "(() => { const tips = [...document.querySelectorAll('div.group div.absolute')].filter((el) => el instanceof HTMLElement); for (const tip of tips) { tip.classList.add('hidden'); tip.classList.remove('flex'); tip.style.removeProperty('display'); tip.style.removeProperty('visibility'); tip.style.removeProperty('opacity'); tip.style.removeProperty('z-index'); } return 'ok'; })()",
+    true,
+  );
+}
+
+function closeEditorMenus() {
+  evalJs(
+    "(() => { document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })); document.body.dispatchEvent(new MouseEvent('mouseup', { bubbles: true })); document.body.dispatchEvent(new MouseEvent('click', { bubbles: true })); return 'ok'; })()",
+    true,
+  );
+}
+
+function closeStashPopover() {
+  if (!stashPopoverVisible()) return;
+
+  for (let i = 0; i < 4; i++) {
+    moveMouseToMainArea();
+    closeEditorMenus();
+    press("Escape", true);
+    wait(overlaySettleMs);
+    if (!stashPopoverVisible()) return;
+  }
+}
+
+function hideSettingsModal() {
+  if (!settingsModalVisible()) return;
+
+  for (let i = 0; i < 4; i++) {
+    press("Escape", true);
+    wait(180);
+    if (!settingsModalVisible()) return;
+
+    evalJs(
+      "(() => { const close = document.querySelector('.fixed.inset-0.z-50 button[title=\"Close\"]'); if (!(close instanceof HTMLElement)) return 'missing'; close.click(); return 'ok'; })()",
+      true,
+    );
+    wait(180);
+    if (!settingsModalVisible()) return;
+  }
+}
+
+function clearTransientOverlays(options: CaptureOptions = {}) {
+  moveMouseToMainArea();
+
+  if (!options.allowFlyout) {
+    dismissFlyout();
+  }
+
+  if (!options.allowMinimapTooltip) {
+    hideMinimapTooltip();
+  }
+
+  if (!options.allowStash) {
+    closeStashPopover();
+  }
+
+  closeEditorMenus();
+
+  if (!options.allowSettings) {
+    hideSettingsModal();
+  }
+
+  wait(overlaySettleMs);
+}
+
+function overlayState() {
+  const raw = evalJs(
+    "(() => { const styleVisible = (el) => { if (!(el instanceof HTMLElement)) return false; const style = window.getComputedStyle(el); return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0'; }; const flyout = styleVisible(document.querySelector('[data-bord-sidebar-flyout]')); const stash = [...document.querySelectorAll('[data-stash-zone]')].some((el) => { if (!(el instanceof HTMLElement)) return false; const cls = typeof el.className === 'string' ? el.className : ''; return cls.includes('absolute') && cls.includes('top-full') && cls.includes('shadow-lg') && styleVisible(el); }); const settings = styleVisible(document.querySelector('.fixed.inset-0.z-50')); const minimapTip = [...document.querySelectorAll('div.group div.absolute')].some((el) => styleVisible(el)); return JSON.stringify({ flyout, stash, settings, minimapTip }); })()",
+    true,
+  );
+
+  return parseJson<{ flyout: boolean; stash: boolean; settings: boolean; minimapTip: boolean }>(raw) ?? {
+    flyout: false,
+    stash: false,
+    settings: false,
+    minimapTip: false,
+  };
+}
+
+function assertCaptureSurface(options: CaptureOptions = {}) {
+  const state = overlayState();
+  const blocking: string[] = [];
+
+  if (state.flyout && !options.allowFlyout) blocking.push("sidebar flyout");
+  if (state.stash && !options.allowStash) blocking.push("stash popover");
+  if (state.settings && !options.allowSettings) blocking.push("settings modal");
+  if (state.minimapTip && !options.allowMinimapTooltip) blocking.push("minimap tooltip");
+
+  if (blocking.length) {
+    throw new Error(`Capture blocked by unexpected overlay(s): ${blocking.join(", ")}`);
+  }
+}
+
+function selectorRect(selector: string): CaptureRect | null {
+  const raw = evalJs(
+    `(() => {
+      const styleVisible = (el) => {
+        if (!(el instanceof HTMLElement)) return false;
+        const style = window.getComputedStyle(el);
+        if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;
+        const rect = el.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      };
+
+      const nodes = [...document.querySelectorAll(${JSON.stringify(selector)})];
+      const el = nodes.find((node) => styleVisible(node));
+      if (!(el instanceof HTMLElement)) return '';
+      const rect = el.getBoundingClientRect();
+      return JSON.stringify({ x: rect.left, y: rect.top, width: rect.width, height: rect.height, viewportWidth: window.innerWidth, viewportHeight: window.innerHeight });
+    })()`,
+    true,
+  );
+
+  return parseJson<CaptureRect>(raw);
+}
+
+function isValidRect(rect: CaptureRect | null): rect is CaptureRect {
+  if (!rect) return false;
+
+  const values = [
+    Number(rect.x),
+    Number(rect.y),
+    Number(rect.width),
+    Number(rect.height),
+    Number(rect.viewportWidth),
+    Number(rect.viewportHeight),
+  ];
+
+  return values.every((value) => Number.isFinite(value));
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function cropToRect(
+  inputPath: string,
+  outputPath: string,
+  rect: CaptureRect,
+  padding = 28,
+  minWidth = 980,
+  minHeight = 620,
+) {
+  const x = Number(rect.x);
+  const y = Number(rect.y);
+  const width = Number(rect.width);
+  const height = Number(rect.height);
+  const viewportWidth = Number(rect.viewportWidth);
+  const viewportHeight = Number(rect.viewportHeight);
+
+  const centerX = x + width / 2;
+  const centerY = y + height / 2;
+
+  const targetWidth = Math.min(
+    viewportWidth,
+    Math.max(Math.ceil(width + padding * 2), minWidth),
+  );
+  const targetHeight = Math.min(
+    viewportHeight,
+    Math.max(Math.ceil(height + padding * 2), minHeight),
+  );
+
+  const left = Math.round(clamp(centerX - targetWidth / 2, 0, viewportWidth - targetWidth));
+  const top = Math.round(clamp(centerY - targetHeight / 2, 0, viewportHeight - targetHeight));
+  const cropWidth = Math.round(targetWidth);
+  const cropHeight = Math.round(targetHeight);
+
+  run(
+    [
+      ffmpegBinaryPath(),
+      "-y",
+      "-i",
+      inputPath,
+      "-vf",
+      `crop=${cropWidth}:${cropHeight}:${left}:${top}`,
+      outputPath,
+    ],
+    { timeout: 90_000, silent: true },
+  );
+}
+
+async function captureShot(name: string, options: CaptureOptions = {}) {
+  clearTransientOverlays(options);
+  assertCaptureSurface(options);
+
+  const outputPath = join(mediaDir, name);
+  const profile = resolveProfile(options.profile);
+
+  if (profile === "closeup" && options.selector) {
+    const tempPath = join(mediaDir, `_tmp-${name}`);
+    screenshotAbsolute(tempPath);
+
+    const rect = selectorRect(options.selector);
+    if (isValidRect(rect)) {
+      cropToRect(
+        tempPath,
+        outputPath,
+        rect,
+        options.padding,
+        options.minWidth,
+        options.minHeight,
+      );
+      await rm(tempPath, { force: true });
+      return;
+    }
+
+    console.warn(`[capture] Fallback to full-frame for ${name}; selector did not resolve: ${options.selector}`);
+
+    await rename(tempPath, outputPath);
+    return;
+  }
+
+  screenshot(name);
 }
 
 function clickText(value: string, exact = false, allowFailure = false) {
@@ -260,6 +551,42 @@ function ensureSectionExpanded(header: string, marker: string) {
   }
 }
 
+function openSettingsPanel() {
+  if (settingsModalVisible()) return;
+
+  evalJs(
+    "(() => { const settingsButton = document.querySelector('button[title=\"Settings\"]'); if (!(settingsButton instanceof HTMLElement)) return 'missing'; settingsButton.click(); return 'ok'; })()",
+    true,
+  );
+  wait(420);
+
+  if (settingsModalVisible()) return;
+
+  ensureSidebarExpanded();
+  clickButton("Settings", true);
+  wait(420);
+
+  if (!settingsModalVisible()) {
+    throw new Error("Failed to open settings panel for media capture");
+  }
+}
+
+function switchSettingsSection(section: "Appearance" | "Notifications" | "Features" | "About") {
+  if (!settingsModalVisible()) {
+    throw new Error("Settings panel is not open");
+  }
+
+  evalJs(
+    `(() => { const modal = document.querySelector('.fixed.inset-0.z-50'); if (!(modal instanceof HTMLElement)) return 'missing'; const buttons = [...modal.querySelectorAll('button')].filter((el) => (el.textContent || '').trim() === ${JSON.stringify(section)}); const button = buttons[0]; if (!(button instanceof HTMLElement)) return 'missing'; button.click(); return 'ok'; })()`,
+    true,
+  );
+  wait(360);
+}
+
+function closeSettingsPanel() {
+  hideSettingsModal();
+}
+
 function selectWorkspace(name: string) {
   evalJs(
     `(() => { const buttons = [...document.querySelectorAll('[data-bord-sidebar-rail] button[title]')]; const target = buttons.find((button) => (button.getAttribute('title') || '').trim() === ${JSON.stringify(name)}); if (!(target instanceof HTMLElement)) return 'missing'; target.click(); return 'ok'; })()`,
@@ -329,14 +656,40 @@ function revealMinimapProviderTooltip() {
 }
 
 function openGitDiff() {
-  press("Meta+g", true);
-  wait(900);
+  const panelVisible = () => {
+    const result = evalJs(
+      "(() => { const panel = document.querySelector('[data-git-panel]'); if (!(panel instanceof HTMLElement)) return false; const style = window.getComputedStyle(panel); return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0'; })()",
+      true,
+    ).trim();
+    return result.includes("true");
+  };
 
-  const candidates = ["src/panel.ts", "src/theme.css", "src/layout.ts", "notes/todo.md"];
-  for (const file of candidates) {
-    clickText(file, false, true);
-    wait(600);
+  evalJs(
+    "(() => { const ctx = window.__bord || {}; if (typeof ctx.setState !== 'function') return 'no-store'; const active = ctx.state?.activeTerminalId; if (!active) return 'no-active'; ctx.setState('gitPanelTerminalId', active); return 'ok'; })()",
+    true,
+  );
+  wait(300);
+
+  if (!panelVisible()) {
+    evalJs(
+      "(() => { const button = [...document.querySelectorAll('button[title=\"Toggle git panel\"]')].find((el) => el instanceof HTMLElement && el.getClientRects().length > 0); if (!(button instanceof HTMLElement)) return 'missing'; button.click(); return 'ok'; })()",
+      true,
+    );
+    wait(500);
   }
+
+  if (!panelVisible()) {
+    press("Meta+g", true);
+    wait(700);
+  }
+
+  if (!panelVisible()) return;
+
+  evalJs(
+    "(() => { const panel = document.querySelector('[data-git-panel]'); if (!(panel instanceof HTMLElement)) return 'missing'; const fileButton = [...panel.querySelectorAll('button')].find((btn) => (btn.textContent || '').trim().includes('/')); if (!(fileButton instanceof HTMLElement)) return 'no-file'; fileButton.click(); return 'ok'; })()",
+    true,
+  );
+  wait(500);
 }
 
 function closeGitPanel() {
@@ -404,6 +757,46 @@ function ensureDockerPanelVisible() {
     wait(900);
     if (hasMarker()) return;
   }
+}
+
+function ensureSidebarFileTreeMode() {
+  evalJs(
+    "(() => { const ctx = window.__bord || {}; if (typeof ctx.setState === 'function') { ctx.setState('sidebarMode', 'files'); return 'ok'; } return 'no-store'; })()",
+    true,
+  );
+  wait(380);
+}
+
+function sidebarFileTreeVisible() {
+  const result = evalJs(
+    "(() => { const trees = [...document.querySelectorAll('[data-bord-sidebar] [data-file-tree]')]; return trees.some((el) => el instanceof HTMLElement && el.getClientRects().length > 0); })()",
+    true,
+  ).trim();
+  return result.includes("true");
+}
+
+function fileViewerVisible() {
+  const result = evalJs(
+    "(() => { const el = document.querySelector('[data-file-viewer]'); if (!(el instanceof HTMLElement)) return false; return el.getClientRects().length > 0; })()",
+    true,
+  ).trim();
+  return result.includes("true");
+}
+
+function openFileFromVisibleTreeByRegex(pattern: string) {
+  evalJs(
+    `(() => { const tree = [...document.querySelectorAll('[data-file-tree]')].find((el) => el instanceof HTMLElement && el.getClientRects().length > 0); if (!(tree instanceof HTMLElement)) return 'missing-tree'; const rows = [...tree.querySelectorAll('div.flex.items-center.cursor-pointer')].filter((el) => el instanceof HTMLElement && el.getClientRects().length > 0); const rx = new RegExp(${JSON.stringify(pattern)}, 'i'); const match = rows.find((row) => rx.test((row.textContent || '').trim())); if (!(match instanceof HTMLElement)) return 'no-match'; match.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); return 'ok'; })()`,
+    true,
+  );
+  wait(420);
+}
+
+function openAnyVisibleTreeFile() {
+  evalJs(
+    "(() => { const tree = [...document.querySelectorAll('[data-file-tree]')].find((el) => el instanceof HTMLElement && el.getClientRects().length > 0); if (!(tree instanceof HTMLElement)) return 'missing-tree'; const rows = [...tree.querySelectorAll('div.flex.items-center.cursor-pointer')].filter((el) => el instanceof HTMLElement && el.getClientRects().length > 0); for (const row of rows) { const text = (row.textContent || '').trim(); if (!text || text === 'Files' || text === 'Loading...') continue; if (/\.[a-z0-9]+$/i.test(text)) { row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); return 'ok'; } } return 'no-file'; })()",
+    true,
+  );
+  wait(420);
 }
 
 function horizontalScrollRight() {
@@ -557,7 +950,7 @@ async function buildGifFromFrames(
       "-frames:v",
       String(frameLimit),
       "-vf",
-      "fps=10,scale=1320:-1:flags=lanczos",
+      "fps=12,scale=1440:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=160:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=2",
       outputPath,
     ],
     { timeout: 120_000 },
@@ -596,6 +989,7 @@ function tokensFor(
 async function main() {
   await verifyApp();
   await mkdir(mediaDir, { recursive: true });
+  console.log(`Capture mode: ${captureMode}`);
 
   const manifestRaw = await readFile(manifestPath, "utf-8");
   const manifest = JSON.parse(manifestRaw) as Manifest;
@@ -624,7 +1018,7 @@ async function main() {
     ensureSidebarExpanded();
     wait(250);
 
-    screenshot("home-overview.png");
+    await captureShot("home-overview.png", { profile: "context" });
 
     selectWorkspace(fixtureWeb.name);
     ensureSectionExpanded("Sessions", "Refresh");
@@ -639,53 +1033,146 @@ async function main() {
 
     ensureSidebarCollapsed();
     moveMouseToMainArea();
-    screenshot("sidebar-rail-counters.png");
+    await captureShot("sidebar-rail-counters.png", {
+      profile: "closeup",
+      selector: "[data-bord-sidebar-rail]",
+      minWidth: 880,
+      minHeight: 740,
+    });
 
     ensureSidebarExpanded();
     hoverExpandedWorkspacePreview(fixtureWeb.name);
     clickPreviewTab("all");
-    screenshot("sidebar-hover-workspace-preview.png");
+    await captureShot("sidebar-hover-workspace-preview.png", {
+      profile: "closeup",
+      selector: "[data-workspace-hover-preview]",
+      allowFlyout: true,
+      minWidth: 980,
+      minHeight: 700,
+    });
     clickPreviewTab("sessions");
     moveMouseToMainArea();
+    dismissFlyout();
 
     ensureProvider("Claude");
     refreshSessions();
-    screenshot("sessions-claude.png");
+    await captureShot("sessions-claude.png", {
+      profile: "closeup",
+      selector: "[data-bord-sidebar-panel=\"expanded\"]",
+      minWidth: 1000,
+      minHeight: 860,
+    });
 
     ensureProvider("Codex");
     refreshSessions();
-    screenshot("sessions-codex.png");
+    await captureShot("sessions-codex.png", {
+      profile: "closeup",
+      selector: "[data-bord-sidebar-panel=\"expanded\"]",
+      minWidth: 1000,
+      minHeight: 860,
+    });
 
-    screenshot("terminals-provider-icons.png");
+    await captureShot("terminals-provider-icons.png", { profile: "context" });
 
     clickButton("1x", true);
     wait(700);
-    screenshot("layout-1x.png");
+    await captureShot("layout-1x.png", { profile: "context" });
 
     clickButton("4x", true);
     wait(700);
-    screenshot("layout-4x.png");
+    await captureShot("layout-4x.png", { profile: "context" });
 
     revealMinimapProviderTooltip();
-    screenshot("minimap-hover-provider-tooltip.png");
+    await captureShot("minimap-hover-provider-tooltip.png", {
+      profile: "closeup",
+      selector: "div.group div.absolute",
+      allowMinimapTooltip: true,
+      minWidth: 780,
+      minHeight: 360,
+    });
+    hideMinimapTooltip();
 
     openGitDiff();
-    screenshot("git-panel-diff-selected.png");
+    await captureShot("git-panel-diff-selected.png", {
+      profile: "context",
+    });
     closeGitPanel();
 
     stashOneTerminalAndOpenTray();
-    screenshot("stash-sidebar-popover.png");
+    await captureShot("stash-sidebar-popover.png", {
+      profile: "closeup",
+      selector: "[data-stash-zone]",
+      allowStash: true,
+      minWidth: 900,
+      minHeight: 580,
+    });
+    closeStashPopover();
 
     selectWorkspace(fixtureDocker.name);
     ensureDockerPanelVisible();
-    screenshot("docker-panel-expanded.png");
+    await captureShot("docker-panel-expanded.png", {
+      profile: "closeup",
+      selector: "[data-bord-sidebar-panel=\"expanded\"]",
+      minWidth: 1020,
+      minHeight: 860,
+    });
 
     selectWorkspace(fixtureWeb.name);
     ensureSidebarExpanded();
     openEditorDropdown();
-    screenshot("open-in-editor-controls.png");
+    await captureShot("open-in-editor-controls.png", {
+      profile: "closeup",
+      selector: "button[title=\"Choose editor\"]",
+      minWidth: 760,
+      minHeight: 460,
+    });
     evalJs("(() => { document.body.click(); return 'ok'; })()", true);
     wait(200);
+
+    openSettingsPanel();
+    switchSettingsSection("Appearance");
+    await captureShot("settings-appearance.png", {
+      profile: "closeup",
+      selector: ".fixed.inset-0.z-50 > div",
+      allowSettings: true,
+      minWidth: 1100,
+      minHeight: 760,
+    });
+    await captureShot("settings-theme-picker.png", {
+      profile: "closeup",
+      selector: ".fixed.inset-0.z-50 > div",
+      allowSettings: true,
+      minWidth: 1100,
+      minHeight: 760,
+    });
+
+    switchSettingsSection("Notifications");
+    await captureShot("settings-notifications.png", {
+      profile: "closeup",
+      selector: ".fixed.inset-0.z-50 > div",
+      allowSettings: true,
+      minWidth: 1100,
+      minHeight: 760,
+    });
+
+    switchSettingsSection("Features");
+    await captureShot("settings-features.png", {
+      profile: "closeup",
+      selector: ".fixed.inset-0.z-50 > div",
+      allowSettings: true,
+      minWidth: 1100,
+      minHeight: 760,
+    });
+
+    switchSettingsSection("About");
+    await captureShot("settings-about-updates.png", {
+      profile: "closeup",
+      selector: ".fixed.inset-0.z-50 > div",
+      allowSettings: true,
+      minWidth: 1100,
+      minHeight: 760,
+    });
+    closeSettingsPanel();
 
     // --- File tree & viewer screenshots ---
     suppressHoverPreview();
@@ -697,6 +1184,7 @@ async function main() {
     // Sidebar file tree mode
     selectWorkspace(fixtureWeb.name);
     ensureSidebarExpanded();
+    ensureSidebarFileTreeMode();
     dismissFlyout();
 
     evalJs(
@@ -705,6 +1193,11 @@ async function main() {
     );
     wait(800);
 
+    if (!sidebarFileTreeVisible()) {
+      ensureSidebarFileTreeMode();
+      wait(420);
+    }
+
     // Expand src/ directory in sidebar file tree
     evalJs(
       "(() => { const tree = document.querySelector('[data-bord-sidebar] [data-file-tree]'); if (!tree) return 'missing'; const entries = [...tree.querySelectorAll('div.flex.items-center.cursor-pointer')]; const srcDir = entries.find(e => (e.textContent || '').trim().startsWith('src')); if (!srcDir) return 'no-src'; srcDir.click(); return 'ok'; })()",
@@ -712,23 +1205,33 @@ async function main() {
     );
     wait(600);
     dismissFlyout();
-    screenshot("sidebar-file-tree.png");
+    await captureShot("sidebar-file-tree.png", {
+      profile: "closeup",
+      selector: "[data-file-tree]",
+      minWidth: 980,
+      minHeight: 860,
+    });
 
-    // Open a .ts file from sidebar → opens in terminal file view
-    evalJs(
-      "(() => { const tree = document.querySelector('[data-bord-sidebar] [data-file-tree]'); if (!tree) return 'missing'; const entries = [...tree.querySelectorAll('div.flex.items-center.cursor-pointer')]; const tsFile = entries.find(e => /\\.(ts|js)$/.test((e.textContent || '').trim())); if (!tsFile) return 'no-ts'; tsFile.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); return 'ok'; })()",
-      true,
-    );
-    wait(1000);
+    // Open a code file from sidebar tree
+    openFileFromVisibleTreeByRegex("\\.(ts|tsx|js|jsx|json)$");
+    if (!fileViewerVisible()) {
+      openAnyVisibleTreeFile();
+    }
+    wait(420);
     dismissFlyout();
-    screenshot("file-viewer-syntax.png");
+    await captureShot("file-viewer-syntax.png", {
+      profile: "closeup",
+      selector: "[data-file-viewer]",
+      minWidth: 1000,
+      minHeight: 760,
+    });
 
-    // Open a .md file and toggle preview
-    evalJs(
-      "(() => { const tree = document.querySelector('[data-bord-sidebar] [data-file-tree]'); if (!tree) return 'missing'; const entries = [...tree.querySelectorAll('div.flex.items-center.cursor-pointer')]; const mdFile = entries.find(e => /\\.md$/.test((e.textContent || '').trim())); if (!mdFile) { const rootEntries = [...tree.querySelectorAll('div.flex.items-center.cursor-pointer')]; const readme = rootEntries.find(e => (e.textContent || '').includes('README')); if (readme) { readme.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); return 'ok-readme'; } return 'no-md'; } mdFile.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); return 'ok'; })()",
-      true,
-    );
-    wait(800);
+    // Open markdown and toggle preview
+    openFileFromVisibleTreeByRegex("(readme|\\.md)$");
+    if (!fileViewerVisible()) {
+      openAnyVisibleTreeFile();
+    }
+    wait(420);
 
     // Click Preview button
     evalJs(
@@ -738,7 +1241,12 @@ async function main() {
     wait(600);
 
     dismissFlyout();
-    screenshot("file-viewer-markdown-preview.png");
+    await captureShot("file-viewer-markdown-preview.png", {
+      profile: "closeup",
+      selector: "[data-file-viewer]",
+      minWidth: 1000,
+      minHeight: 760,
+    });
 
     // Terminal file tree (folder icon on terminal panel)
     // Click file tree button on terminal title bar
@@ -748,7 +1256,12 @@ async function main() {
     );
     wait(800);
     dismissFlyout();
-    screenshot("file-tree-terminal.png");
+    await captureShot("file-tree-terminal.png", {
+      profile: "closeup",
+      selector: "[data-file-tree]",
+      minWidth: 1020,
+      minHeight: 760,
+    });
 
     // Return to terminal view for subsequent captures
     evalJs(

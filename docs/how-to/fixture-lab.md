@@ -57,6 +57,10 @@ bun run scripts/fixtures/register-workspaces.ts
 
 ```bash
 bun run scripts/qa/capture-media.ts
+
+# Optional: force profile
+# BORD_CAPTURE_MODE=context bun run scripts/qa/capture-media.ts
+# BORD_CAPTURE_MODE=closeup bun run scripts/qa/capture-media.ts
 ```
 
 Outputs are written to:
@@ -76,3 +80,4 @@ bun run scripts/fixtures/cleanup-demo.ts
 - Session seeding intentionally uses real `claude` and `codex` commands to match production scanner behavior.
 - If session seeding fails for auth or network reasons, the script still writes the manifest and reports failures.
 - You can override the fixture root with `BORD_FIXTURE_ROOT`.
+- Media capture defaults to mixed mode (`BORD_CAPTURE_MODE=mixed`) so README images keep context while closeups stay readable.

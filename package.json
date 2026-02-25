@@ -13,6 +13,8 @@
     "fixtures:register": "bun run scripts/fixtures/register-workspaces.ts",
     "fixtures:cleanup": "bun run scripts/fixtures/cleanup-demo.ts",
     "qa:capture-media": "bun run scripts/qa/capture-media.ts",
+    "qa:capture-media:context": "BORD_CAPTURE_MODE=context bun run scripts/qa/capture-media.ts",
+    "qa:capture-media:closeup": "BORD_CAPTURE_MODE=closeup bun run scripts/qa/capture-media.ts",
     "qa:capture-hscroll": "bun run scripts/qa/capture-horizontal-scroll.ts",
     "test:e2e": "playwright test --config e2e/playwright.config.ts",
     "test:e2e:headed": "playwright test --config e2e/playwright.config.ts --headed",

@@ -12,10 +12,11 @@ This is the practical operator guide for daily usage.
 ## Terminal Cards
 
 - Create terminal: `Cmd/Ctrl+N` or the `+` button in the center topbar strip.
-- Switch active terminal: `Cmd/Ctrl+Left` and `Cmd/Ctrl+Right`.
+- Switch active terminal: `Alt+Left` and `Alt+Right`.
 - Reorder cards with drag-and-drop.
 - Use density buttons (`1x`, `2x`, `3x`, `4x`) to change visible columns.
 - Use minimap in the top bar to jump to any terminal quickly.
+- Use the **Return** button in terminal headers to jump shell cwd back to workspace root after `cd` drift.
 
 ## Stash + Notifications
 

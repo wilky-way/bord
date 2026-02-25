@@ -15,7 +15,7 @@ Use this matrix with fixture environment from `docs/how-to/fixture-lab.md`.
 | W1 | Workspace scoping | Open workspace A terminals, switch to workspace B | A terminals disappear, B terminals show |
 | W2 | Ownership persistence | In workspace A terminal, `cd` to unrelated path | Terminal remains in workspace A |
 | W3 | New terminal hotkey | Press `Cmd/Ctrl+N` in active workspace | New terminal card appears |
-| W4 | Adjacent navigation | Press `Cmd/Ctrl+Left/Right` | Focus moves to previous/next card |
+| W4 | Adjacent navigation | Press `Alt+Left/Right` | Focus moves to previous/next card |
 | W5 | Drag reorder | Drag card positions | Card order updates and persists in store |
 | W6 | Density controls | Toggle `1x` -> `4x` -> `2x` | Layout updates with matching visible column count |
 | W7 | Minimap navigation | Click minimap item | Corresponding terminal becomes active |

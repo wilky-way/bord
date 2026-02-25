@@ -195,7 +195,7 @@ async function main() {
       wait(200);
       ab(["open", appUrl]);
     }
-    ab(["set", "viewport", "1720", "980"]);
+    ab(["set", "viewport", "1520", "920"]);
     wait(2000);
 
     // Create or reuse workspace
@@ -337,7 +337,7 @@ async function main() {
         "-frames:v",
         String(totalFrames),
         "-vf",
-        "fps=12,scale=1320:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=128:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=3",
+        "fps=12,scale=1480:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=160:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=2",
         tempGifPath,
       ],
       { timeout: 120_000 },

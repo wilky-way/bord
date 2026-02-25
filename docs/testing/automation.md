@@ -4,6 +4,12 @@
 
 Automate repeatable fixture setup and media capture so docs and QA evidence stay current.
 
+Media capture supports three profiles via `BORD_CAPTURE_MODE`:
+
+- `mixed` (default): context shots for layout + closeups for feature readability
+- `context`: full-frame captures everywhere
+- `closeup`: selector-focused closeups wherever available
+
 Prerequisite:
 
 - `ffmpeg` must be available on `PATH` for `showcase-workflow.webm` generation.
@@ -30,7 +36,7 @@ bun run fixtures:cleanup
 
 ## Capture Outputs
 
-Generated media files (default):
+Generated media files (default mixed profile):
 
 - `docs/media/home-overview.png`
 - `docs/media/terminals-provider-icons.png`
@@ -45,6 +51,11 @@ Generated media files (default):
 - `docs/media/sidebar-hover-workspace-preview.png`
 - `docs/media/docker-panel-expanded.png`
 - `docs/media/open-in-editor-controls.png`
+- `docs/media/settings-appearance.png`
+- `docs/media/settings-theme-picker.png`
+- `docs/media/settings-notifications.png`
+- `docs/media/settings-features.png`
+- `docs/media/settings-about-updates.png`
 - `docs/media/showcase-workflow.gif`
 - `docs/media/showcase-workflow.webm`
 
@@ -54,3 +65,4 @@ Generated media files (default):
 - `BORD_API_URL` - workspace API base (default `http://localhost:4200`)
 - `BORD_APP_URL` - UI URL for media capture (default `http://localhost:1420`)
 - `AGENT_BROWSER_SESSION` - browser session name for capture script
+- `BORD_CAPTURE_MODE` - `mixed`, `context`, or `closeup` (default `mixed`)
