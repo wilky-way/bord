@@ -51,7 +51,7 @@ The SolidJS implementation here is flawless. Using `createStore` and highly spec
 **Highlight:** The [getVisibleTerminals()](file:///Users/wilky/Developer/bord/src/store/terminals.ts#30-37) computed signal driving the [TilingLayout](file:///Users/wilky/Developer/bord/src/components/layout/TilingLayout.tsx#12-147) is implemented perfectly. Drag-and-drop converting to absolute indices via custom Pointer Events is also extremely well done.
 
 ## Summary
-The foundation is fantastic. Before adding new features (like WYSIWYG piping or LLM tabs), I strongly recommend we:
+The foundation is fantastic. Before adding additional workflow surface area, I strongly recommend we:
 1. **Refactor [pty-manager.ts](file:///Users/wilky/Developer/bord/server/services/pty-manager.ts)** (Resolved)
 2. **Fix [TerminalView](file:///Users/wilky/Developer/bord/src/components/terminal/TerminalView.tsx#25-124) sizing** (Resolved)
 3. (Optional but recommended) Decide if Bun is a permanent dependency or if we should port the backend to Rust via Tauri commands.

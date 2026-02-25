@@ -1,6 +1,7 @@
 import { createSignal, For, Show, onMount } from "solid-js";
 import { api } from "../../lib/api";
 import { getFileIcon } from "../../lib/file-icons";
+import { fileIconPack } from "../../store/settings";
 
 interface DirEntry {
   name: string;
@@ -58,7 +59,13 @@ export default function FileTree(props: Props) {
     const isExpanded = () => expanded().has(nodeProps.entry.path);
     const isLoading = () => loading().has(nodeProps.entry.path);
     const children = () => cache().get(nodeProps.entry.path);
-    const icon = () => getFileIcon(nodeProps.entry.name, nodeProps.entry.type);
+    const icon = () => getFileIcon(
+      nodeProps.entry.name,
+      nodeProps.entry.type,
+      fileIconPack(),
+      nodeProps.entry.path,
+      { expanded: isExpanded() },
+    );
 
     return (
       <>
@@ -87,12 +94,24 @@ export default function FileTree(props: Props) {
           </Show>
 
           {/* File icon */}
-          <span
-            class="text-[10px] font-mono font-bold shrink-0 w-4 text-center leading-none"
-            style={{ color: icon().color }}
+          <Show
+            when={icon().kind === "asset"}
+            fallback={
+              <span
+                class="text-[10px] font-mono font-bold shrink-0 w-4 text-center leading-none"
+                style={{ color: icon().color }}
+              >
+                {icon().icon}
+              </span>
+            }
           >
-            {icon().icon}
-          </span>
+            <img
+              src={icon().icon}
+              alt=""
+              class="w-[14px] h-[14px] shrink-0"
+              draggable={false}
+            />
+          </Show>
 
           {/* Name */}
           <span

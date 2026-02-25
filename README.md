@@ -207,6 +207,7 @@ Rosé Pine — muted purple and gold.
 - **Terminal isolation** — each workspace maintains its own set of active and stashed terminals
 - **Workspace switching** — swap entire terminal sets by selecting a different workspace
 - **Ownership persistence** — terminals remain owned by their workspace even after `cd` to other paths
+- **Return to workspace** — one-click action on terminal headers when cwd drifts outside workspace root
 - **Folder browser** — browse and add workspace directories via the filesystem API
 
 ### Session Integration (Multi-Provider)
@@ -229,6 +230,7 @@ Rosé Pine — muted purple and gold.
 ### File Browser & Editor
 - **Workspace file tree** in sidebar — browse project files without leaving Bord
 - **Per-terminal file tree** scoped to terminal's CWD
+- **Built-in icon packs** — switch between Bord Classic and Catppuccin icon styles in settings
 - **Built-in file viewer** with syntax highlighting (30+ languages via highlight.js)
 - **Tab system** — up to 5 open files per terminal panel
 - **Markdown preview** with mermaid diagram rendering
@@ -236,6 +238,8 @@ Rosé Pine — muted purple and gold.
 - **Smart file opening** — sidebar file tree spawns/reuses viewer terminals
 - **Git integration** — double-click changed files in git panel to view/edit
 - **Keyboard shortcuts**: Cmd+Shift+E (sidebar files), Cmd+1-5 (switch tabs)
+
+Catppuccin icon assets are bundled from `catppuccin/vscode-icons` under MIT license (see `public/vendor/catppuccin-icons/LICENSE`).
 
 ### Docker Panel
 - **Compose discovery** — scans workspace for compose files

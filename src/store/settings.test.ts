@@ -7,6 +7,8 @@ import {
   resetFontSize,
   fontFamily,
   setFontFamily,
+  fileIconPack,
+  setFileIconPack,
 } from "./settings";
 
 const storage = (globalThis as any).__testStorage as Map<string, string>;
@@ -98,6 +100,36 @@ describe("settings - fontFamily", () => {
     createRoot((dispose) => {
       setFontFamily("Menlo, monospace");
       expect(storage.get("bord:font-family")).toBe("Menlo, monospace");
+      dispose();
+    });
+  });
+});
+
+describe("settings - fileIconPack", () => {
+  beforeEach(() => {
+    storage.clear();
+    setFileIconPack("catppuccin");
+  });
+
+  test("default pack is catppuccin", () => {
+    createRoot((dispose) => {
+      expect(fileIconPack()).toBe("catppuccin");
+      dispose();
+    });
+  });
+
+  test("setFileIconPack updates signal", () => {
+    createRoot((dispose) => {
+      setFileIconPack("catppuccin");
+      expect(fileIconPack()).toBe("catppuccin");
+      dispose();
+    });
+  });
+
+  test("setFileIconPack persists to localStorage", () => {
+    createRoot((dispose) => {
+      setFileIconPack("catppuccin");
+      expect(storage.get("bord:file-icon-pack")).toBe("catppuccin");
       dispose();
     });
   });

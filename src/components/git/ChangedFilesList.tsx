@@ -1,6 +1,8 @@
 import { For, Show } from "solid-js";
 import type { GitStatus } from "../../store/types";
 import OpenFileButton from "../shared/OpenFileButton";
+import { getFileIcon } from "../../lib/file-icons";
+import { fileIconPack } from "../../store/settings";
 
 interface Props {
   status: GitStatus;
@@ -64,9 +66,32 @@ export default function ChangedFilesList(props: Props) {
           <For each={props.status.staged}>
             {(file) => {
               const stats = () => props.fileStats?.staged[file.path];
+              const icon = () => getFileIcon(file.path, "file", fileIconPack(), file.path);
               return (
                 <div class="flex items-center gap-2 py-0.5 group">
                   <StatusBadge status={file.status} />
+                  <span
+                    class="shrink-0 w-4 h-4 flex items-center justify-center"
+                  >
+                    <Show
+                      when={icon().kind === "asset"}
+                      fallback={
+                        <span
+                          class="text-[10px] font-mono font-bold leading-none"
+                          style={{ color: icon().color }}
+                        >
+                          {icon().icon}
+                        </span>
+                      }
+                    >
+                      <img
+                        src={icon().icon}
+                        alt=""
+                        class="w-[13px] h-[13px]"
+                        draggable={false}
+                      />
+                    </Show>
+                  </span>
                   <button
                     class="flex-1 text-left text-xs text-[var(--text-primary)] truncate hover:text-[var(--accent)]"
                     onClick={() => props.onViewDiff(file.path, true)}
@@ -107,9 +132,32 @@ export default function ChangedFilesList(props: Props) {
           <For each={props.status.unstaged}>
             {(file) => {
               const stats = () => props.fileStats?.unstaged[file.path];
+              const icon = () => getFileIcon(file.path, "file", fileIconPack(), file.path);
               return (
                 <div class="flex items-center gap-2 py-0.5 group">
                   <StatusBadge status={file.status} />
+                  <span
+                    class="shrink-0 w-4 h-4 flex items-center justify-center"
+                  >
+                    <Show
+                      when={icon().kind === "asset"}
+                      fallback={
+                        <span
+                          class="text-[10px] font-mono font-bold leading-none"
+                          style={{ color: icon().color }}
+                        >
+                          {icon().icon}
+                        </span>
+                      }
+                    >
+                      <img
+                        src={icon().icon}
+                        alt=""
+                        class="w-[13px] h-[13px]"
+                        draggable={false}
+                      />
+                    </Show>
+                  </span>
                   <button
                     class="flex-1 text-left text-xs text-[var(--text-primary)] truncate hover:text-[var(--accent)]"
                     onClick={() => props.onViewDiff(file.path, false)}
@@ -148,24 +196,49 @@ export default function ChangedFilesList(props: Props) {
             </button>
           </div>
           <For each={props.status.untracked}>
-            {(file) => (
-              <div class="flex items-center gap-2 py-0.5 group">
-                <span class="font-mono text-[10px] w-3 text-[var(--text-secondary)]">?</span>
-                <button
-                  class="flex-1 text-left text-xs text-[var(--text-secondary)] truncate hover:text-[var(--accent)]"
-                  onDblClick={() => props.onOpenFile(file)}
-                >
-                  {file}
-                </button>
-                <OpenFileButton cwd={props.cwd} file={file} />
-                <button
-                  class="text-xs text-[var(--text-secondary)] opacity-0 group-hover:opacity-100 hover:text-[var(--success)] w-5 h-5 flex items-center justify-center rounded hover:bg-[var(--bg-tertiary)]"
-                  onClick={() => props.onStage(file)}
-                >
-                  +
-                </button>
-              </div>
-            )}
+            {(file) => {
+              const icon = () => getFileIcon(file, "file", fileIconPack(), file);
+              return (
+                <div class="flex items-center gap-2 py-0.5 group">
+                  <span class="font-mono text-[10px] w-3 text-[var(--text-secondary)]">?</span>
+                  <span
+                    class="shrink-0 w-4 h-4 flex items-center justify-center"
+                  >
+                    <Show
+                      when={icon().kind === "asset"}
+                      fallback={
+                        <span
+                          class="text-[10px] font-mono font-bold leading-none"
+                          style={{ color: icon().color }}
+                        >
+                          {icon().icon}
+                        </span>
+                      }
+                    >
+                      <img
+                        src={icon().icon}
+                        alt=""
+                        class="w-[13px] h-[13px]"
+                        draggable={false}
+                      />
+                    </Show>
+                  </span>
+                  <button
+                    class="flex-1 text-left text-xs text-[var(--text-secondary)] truncate hover:text-[var(--accent)]"
+                    onDblClick={() => props.onOpenFile(file)}
+                  >
+                    {file}
+                  </button>
+                  <OpenFileButton cwd={props.cwd} file={file} />
+                  <button
+                    class="text-xs text-[var(--text-secondary)] opacity-0 group-hover:opacity-100 hover:text-[var(--success)] w-5 h-5 flex items-center justify-center rounded hover:bg-[var(--bg-tertiary)]"
+                    onClick={() => props.onStage(file)}
+                  >
+                    +
+                  </button>
+                </div>
+              );
+            }}
           </For>
         </div>
       </Show>

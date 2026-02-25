@@ -3,12 +3,13 @@ import { themes } from "../../lib/themes";
 import { activeTheme, setTheme } from "../../lib/theme";
 import { getSettings, updateSettings, requestOsNotificationPermission } from "../../lib/notifications/store";
 import { sendConfigureToAll } from "../../lib/ws";
-import { fontFamily, setFontFamily, FONT_PRESETS } from "../../store/settings";
+import { fontFamily, setFontFamily, FONT_PRESETS, fileIconPack, setFileIconPack } from "../../store/settings";
 import { checkForUpdates, updateAvailable, updateVersion, updateStatus, installUpdate } from "../../lib/updater";
 import { getFeatures, updateFeatures } from "../../store/features";
 import { listProviders } from "../../lib/providers";
 import type { BordTheme } from "../../lib/themes";
 import { getFileOpenTarget, getPreferredEditor, setFileOpenTarget, setPreferredEditor, type Editor } from "../../lib/editor-preference";
+import { FILE_ICON_PACKS, type FileIconPackId } from "../../lib/file-icons";
 
 interface Props {
   open: boolean;
@@ -126,6 +127,20 @@ export default function SettingsPanel(props: Props) {
 
               <label class="text-xs font-medium text-[var(--text-secondary)] mt-5 mb-2 block">Terminal Font</label>
               <FontPicker />
+
+              <label class="text-xs font-medium text-[var(--text-secondary)] mt-5 mb-2 block">File Icons</label>
+              <select
+                class="w-full bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs rounded-md px-2 py-1.5 border border-[var(--border)] outline-none focus:border-[var(--accent)]"
+                value={fileIconPack()}
+                onChange={(e) => setFileIconPack(e.currentTarget.value as FileIconPackId)}
+              >
+                <For each={FILE_ICON_PACKS}>
+                  {(pack) => <option value={pack.id}>{pack.label}</option>}
+                </For>
+              </select>
+              <p class="text-[10px] text-[var(--text-secondary)] mt-1">
+                Applies to file tree, file tabs, and git changed-file lists. Catppuccin uses bundled VS Code-style SVG icons.
+              </p>
 
             </Show>
 

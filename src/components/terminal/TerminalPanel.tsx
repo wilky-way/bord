@@ -13,6 +13,8 @@ import FileViewer from "../files/FileViewer";
 import { api } from "../../lib/api";
 import { isFeatureEnabled } from "../../store/features";
 import { getFileOpenTarget, getPreferredEditor } from "../../lib/editor-preference";
+import { sendToTerminal } from "../../lib/ws";
+import { buildCdCommand, isPathWithinRoot } from "../../lib/workspace-paths";
 
 interface Props {
   id: string;
@@ -30,6 +32,13 @@ export default function TerminalPanel(props: Props) {
   const effectiveCwd = () => terminal()?.dynamicCwd ?? props.cwd;
   const terminalView = () => terminal()?.terminalView ?? "terminal";
   const workspaceName = () => state.workspaces.find((w) => w.id === terminal()?.workspaceId)?.name;
+  const workspacePath = () => state.workspaces.find((w) => w.id === terminal()?.workspaceId)?.path;
+  const isOutsideWorkspace = () => {
+    const workspaceRoot = workspacePath();
+    const cwd = effectiveCwd();
+    if (!workspaceRoot || !cwd) return false;
+    return !isPathWithinRoot(workspaceRoot, cwd);
+  };
   const displayTitle = () => terminal()?.customTitle || terminal()?.sessionTitle || title();
   const [branch, setBranch] = createSignal<string | null>(null);
   const [dirty, setDirty] = createSignal(false);
@@ -38,7 +47,9 @@ export default function TerminalPanel(props: Props) {
   const [pushDone, setPushDone] = createSignal(false);
   const [insertions, setInsertions] = createSignal(0);
   const [deletions, setDeletions] = createSignal(0);
+  const [returningHome, setReturningHome] = createSignal(false);
   const isGitPanelOpen = () => state.gitPanelTerminalId === props.id;
+  let returnHomeTimer: ReturnType<typeof setTimeout> | undefined;
 
   let branchButtonRef: HTMLButtonElement | undefined;
   let popoverRef: HTMLDivElement | undefined;
@@ -156,6 +167,9 @@ export default function TerminalPanel(props: Props) {
     }
   });
   onCleanup(() => clearInterval(interval));
+  onCleanup(() => {
+    if (returnHomeTimer) clearTimeout(returnHomeTimer);
+  });
 
   // Re-fetch git info when CWD changes (debounced to avoid spam during rapid cd)
   let cwdDebounce: ReturnType<typeof setTimeout>;
@@ -174,6 +188,14 @@ export default function TerminalPanel(props: Props) {
   createEffect(() => {
     if (props.isActive && panelRef) {
       panelRef.scrollIntoView({ inline: "nearest", behavior: "instant" });
+    }
+  });
+
+  createEffect(() => {
+    if (!returningHome()) return;
+    if (!isOutsideWorkspace()) {
+      setReturningHome(false);
+      if (returnHomeTimer) clearTimeout(returnHomeTimer);
     }
   });
 
@@ -200,6 +222,19 @@ export default function TerminalPanel(props: Props) {
     }
 
     openFileInTerminal(props.id, path);
+  }
+
+  function returnToWorkspace() {
+    const workspaceRoot = workspacePath();
+    if (!workspaceRoot) return;
+
+    setReturningHome(true);
+    sendToTerminal(props.id, buildCdCommand(workspaceRoot));
+
+    if (returnHomeTimer) clearTimeout(returnHomeTimer);
+    returnHomeTimer = setTimeout(() => {
+      setReturningHome(false);
+    }, 5000);
   }
 
   return (
@@ -282,6 +317,22 @@ export default function TerminalPanel(props: Props) {
           <span class="text-[10px] text-[var(--text-secondary)] opacity-50 truncate">
             {effectiveCwd()}
           </span>
+          <Show when={isOutsideWorkspace()}>
+            <button
+              class="text-[10px] px-1.5 py-0.5 rounded-[var(--btn-radius)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+              classList={{
+                "text-[var(--accent)] border-[var(--accent)]": returningHome(),
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                returnToWorkspace();
+              }}
+              title={`Return to workspace root: ${workspacePath()}`}
+            >
+              {returningHome() ? "Returning..." : "Return"}
+            </button>
+          </Show>
           <WarmupIndicator
             armed={!!terminal()?.notificationsArmed}
             muted={!!terminal()?.muted}

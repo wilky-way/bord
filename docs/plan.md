@@ -1,6 +1,6 @@
 # Bord Execution Plan (Living)
 
-Last updated: 2026-02-24
+Last updated: 2026-02-25
 Owner: OpenCode + Wilky
 
 ## Goal
@@ -19,30 +19,29 @@ This document is the source of truth for:
 
 - Workspace-scoped terminals (active + stashed per workspace)
 - Terminal ownership persists by `workspaceId` even if shell cwd changes later
+- Return-to-workspace action when cwd drifts outside workspace root
 - Session resume linking for Claude/Codex/OpenCode via provider-aware command parsing
 - Terminal minimap with provider icon + hover details + attention pulse
 - Cmd/Ctrl shortcuts: new terminal, next/prev terminal, git panel toggle
 - Drag-and-drop terminal reorder
 - 1x/2x/3x/4x layout density controls
+- Compact sidebar rail + hover flyout previews + quick workspace/session switching
 - Stash terminals with attention and per-terminal mute + global bell mute
 - Git operations in-app (status, diff, stage/unstage, commit, push/pull, branches)
 - Workspace and terminal level git indicators
+- Built-in file icon packs (Bord Classic + Catppuccin) across file tree/tabs/git rows
 - Open in VS Code/Cursor (workspace and file level)
 - Docker sidebar panel with compose discovery + start/stop/restart/pull + logs/shell
 - App rename to bord (runtime/UI/tauri config)
 
 ### Partial
 
-- Git panel is a floating popover, not yet a full in-card terminal replacement overlay
 - Provider parity: Gemini exists in UI but scanner currently returns no sessions
-- Sidebar collapse sections exist, but not yet the compact left rail + hover flyout model switch UX
 - Native desktop notifications are partially implemented (permission-aware web notifications; native desktop parity still in progress)
 - Layout density behavior is good, but strict "uniform resize all cards" semantics need extra polish around min-width constraints
 
 ### Missing
 
-- WYSIWYG prompt composer that pipes prompts into active terminal session
-- Return-to-workspace action based on live cwd tracking after `cd` away
 - Full Gemini session discovery/resume parity
 
 ## Key Behavioral Notes
@@ -55,9 +54,9 @@ This document is the source of truth for:
 
 ### Patterns to borrow now
 
-1. Prompt composer region
-- One input surface that can route to message submit, shell mode, and command mode.
-- Keep state machine separate from presentational component to avoid regressions.
+1. Terminal ownership + cwd drift controls
+- Keep workspace ownership metadata-based.
+- Provide an explicit one-click return action when shell cwd drifts outside the workspace root.
 
 2. Collapsed rail navigation
 - Keep a narrow icon rail always visible.
@@ -101,7 +100,7 @@ Acceptance criteria:
 Scope:
 - Move sidebar hide/show control into sidebar rail
 - Implement compact icon rail + hover tooltips + quick switch interactions
-- Add visible prev/next navigation buttons in top chrome (keep hotkeys)
+- Keep minimap + hotkeys as primary terminal navigation model (no extra chrome arrows)
 
 Acceptance criteria:
 - Sidebar can be fully collapsed to rail and still usable
@@ -110,11 +109,11 @@ Acceptance criteria:
 ### Phase 2 - Git overlay parity (P1)
 
 Scope:
-- Replace popover model with true in-card git overlay using same panel dimensions as terminal
+- Keep popover model and focus on interaction smoothness + reliability
 - Preserve titlebar branch stats + open/close affordances
 
 Acceptance criteria:
-- Git view and terminal view swap in the same card with no layout jump
+- Git popover remains stable during resize/reflow and does not steal terminal focus unexpectedly
 - Commit/push/pull/diff/stage flows remain fully functional
 
 ### Phase 3 - Session/provider polish (P1)
@@ -128,23 +127,23 @@ Acceptance criteria:
 - Session panel behavior is consistent across providers
 - No confusing empty provider states without explanation
 
-### Phase 4 - Prompt composer (P1)
+### Phase 4 - File icon packs (P1)
 
 Scope:
-- Add optional prompt composer with send button
-- Pipe content to active terminal input stream
-- Keep CLI-first behavior (no model RPC abstraction)
+- Add built-in icon pack selector in settings
+- Ship Bord Classic + Catppuccin packs
+- Apply icons consistently in file tree, file tabs, and git changed-file rows
 
 Acceptance criteria:
-- Composer can be toggled on/off
-- Enter/send writes prompt to active terminal reliably
+- Icon pack changes apply immediately and persist
+- No regressions in file open/diff workflows
 
 ### Phase 5 - Themes + settings (P2)
 
 Scope:
 - Settings entry point
 - Theme selection (catppuccin variants + gruvbox + one dark baseline)
-- Composer and notification preferences in settings
+- Notification and appearance preferences in settings
 
 Acceptance criteria:
 - Theme changes apply immediately and persist

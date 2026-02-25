@@ -2,6 +2,8 @@ import { createSignal, createEffect, onMount, onCleanup, Show, For } from "solid
 import { state } from "../../store/core";
 import { closeFileInTerminal, setActiveFileInTerminal, setTerminalView, setFileScrollTop } from "../../store/terminals";
 import { api } from "../../lib/api";
+import { getFileIcon } from "../../lib/file-icons";
+import { fileIconPack } from "../../store/settings";
 
 interface Props {
   terminalId: string;
@@ -299,31 +301,57 @@ export default function FileViewer(props: Props) {
       {/* Tab bar */}
       <div class="flex items-center h-8 border-b border-[var(--border)] shrink-0 px-1 gap-0.5" data-file-viewer-tabs>
         <For each={openFiles()}>
-          {(file, idx) => (
-            <button
-              class="flex items-center gap-1 px-2 py-1 text-[11px] rounded-t-[var(--btn-radius)] transition-colors max-w-[160px] group"
-              classList={{
-                "bg-[var(--bg-secondary)] text-[var(--text-primary)] border-b-2 border-[var(--accent)]": idx() === activeFileIndex(),
-                "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]": idx() !== activeFileIndex(),
-              }}
-              data-file-tab={basename(file.path)}
-              onClick={() => setActiveFileInTerminal(props.terminalId, idx())}
-            >
-              <span class="truncate">{basename(file.path)}</span>
-              <Show when={idx() === activeFileIndex() && isDirty()}>
-                <span class="text-[var(--warning)] ml-0.5">{"\u25CF"}</span>
-              </Show>
-              <span
-                class="ml-1 text-[var(--text-secondary)] hover:text-[var(--danger)] opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  closeFileInTerminal(props.terminalId, idx());
+          {(file, idx) => {
+            const icon = () => getFileIcon(basename(file.path), "file", fileIconPack(), file.path);
+
+            return (
+              <button
+                class="flex items-center gap-1 px-2 py-1 text-[11px] rounded-t-[var(--btn-radius)] transition-colors max-w-[160px] group"
+                classList={{
+                  "bg-[var(--bg-secondary)] text-[var(--text-primary)] border-b-2 border-[var(--accent)]": idx() === activeFileIndex(),
+                  "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]": idx() !== activeFileIndex(),
                 }}
+                data-file-tab={basename(file.path)}
+                onClick={() => setActiveFileInTerminal(props.terminalId, idx())}
               >
-                {"\u00D7"}
-              </span>
-            </button>
-          )}
+                <span
+                  class="shrink-0 w-4 h-4 flex items-center justify-center"
+                >
+                  <Show
+                    when={icon().kind === "asset"}
+                    fallback={
+                      <span
+                        class="text-[10px] font-mono font-bold leading-none"
+                        style={{ color: icon().color }}
+                      >
+                        {icon().icon}
+                      </span>
+                    }
+                  >
+                    <img
+                      src={icon().icon}
+                      alt=""
+                      class="w-[13px] h-[13px]"
+                      draggable={false}
+                    />
+                  </Show>
+                </span>
+                <span class="truncate">{basename(file.path)}</span>
+                <Show when={idx() === activeFileIndex() && isDirty()}>
+                  <span class="text-[var(--warning)] ml-0.5">{"\u25CF"}</span>
+                </Show>
+                <span
+                  class="ml-1 text-[var(--text-secondary)] hover:text-[var(--danger)] opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    closeFileInTerminal(props.terminalId, idx());
+                  }}
+                >
+                  {"\u00D7"}
+                </span>
+              </button>
+            );
+          }}
         </For>
 
         <div class="flex-1" />

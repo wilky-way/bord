@@ -1,4 +1,5 @@
 import { createSignal } from "solid-js";
+import type { FileIconPackId } from "../lib/file-icons";
 
 const FONT_SIZE_KEY = "bord:font-size";
 const DEFAULT_FONT_SIZE = 13;
@@ -69,6 +70,39 @@ export function setFontFamily(family: string) {
 }
 
 export { fontFamily };
+
+// File icon pack
+const FILE_ICON_PACK_KEY = "bord:file-icon-pack";
+const FILE_ICON_PACK_EXPLICIT_KEY = "bord:file-icon-pack-explicit";
+const DEFAULT_FILE_ICON_PACK: FileIconPackId = "catppuccin";
+
+function isFileIconPackId(value: string | null): value is FileIconPackId {
+  return value === "classic" || value === "catppuccin";
+}
+
+function loadFileIconPack(): FileIconPackId {
+  try {
+    const stored = localStorage.getItem(FILE_ICON_PACK_KEY);
+    const explicit = localStorage.getItem(FILE_ICON_PACK_EXPLICIT_KEY) === "1";
+
+    if (isFileIconPackId(stored)) {
+      // Migrate old implicit default from "classic" to the newer VS Code-like pack.
+      if (stored === "classic" && !explicit) return "catppuccin";
+      return stored;
+    }
+  } catch {}
+  return DEFAULT_FILE_ICON_PACK;
+}
+
+const [fileIconPack, setFileIconPackRaw] = createSignal<FileIconPackId>(loadFileIconPack());
+
+export function setFileIconPack(pack: FileIconPackId) {
+  setFileIconPackRaw(pack);
+  localStorage.setItem(FILE_ICON_PACK_KEY, pack);
+  localStorage.setItem(FILE_ICON_PACK_EXPLICIT_KEY, "1");
+}
+
+export { fileIconPack };
 
 // Global settings panel open state (so Cmd+, can open it from anywhere)
 const [settingsOpen, setSettingsOpen] = createSignal(false);
