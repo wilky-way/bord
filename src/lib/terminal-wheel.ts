@@ -66,11 +66,18 @@ function getMouseCellPosition(terminal: Terminal, event: WheelEvent): { col: num
   };
 }
 
+function isHorizontalDominantWheel(event: WheelEvent): boolean {
+  const absX = Math.abs(event.deltaX);
+  const absY = Math.abs(event.deltaY);
+  return absX > 0 && absX > absY;
+}
+
 export function createTerminalWheelHandler(
   ptyId: string,
   terminal: Terminal,
 ): (event: WheelEvent) => boolean {
   return (event: WheelEvent): boolean => {
+    if (isHorizontalDominantWheel(event)) return false;
     if (terminal.buffer.active.type !== "alternate") return false;
     if (!terminal.hasMouseTracking()) return false;
     if (event.deltaY === 0) return false;

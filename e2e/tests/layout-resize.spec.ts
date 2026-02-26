@@ -37,6 +37,43 @@ test.describe("Layout & resize", () => {
     expect(await topbar.getActiveDensity()).toBe(1);
   });
 
+  test("horizontal wheel gesture scrolls the panel strip", async ({
+    page,
+    topbar,
+  }) => {
+    await topbar.setDensity(1);
+    await page.waitForTimeout(300);
+
+    const layout = page.locator("div.flex-nowrap.overflow-x-auto").first();
+    await expect(layout).toBeVisible();
+
+    const dimensions = await layout.evaluate((el) => ({
+      scrollLeft: el.scrollLeft,
+      scrollWidth: el.scrollWidth,
+      clientWidth: el.clientWidth,
+    }));
+    expect(dimensions.scrollWidth).toBeGreaterThan(dimensions.clientWidth);
+
+    const box = await layout.boundingBox();
+    if (!box) {
+      test.skip();
+      return;
+    }
+
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.wheel(700, 40);
+    await page.waitForTimeout(200);
+
+    const afterRight = await layout.evaluate((el) => el.scrollLeft);
+    expect(afterRight).toBeGreaterThan(dimensions.scrollLeft);
+
+    await page.mouse.wheel(-700, -40);
+    await page.waitForTimeout(200);
+
+    const afterLeft = await layout.evaluate((el) => el.scrollLeft);
+    expect(afterLeft).toBeLessThan(afterRight);
+  });
+
   test("4x density shows all terminals without scroll", async ({
     page,
     topbar,

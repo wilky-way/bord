@@ -33,13 +33,26 @@ export default function TilingLayout() {
 
   onMount(() => {
     if (!containerRef) return;
+    const container = containerRef;
 
     // ResizeObserver for container width
     const ro = new ResizeObserver((entries) => {
       setContainerWidth(entries[0].contentRect.width);
     });
-    ro.observe(containerRef);
+    ro.observe(container);
     onCleanup(() => ro.disconnect());
+
+    // Capture horizontal wheel gestures before terminal canvases handle wheel events.
+    const onWheelCapture = (e: WheelEvent) => {
+      if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
+      e.stopPropagation();
+      container.scrollLeft += e.deltaX;
+    };
+
+    container.addEventListener("wheel", onWheelCapture, { capture: true });
+    onCleanup(() => {
+      container.removeEventListener("wheel", onWheelCapture, true);
+    });
   });
 
   const columns = () => state.layoutColumns || visibleTerminals().length;

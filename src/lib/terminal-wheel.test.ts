@@ -46,6 +46,7 @@ function createMockTerminal(overrides: Record<string, unknown> = {}) {
 
 function makeWheelEvent(overrides: Record<string, unknown> = {}): WheelEvent {
   return {
+    deltaX: 0,
     deltaY: -10,
     deltaMode: 0,
     clientX: 15,
@@ -82,6 +83,26 @@ describe("createTerminalWheelHandler", () => {
     const handler = createTerminalWheelHandler("pty-1", terminal as any);
 
     const handled = handler(makeWheelEvent());
+
+    expect(handled).toBe(false);
+    expect(sentData).toHaveLength(0);
+  });
+
+  test("passes through when horizontal wheel dominates", () => {
+    const terminal = createMockTerminal();
+    const handler = createTerminalWheelHandler("pty-1", terminal as any);
+
+    const handled = handler(makeWheelEvent({ deltaX: 80, deltaY: 5 }));
+
+    expect(handled).toBe(false);
+    expect(sentData).toHaveLength(0);
+  });
+
+  test("passes through when vertical delta is zero", () => {
+    const terminal = createMockTerminal();
+    const handler = createTerminalWheelHandler("pty-1", terminal as any);
+
+    const handled = handler(makeWheelEvent({ deltaX: 80, deltaY: 0 }));
 
     expect(handled).toBe(false);
     expect(sentData).toHaveLength(0);
