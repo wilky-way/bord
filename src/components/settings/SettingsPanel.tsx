@@ -2,7 +2,6 @@ import { For, Show, createSignal, onMount, onCleanup } from "solid-js";
 import { themes } from "../../lib/themes";
 import { activeTheme, setTheme } from "../../lib/theme";
 import { getSettings, updateSettings, requestOsNotificationPermission } from "../../lib/notifications/store";
-import { sendConfigureToAll } from "../../lib/ws";
 import { fontFamily, setFontFamily, FONT_PRESETS, fileIconPack, setFileIconPack } from "../../store/settings";
 import { checkForUpdates, updateAvailable, updateVersion, updateStatus, installUpdate } from "../../lib/updater";
 import { getFeatures, updateFeatures } from "../../store/features";
@@ -220,7 +219,7 @@ function NotificationSettings() {
         <div class="space-y-1">
           <ToggleRow
             label="Agent done"
-            description="Play a chime when an agent finishes (goes idle)"
+            description="Play a chime when an agent reports turn completion via OSC title"
             checked={s().soundEnabled}
             onChange={(v) => updateSettings({ soundEnabled: v })}
           />
@@ -252,34 +251,20 @@ function NotificationSettings() {
       </div>
 
       <div>
-        <label class="text-xs font-medium text-[var(--text-secondary)] mb-2 block">
-          Idle threshold: {(s().idleThresholdMs / 1000).toFixed(0)}s
-        </label>
-        <div class="flex items-center gap-3">
-          <span class="text-[10px] text-[var(--text-secondary)]">5s</span>
-          <input
-            type="range"
-            min="5000"
-            max="30000"
-            step="1000"
-            value={s().idleThresholdMs}
-            class="flex-1 accent-[var(--accent)]"
-            onInput={(e) => {
-              const val = parseInt(e.currentTarget.value, 10);
-              updateSettings({ idleThresholdMs: val });
-              sendConfigureToAll(val);
-            }}
-          />
-          <span class="text-[10px] text-[var(--text-secondary)]">30s</span>
+        <label class="text-xs font-medium text-[var(--text-secondary)] mb-2 block">Detection mode</label>
+        <div class="rounded-md border border-[var(--border)] bg-[var(--bg-tertiary)] px-2.5 py-2">
+          <p class="text-[10px] text-[var(--text-primary)]">
+            OSC title signals only. Bord no longer uses idle/output-silence heuristics.
+          </p>
+          <p class="text-[10px] text-[var(--text-secondary)] mt-1">
+            Reliable turn-complete notifications currently depend on provider title support (best with Gemini dynamic titles).
+          </p>
         </div>
-        <p class="text-[10px] text-[var(--text-secondary)] mt-1">
-          How long a terminal must be silent before triggering a notification
-        </p>
       </div>
 
       <div>
         <label class="text-xs font-medium text-[var(--text-secondary)] mb-2 block">
-          Notification delay: {s().warmupDurationMs === 0 ? "Off" : `${(s().warmupDurationMs / 1000).toFixed(0)}s`}
+          OSC warmup: {s().warmupDurationMs === 0 ? "Off" : `${(s().warmupDurationMs / 1000).toFixed(0)}s`}
         </label>
         <div class="flex items-center gap-3">
           <span class="text-[10px] text-[var(--text-secondary)]">Off</span>
@@ -298,7 +283,32 @@ function NotificationSettings() {
           <span class="text-[10px] text-[var(--text-secondary)]">30s</span>
         </div>
         <p class="text-[10px] text-[var(--text-secondary)] mt-1">
-          Agent must work this long before notifications arm. Prevents alerts from brief output bursts.
+          How long OSC title activity must continue before the indicator arms.
+        </p>
+      </div>
+
+      <div>
+        <label class="text-xs font-medium text-[var(--text-secondary)] mb-2 block">
+          OSC quiet timeout: {(s().idleThresholdMs / 1000).toFixed(0)}s
+        </label>
+        <div class="flex items-center gap-3">
+          <span class="text-[10px] text-[var(--text-secondary)]">1s</span>
+          <input
+            type="range"
+            min="1000"
+            max="30000"
+            step="1000"
+            value={s().idleThresholdMs}
+            class="flex-1 accent-[var(--accent)]"
+            onInput={(e) => {
+              const val = parseInt(e.currentTarget.value, 10);
+              updateSettings({ idleThresholdMs: val });
+            }}
+          />
+          <span class="text-[10px] text-[var(--text-secondary)]">30s</span>
+        </div>
+        <p class="text-[10px] text-[var(--text-secondary)] mt-1">
+          If an armed working title stops changing for this long, Bord treats the turn as complete.
         </p>
       </div>
     </div>

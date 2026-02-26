@@ -160,9 +160,9 @@ export default function TerminalView(props: Props) {
             const bytes = new Uint8Array(data);
             writer.write(bytes);
             // ghostty-web only scans strings for OSC titles, so scan binary ourselves
-            if (props.onTitleChange) {
-              const title = extractOscTitle(bytes);
-              if (title) props.onTitleChange(title);
+            const title = extractOscTitle(bytes);
+            if (title) {
+              props.onTitleChange?.(title);
             }
             if (props.onCwdChange) {
               const cwd = extractOsc7Cwd(bytes);

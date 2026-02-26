@@ -49,6 +49,16 @@ function saveSettings(settings: NotificationSettings) {
 
 const [notifications, setNotifications] = createSignal<Notification[]>(loadNotifications());
 const [settings, setSettingsSignal] = createSignal<NotificationSettings>(loadSettings());
+const DEV_LOGS = !!(import.meta as any).env?.DEV;
+
+function logNotify(message: string, payload?: unknown) {
+  if (!DEV_LOGS) return;
+  if (payload === undefined) {
+    console.log(`[bord][notify] ${message}`);
+    return;
+  }
+  console.log(`[bord][notify] ${message}`, payload);
+}
 
 export { notifications };
 
@@ -76,14 +86,33 @@ export function addNotification(opts: {
   isActiveTerminal: boolean;
   isAppFocused: boolean;
 }) {
-  // Suppress if terminal is active AND app is focused (user is watching)
-  if (opts.isActiveTerminal && opts.isAppFocused) return;
+  const s = settings();
+
+  // Play sound even if the user is currently viewing the terminal.
+  if (opts.type === "turn-complete" && s.soundEnabled) {
+    logNotify("play chime", {
+      terminalId: opts.terminalId,
+      isActiveTerminal: opts.isActiveTerminal,
+      isAppFocused: opts.isAppFocused,
+    });
+    playSound("chime");
+  } else if (opts.type === "error" && s.errorSoundEnabled) {
+    logNotify("play error", {
+      terminalId: opts.terminalId,
+      isActiveTerminal: opts.isActiveTerminal,
+      isAppFocused: opts.isAppFocused,
+    });
+    playSound("error");
+  } else if (opts.type === "turn-complete") {
+    logNotify("chime skipped (sound disabled)", {
+      terminalId: opts.terminalId,
+      soundEnabled: s.soundEnabled,
+    });
+  }
 
   // Deduplicate: don't stack notifications for the same terminal+type if one is already unviewed
   const existing = notifications();
   if (existing.some((n) => n.terminalId === opts.terminalId && n.type === opts.type && !n.viewed)) return;
-
-  const s = settings();
 
   const notification: Notification = {
     id: `n-${Date.now()}-${++idCounter}`,
@@ -105,13 +134,6 @@ export function addNotification(opts: {
     saveNotifications(pruned);
     return pruned;
   });
-
-  // Play sound
-  if (opts.type === "turn-complete" && s.soundEnabled) {
-    playSound("chime");
-  } else if (opts.type === "error" && s.errorSoundEnabled) {
-    playSound("error");
-  }
 
   // OS notification when app not focused
   if (s.osNotificationsEnabled && !opts.isAppFocused) {
@@ -172,7 +194,7 @@ function sendOsNotification(n: Notification) {
 
   try {
     const osNotif = new globalThis.Notification(n.title, {
-      body: n.body ?? `${n.provider ?? "Terminal"} is idle`,
+      body: n.body ?? `${n.provider ?? "Terminal"} turn is complete`,
       tag: n.terminalId, // collapse per terminal
     });
     osNotif.onclick = () => {

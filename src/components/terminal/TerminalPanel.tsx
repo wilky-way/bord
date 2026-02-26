@@ -335,6 +335,7 @@ export default function TerminalPanel(props: Props) {
           </Show>
           <WarmupIndicator
             armed={!!terminal()?.notificationsArmed}
+            warmupStartedAt={terminal()?.notificationWarmupStartedAt}
             muted={!!terminal()?.muted}
             globalMuted={state.bellMuted}
             onMuteToggle={() => setTerminalMuted(props.id, !terminal()?.muted)}

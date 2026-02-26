@@ -31,6 +31,10 @@ export function setTerminalArmed(id: string, armed: boolean) {
   setState("terminals", (t) => t.id === id, "notificationsArmed", armed);
 }
 
+export function setTerminalWarmupStartedAt(id: string, startedAt: number | undefined) {
+  setState("terminals", (t) => t.id === id, "notificationWarmupStartedAt", startedAt);
+}
+
 export function setTerminalMuted(id: string, value: boolean) {
   setState("terminals", (t) => t.id === id, "muted", value);
 }

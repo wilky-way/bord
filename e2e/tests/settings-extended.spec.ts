@@ -149,33 +149,16 @@ test.describe("Settings — extended coverage", () => {
     expect(selectedClasses).toContain("border-[var(--accent)]");
   });
 
-  test("idle threshold slider changes value", async ({ page, settings }) => {
+  test("notifications panel exposes OSC-only mode copy", async ({ page, settings }) => {
     await page.keyboard.press("Meta+,");
     await page.waitForTimeout(300);
 
     await settings.switchSection("Notifications");
     await page.waitForTimeout(200);
 
-    const slider = settings.idleSlider().first();
-    await expect(slider).toBeVisible();
-
-    const initialValue = parseInt(await slider.inputValue());
-    const min = parseInt((await slider.getAttribute("min")) ?? "5000");
-    const max = parseInt((await slider.getAttribute("max")) ?? "30000");
-
-    // Set to a different value using evaluate + dispatchEvent (fill doesn't work on range inputs)
-    const newValue = initialValue === min ? min + 1000 : min;
-    await slider.evaluate((el, val) => {
-      const input = el as HTMLInputElement;
-      const nativeInputValueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
-      nativeInputValueSetter.call(input, String(val));
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-    }, newValue);
-    await page.waitForTimeout(300);
-
-    const updatedValue = parseInt(await slider.inputValue());
-    expect(updatedValue).toBeGreaterThanOrEqual(min);
-    expect(updatedValue).toBeLessThanOrEqual(max);
+    await expect(settings.modal.locator("text=/Detection mode/i")).toBeVisible();
+    await expect(settings.modal.locator("text=/OSC title signals only/i")).toBeVisible();
+    await expect(settings.modal.locator("text=/output-silence heuristics/i")).toBeVisible();
   });
 
   test("settings sections switch correctly", async ({ page, settings }) => {

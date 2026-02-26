@@ -187,20 +187,15 @@ test.describe("Settings & themes", () => {
     await expect(customInput.first()).toBeVisible();
   });
 
-  test("idle threshold slider is interactive", async ({ page, settings }) => {
+  test("Notifications section shows OSC-only detection mode", async ({ page, settings }) => {
     await page.keyboard.press("Meta+,");
     await page.waitForTimeout(300);
 
     await settings.switchSection("Notifications");
     await page.waitForTimeout(200);
 
-    const slider = settings.idleSlider().first();
-    await expect(slider).toBeVisible();
-
-    // Get initial value
-    const initialValue = await slider.inputValue();
-    expect(parseInt(initialValue)).toBeGreaterThanOrEqual(5000);
-    expect(parseInt(initialValue)).toBeLessThanOrEqual(30000);
+    await expect(settings.modal.locator("text=/Detection mode/i")).toBeVisible();
+    await expect(settings.modal.locator("text=/OSC title signals only/i")).toBeVisible();
   });
 
   test("Check for updates button click doesn't crash", async ({ page, settings }) => {

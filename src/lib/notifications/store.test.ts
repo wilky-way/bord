@@ -62,10 +62,10 @@ describe("notification store", () => {
     });
   });
 
-  test("suppresses when terminal is active AND focused", () => {
+  test("still records when terminal is active AND focused", () => {
     createRoot((dispose) => {
       addTestNotification({ isActiveTerminal: true, isAppFocused: true });
-      expect(notifications().length).toBe(0);
+      expect(notifications().length).toBe(1);
       dispose();
     });
   });

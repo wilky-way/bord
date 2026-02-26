@@ -13,10 +13,11 @@ export interface TerminalInstance {
   sessionTitle?: string; // session title shown in sidebar (from SessionCard click)
   lastOutputAt?: number; // Date.now() of last PTY data received
   lastSeenAt?: number; // Date.now() when user last viewed this terminal
-  muted?: boolean; // per-terminal mute — skips idle detection entirely
+  muted?: boolean; // per-terminal mute — suppresses turn-complete notifications
   provider?: Provider; // which AI provider spawned this terminal
   createdAt: number; // Date.now() when terminal was spawned
-  notificationsArmed?: boolean; // true when agent has worked long enough to trigger notifications on idle
+  notificationsArmed?: boolean; // true while an OSC title indicates an active agent turn
+  notificationWarmupStartedAt?: number; // per-turn warmup countdown start for bell indicator
   dynamicCwd?: string; // live CWD updated via OSC 7 — tracks shell's real current directory
   terminalView?: "terminal" | "filetree" | "file"; // default "terminal"
   openFiles?: Array<{ path: string; scrollTop: number }>; // max 5
