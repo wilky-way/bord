@@ -408,20 +408,24 @@ export default function TerminalPanel(props: Props) {
       <div class="flex-1 min-h-0 overflow-hidden relative">
         {/* TerminalView uses CSS hide to preserve ghostty-web WASM state */}
         <div class={terminalView() === "terminal" ? "contents" : "hidden"}>
-          <TerminalView
-            ptyId={props.id}
-            onTitleChange={(newTitle: string) => {
-              setTitle(newTitle);
-              setTerminalOscTitle(props.id, newTitle);
-            }}
-            onCwdChange={(newCwd: string) => {
-              setTerminalDynamicCwd(props.id, newCwd);
-            }}
-            onFileLinkOpen={(path: string) => {
-              openPath(path);
-            }}
-            getCwd={() => effectiveCwd()}
-          />
+          <Show when={props.id} keyed>
+            {(ptyId) => (
+              <TerminalView
+                ptyId={ptyId}
+                onTitleChange={(newTitle: string) => {
+                  setTitle(newTitle);
+                  setTerminalOscTitle(ptyId, newTitle);
+                }}
+                onCwdChange={(newCwd: string) => {
+                  setTerminalDynamicCwd(ptyId, newCwd);
+                }}
+                onFileLinkOpen={(path: string) => {
+                  openPath(path);
+                }}
+                getCwd={() => effectiveCwd()}
+              />
+            )}
+          </Show>
         </div>
         <Show when={terminalView() === "filetree"}>
           <FileTree

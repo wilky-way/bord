@@ -257,7 +257,7 @@ function NotificationSettings() {
             OSC title signals only. Bord no longer uses idle/output-silence heuristics.
           </p>
           <p class="text-[10px] text-[var(--text-secondary)] mt-1">
-            Reliable turn-complete notifications currently depend on provider title support (best with Gemini dynamic titles).
+            Reliable turn-complete notifications depend on provider title support. Claude and Gemini are strongest; Codex and OpenCode use fallback title heuristics.
           </p>
         </div>
       </div>

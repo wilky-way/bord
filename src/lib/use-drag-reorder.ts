@@ -1,4 +1,4 @@
-import { createSignal } from "solid-js";
+import { createSignal, onCleanup } from "solid-js";
 
 interface DragReorderOptions {
   getPanelElements: () => HTMLElement[];
@@ -14,8 +14,26 @@ export function useDragReorder(opts: DragReorderOptions) {
   let startX = 0;
   let startY = 0;
   let active = false;
+  let detachListeners: (() => void) | null = null;
+
+  function cancelDrag() {
+    active = false;
+    dragVisibleIndex = -1;
+    setDraggingId(null);
+    setDropIndex(null);
+    if (detachListeners) {
+      detachListeners();
+      detachListeners = null;
+    }
+  }
+
+  onCleanup(() => {
+    cancelDrag();
+  });
 
   function handlePointerDown(terminalId: string, visibleIndex: number, e: PointerEvent) {
+    cancelDrag();
+
     const target = e.target as HTMLElement;
     if (target.closest("button, input")) return;
     if (e.button !== 0) return;
@@ -34,7 +52,7 @@ export function useDragReorder(opts: DragReorderOptions) {
       if (!active) {
         // Only start drag if horizontal movement dominates
         if (dy > dx) {
-          cleanup();
+          cancelDrag();
           return;
         }
         active = true;
@@ -69,20 +87,25 @@ export function useDragReorder(opts: DragReorderOptions) {
           opts.onDrop(dragVisibleIndex, targetIndex);
         }
       }
-      cleanup();
+      cancelDrag();
     };
 
-    const cleanup = () => {
-      active = false;
-      setDraggingId(null);
-      setDropIndex(null);
+    const onCancel = () => {
+      cancelDrag();
+    };
+
+    detachListeners = () => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onCancel);
+      window.removeEventListener("blur", onCancel);
     };
 
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onCancel);
+    window.addEventListener("blur", onCancel);
   }
 
-  return { draggingId, dropIndex, handlePointerDown };
+  return { draggingId, dropIndex, handlePointerDown, cancelDrag };
 }

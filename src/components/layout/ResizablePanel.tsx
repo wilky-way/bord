@@ -45,7 +45,7 @@ export default function ResizablePanel(props: Props) {
     <div
       ref={(el) => props.ref?.(el)}
       class="relative h-full rounded-xl overflow-hidden panel-appear"
-      classList={{ "opacity-40 pointer-events-none": props.isDragging }}
+      classList={{ "opacity-40": props.isDragging }}
       style={{
         flex: `0 0 ${props.pixelWidth}px`,
         transition: props.isDragging ? "opacity 0.15s ease" : undefined,

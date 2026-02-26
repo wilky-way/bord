@@ -8,7 +8,7 @@ import { state } from "../store/core";
 import { addNotification, getSettings } from "./notifications/store";
 import { getWsBase } from "./server";
 import { createKeyedBatchCoalescer } from "./debounce";
-import type { Provider } from "../store/types";
+import type { Provider, TerminalInstance } from "../store/types";
 
 type MessageHandler = (data: ArrayBuffer | string) => void;
 type StatusHandler = (connected: boolean) => void;
@@ -25,6 +25,9 @@ interface WsConnection {
   bufferingOutput: boolean;
   bufferedOutput: Array<ArrayBuffer | string>;
   bufferedBytes: number;
+  flushingOutput: boolean;
+  flushRafId?: number;
+  flushTimerId?: ReturnType<typeof setTimeout>;
 }
 
 const noopData: MessageHandler = () => {};
@@ -32,7 +35,7 @@ const noopStatus: StatusHandler = () => {};
 
 const connections = new Map<string, WsConnection>();
 
-type OscTurnState = "working" | "done" | "unknown";
+export type OscTurnState = "working" | "done" | "unknown";
 
 // Per-terminal state derived from OSC title updates.
 const oscTurnStateByTerminal = new Map<string, OscTurnState>();
@@ -56,6 +59,8 @@ const textEncoder = typeof TextEncoder !== "undefined" ? new TextEncoder() : nul
 const oscTextDecoder = typeof TextDecoder !== "undefined" ? new TextDecoder() : null;
 const DEV_LOGS = !!(import.meta as any).env?.DEV;
 const BACKGROUND_OUTPUT_BUFFER_MAX_BYTES = 2 * 1024 * 1024;
+const BACKGROUND_FLUSH_MAX_BYTES_PER_FRAME = 64 * 1024;
+const BACKGROUND_FLUSH_MAX_CHUNKS_PER_FRAME = 64;
 
 function loadCursors(): Record<string, { cursor: number; scrollY: number }> {
   try {
@@ -129,17 +134,102 @@ function bufferOutput(conn: WsConnection, data: ArrayBuffer | string) {
   }
 }
 
-function flushBufferedOutput(ptyId: string, conn: WsConnection) {
-  if (!conn.bufferedOutput.length) return;
+export function drainBufferedOutputSlice(
+  queue: Array<ArrayBuffer | string>,
+  maxBytes = BACKGROUND_FLUSH_MAX_BYTES_PER_FRAME,
+  maxChunks = BACKGROUND_FLUSH_MAX_CHUNKS_PER_FRAME,
+): { chunks: Array<ArrayBuffer | string>; bytes: number } {
+  const chunkBudget = Math.max(1, Math.floor(maxChunks));
+  const byteBudget = Math.max(1, Math.floor(maxBytes));
 
-  const pending = conn.bufferedOutput;
-  conn.bufferedOutput = [];
-  conn.bufferedBytes = 0;
+  const drained: Array<ArrayBuffer | string> = [];
+  let drainedBytes = 0;
 
-  logOsc(`flush buffered output ${ptyId}`, { chunks: pending.length });
-  for (const chunk of pending) {
-    conn.onData(chunk);
+  while (queue.length > 0 && drained.length < chunkBudget && drainedBytes < byteBudget) {
+    const chunk = queue.shift();
+    if (chunk === undefined) break;
+    drained.push(chunk);
+    drainedBytes += payloadByteLength(chunk);
   }
+
+  return { chunks: drained, bytes: drainedBytes };
+}
+
+function clearBufferedFlushSchedule(conn: WsConnection) {
+  if (typeof conn.flushRafId === "number" && typeof cancelAnimationFrame === "function") {
+    cancelAnimationFrame(conn.flushRafId);
+  }
+  if (conn.flushTimerId !== undefined) {
+    clearTimeout(conn.flushTimerId);
+  }
+  conn.flushRafId = undefined;
+  conn.flushTimerId = undefined;
+}
+
+function scheduleBufferedFlush(conn: WsConnection, flushStep: () => void) {
+  if (typeof requestAnimationFrame === "function") {
+    conn.flushRafId = requestAnimationFrame(() => {
+      conn.flushRafId = undefined;
+      flushStep();
+    });
+    return;
+  }
+
+  conn.flushTimerId = setTimeout(() => {
+    conn.flushTimerId = undefined;
+    flushStep();
+  }, 16);
+}
+
+function flushBufferedOutput(ptyId: string, conn: WsConnection) {
+  if (!conn.bufferedOutput.length || conn.flushingOutput) return;
+
+  conn.flushingOutput = true;
+  logOsc(`flush buffered output ${ptyId}`, {
+    chunks: conn.bufferedOutput.length,
+    bufferedBytes: conn.bufferedBytes,
+  });
+
+  const flushStep = () => {
+    clearBufferedFlushSchedule(conn);
+
+    if (connections.get(ptyId) !== conn) {
+      conn.flushingOutput = false;
+      return;
+    }
+
+    if (conn.bufferingOutput) {
+      conn.flushingOutput = false;
+      return;
+    }
+
+    const slice = drainBufferedOutputSlice(conn.bufferedOutput);
+    if (slice.chunks.length === 0) {
+      conn.bufferedBytes = 0;
+      conn.flushingOutput = false;
+      return;
+    }
+
+    conn.bufferedBytes = Math.max(0, conn.bufferedBytes - slice.bytes);
+    for (const chunk of slice.chunks) {
+      conn.onData(chunk);
+    }
+
+    if (!conn.bufferedOutput.length) {
+      conn.bufferedBytes = 0;
+      conn.flushingOutput = false;
+      return;
+    }
+
+    if (conn.bufferingOutput) {
+      conn.flushingOutput = false;
+      return;
+    }
+
+    scheduleBufferedFlush(conn, flushStep);
+  };
+
+  scheduleBufferedFlush(conn, flushStep);
 }
 
 function advanceLiveCursor(ptyId: string, data: ArrayBuffer | string) {
@@ -197,6 +287,22 @@ function extractOscTitles(data: Uint8Array): string[] {
   return titles;
 }
 
+function hasSpinnerPrefix(title: string): boolean {
+  if (/^[\u2800-\u28ff]/u.test(title)) return true;
+  if (/^[◐◓◑◒◴◷◶◵]/u.test(title)) return true;
+  if (/^[|/\\-]\s/.test(title)) return true;
+  return false;
+}
+
+function hasWorkingKeyword(title: string): boolean {
+  return /^(thinking|working|running|planning|analyzing|reviewing|processing|executing|generating|searching)\b/i.test(title);
+}
+
+function hasDoneKeyword(title: string): boolean {
+  if (/\b(action required|awaiting input)\b/i.test(title)) return true;
+  return /^(ready|done|complete|completed|idle|awaiting|waiting|finished|standby)\b/i.test(title);
+}
+
 function parseGeminiOscState(title: string): OscTurnState {
   const normalized = normalizeOscTitle(title);
   if (!normalized) return "unknown";
@@ -216,7 +322,7 @@ function parseClaudeOscState(title: string): OscTurnState {
 
   // Claude uses braille spinner glyphs (U+2800..U+28FF) and sometimes star
   // prefixes while a turn is running.
-  if (/^[\u2800-\u28ff]/u.test(normalized)) return "working";
+  if (hasSpinnerPrefix(normalized)) return "working";
   if (normalized.startsWith("✳") || normalized.startsWith("*") || normalized.startsWith("✶")) {
     return "working";
   }
@@ -225,10 +331,42 @@ function parseClaudeOscState(title: string): OscTurnState {
   return "done";
 }
 
-function parseOscTurnState(provider: Provider, title: string): OscTurnState {
+function parseCodexOscState(title: string): OscTurnState {
+  const normalized = normalizeOscTitle(title);
+  if (!normalized) return "unknown";
+
+  if (hasSpinnerPrefix(normalized) || hasWorkingKeyword(normalized)) return "working";
+  if (hasDoneKeyword(normalized)) return "done";
+
+  return "unknown";
+}
+
+function parseOpenCodeOscState(title: string): OscTurnState {
+  const normalized = normalizeOscTitle(title);
+  if (!normalized) return "unknown";
+
+  if (hasSpinnerPrefix(normalized) || hasWorkingKeyword(normalized)) return "working";
+  if (hasDoneKeyword(normalized)) return "done";
+
+  return "unknown";
+}
+
+export function parseOscTurnState(provider: Provider, title: string): OscTurnState {
   if (provider === "gemini") return parseGeminiOscState(title);
   if (provider === "claude") return parseClaudeOscState(title);
+  if (provider === "codex") return parseCodexOscState(title);
+  if (provider === "opencode") return parseOpenCodeOscState(title);
   return "unknown";
+}
+
+export function shouldKeepBackgroundConnection(
+  terminal: Pick<TerminalInstance, "provider" | "notificationsArmed" | "notificationWarmupStartedAt"> | undefined,
+  turnState: OscTurnState,
+): boolean {
+  if (!terminal?.provider) return false;
+  if (turnState === "working") return true;
+  if (terminal.notificationsArmed) return true;
+  return typeof terminal.notificationWarmupStartedAt === "number";
 }
 
 function clearArmingTimer(ptyId: string) {
@@ -243,6 +381,15 @@ function clearQuietDoneTimer(ptyId: string) {
   if (!timer) return;
   clearTimeout(timer);
   oscQuietDoneTimers.delete(ptyId);
+}
+
+function resetTurnTracking(ptyId: string) {
+  clearArmingTimer(ptyId);
+  clearQuietDoneTimer(ptyId);
+  turnStartAtByTerminal.delete(ptyId);
+  setTerminalWarmupStartedAt(ptyId, undefined);
+  oscTurnStateByTerminal.set(ptyId, "unknown");
+  lastOscTitleByTerminal.delete(ptyId);
 }
 
 function scheduleQuietDoneTimer(ptyId: string) {
@@ -288,12 +435,15 @@ function scheduleOscArming(ptyId: string, source: "osc" | "input" = "osc") {
 
   const delay = Math.max(0, getSettings().warmupDurationMs);
   if (delay === 0) {
+    const currentState = oscTurnStateByTerminal.get(ptyId) ?? "unknown";
     const lastActivity = lastOscActivityAt.get(ptyId) ?? 0;
-    if (lastActivity < turnStartedAt) return;
-    setTerminalArmed(ptyId, true);
-    if ((oscTurnStateByTerminal.get(ptyId) ?? "unknown") === "working") {
-      scheduleQuietDoneTimer(ptyId);
+    if (currentState !== "working" || lastActivity < turnStartedAt) {
+      resetTurnTracking(ptyId);
+      return;
     }
+
+    setTerminalArmed(ptyId, true);
+    scheduleQuietDoneTimer(ptyId);
     logOsc(`armed ${ptyId} after 0ms warmup`, { source });
     return;
   }
@@ -308,21 +458,25 @@ function scheduleOscArming(ptyId: string, source: "osc" | "input" = "osc") {
     const currentTurnStart = turnStartAtByTerminal.get(ptyId);
     if (currentTurnStart !== turnStartedAt) return;
 
-    // Avoid arming from stale replay or very old title updates.
-    const lastActivity = lastOscActivityAt.get(ptyId) ?? 0;
-    if (lastActivity < turnStartedAt) {
-      setTerminalWarmupStartedAt(ptyId, undefined);
-      return;
-    }
-    if (Date.now() - lastActivity > delay + 1000) {
+    const currentState = oscTurnStateByTerminal.get(ptyId) ?? "unknown";
+    if (currentState !== "working") {
       setTerminalWarmupStartedAt(ptyId, undefined);
       return;
     }
 
-    setTerminalArmed(ptyId, true);
-    if ((oscTurnStateByTerminal.get(ptyId) ?? "unknown") === "working") {
-      scheduleQuietDoneTimer(ptyId);
+    // Avoid arming from stale replay or very old title updates.
+    const lastActivity = lastOscActivityAt.get(ptyId) ?? 0;
+    if (lastActivity < turnStartedAt) {
+      resetTurnTracking(ptyId);
+      return;
     }
+    if (Date.now() - lastActivity > delay + 1000) {
+      resetTurnTracking(ptyId);
+      return;
+    }
+
+    setTerminalArmed(ptyId, true);
+    scheduleQuietDoneTimer(ptyId);
     logOsc(`armed ${ptyId} after ${delay}ms warmup`, { source });
   }, delay);
 
@@ -361,7 +515,6 @@ export function handleTerminalOscTitle(ptyId: string, rawTitle: string) {
   if (nextState === "working" && !terminal.notificationWarmupStartedAt) {
     setTerminalWarmupStartedAt(ptyId, Date.now());
   }
-  scheduleOscArming(ptyId, "osc");
 
   logOsc(`title ${terminal.provider}:${ptyId}`, {
     title,
@@ -379,6 +532,7 @@ export function handleTerminalOscTitle(ptyId: string, rawTitle: string) {
 
   if (nextState === "working") {
     oscTurnStateByTerminal.set(ptyId, "working");
+    scheduleOscArming(ptyId, "osc");
     scheduleQuietDoneTimer(ptyId);
     return;
   }
@@ -408,7 +562,9 @@ export function connectTerminal(
     if (existing.ws.readyState === WebSocket.OPEN || existing.ws.readyState === WebSocket.CONNECTING) {
       existing.onData = onData;
       existing.onStatus = onStatus;
+      clearBufferedFlushSchedule(existing);
       existing.bufferingOutput = false;
+      existing.flushingOutput = false;
       flushBufferedOutput(ptyId, existing);
       onStatus(existing.ws.readyState === WebSocket.OPEN);
 
@@ -422,40 +578,35 @@ export function connectTerminal(
         }
 
         const terminal = state.terminals.find((t) => t.id === ptyId);
-        const keepBackground =
-          !!terminal?.provider &&
-          (
-            (oscTurnStateByTerminal.get(ptyId) ?? "unknown") === "working" ||
-            !!terminal.notificationsArmed ||
-            turnStartAtByTerminal.has(ptyId)
-          );
+        const turnState = oscTurnStateByTerminal.get(ptyId) ?? "unknown";
+        const keepBackground = shouldKeepBackgroundConnection(terminal, turnState);
 
         if (keepBackground) {
           // Keep provider streams alive in background so OSC completion still
           // works when switching tabs/workspaces.
+          clearBufferedFlushSchedule(conn);
           conn.onData = noopData;
           conn.onStatus = noopStatus;
           conn.bufferingOutput = true;
+          conn.flushingOutput = false;
           return;
         }
 
+        clearBufferedFlushSchedule(conn);
         existing.ws.close();
         connections.delete(ptyId);
         liveCursorByTerminal.delete(ptyId);
         conn.bufferedOutput = [];
         conn.bufferedBytes = 0;
+        conn.flushingOutput = false;
 
         replayingTerminals.delete(ptyId);
-        clearArmingTimer(ptyId);
-        clearQuietDoneTimer(ptyId);
-        setTerminalWarmupStartedAt(ptyId, undefined);
+        resetTurnTracking(ptyId);
 
         const stillExists = state.terminals.some((t) => t.id === ptyId);
         if (!stillExists) {
           lastNotifiedAt.delete(ptyId);
-          lastOscTitleByTerminal.delete(ptyId);
           lastOscActivityAt.delete(ptyId);
-          turnStartAtByTerminal.delete(ptyId);
           oscTurnStateByTerminal.delete(ptyId);
           oscQuietDoneTimers.delete(ptyId);
         }
@@ -482,6 +633,7 @@ export function connectTerminal(
     bufferingOutput: false,
     bufferedOutput: [],
     bufferedBytes: 0,
+    flushingOutput: false,
   });
 
   ws.onopen = () => {
@@ -498,8 +650,10 @@ export function connectTerminal(
     if (!stillExists) {
       connections.delete(ptyId);
       liveCursorByTerminal.delete(ptyId);
+      clearBufferedFlushSchedule(conn);
       conn.bufferedOutput = [];
       conn.bufferedBytes = 0;
+      conn.flushingOutput = false;
       replayingTerminals.delete(ptyId);
       clearArmingTimer(ptyId);
       clearQuietDoneTimer(ptyId);
@@ -594,42 +748,37 @@ export function connectTerminal(
     }
 
     const terminal = state.terminals.find((t) => t.id === ptyId);
-    const keepBackground =
-      !!terminal?.provider &&
-      (
-        (oscTurnStateByTerminal.get(ptyId) ?? "unknown") === "working" ||
-        !!terminal.notificationsArmed ||
-        turnStartAtByTerminal.has(ptyId)
-      );
+    const turnState = oscTurnStateByTerminal.get(ptyId) ?? "unknown";
+    const keepBackground = shouldKeepBackgroundConnection(terminal, turnState);
 
     if (keepBackground) {
       // Keep provider streams alive in background so notifications still fire
       // while user is viewing a different tab/workspace.
+      clearBufferedFlushSchedule(conn);
       conn.onData = noopData;
       conn.onStatus = noopStatus;
       conn.bufferingOutput = true;
+      conn.flushingOutput = false;
       return;
     }
 
+    clearBufferedFlushSchedule(conn);
     ws.close();
     connections.delete(ptyId);
     liveCursorByTerminal.delete(ptyId);
     conn.bufferedOutput = [];
     conn.bufferedBytes = 0;
+    conn.flushingOutput = false;
 
     replayingTerminals.delete(ptyId);
-    clearArmingTimer(ptyId);
-    clearQuietDoneTimer(ptyId);
-    setTerminalWarmupStartedAt(ptyId, undefined);
+    resetTurnTracking(ptyId);
 
-    // Preserve OSC state/cooldown across transient unmounts (workspace switches).
-    // If the terminal was removed entirely, drop all state.
+    // Drop volatile OSC turn-tracking state on disconnect. Notification cooldown
+    // remains until terminal removal.
     const stillExists = state.terminals.some((t) => t.id === ptyId);
     if (!stillExists) {
       lastNotifiedAt.delete(ptyId);
-      lastOscTitleByTerminal.delete(ptyId);
       lastOscActivityAt.delete(ptyId);
-      turnStartAtByTerminal.delete(ptyId);
       oscTurnStateByTerminal.delete(ptyId);
       oscQuietDoneTimers.delete(ptyId);
     }

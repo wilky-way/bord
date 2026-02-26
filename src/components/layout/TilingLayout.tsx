@@ -1,4 +1,4 @@
-import { For, Show, createSignal, onMount, onCleanup } from "solid-js";
+import { For, Show, createSignal, createEffect, onMount, onCleanup } from "solid-js";
 import { state, setState } from "../../store/core";
 import { addTerminal, moveTerminal, getVisibleTerminals } from "../../store/terminals";
 import { useDragReorder } from "../../lib/use-drag-reorder";
@@ -17,7 +17,7 @@ export default function TilingLayout() {
   const panelRefs: HTMLElement[] = [];
 
   // Drag reorder
-  const { draggingId, dropIndex, handlePointerDown } = useDragReorder({
+  const { draggingId, dropIndex, handlePointerDown, cancelDrag } = useDragReorder({
     getPanelElements: () => panelRefs.slice(0, visibleTerminals().length),
     getVisibleCount: () => visibleTerminals().length,
     onDrop: (fromVisible, toVisible) => {
@@ -29,6 +29,15 @@ export default function TilingLayout() {
         moveTerminal(fromAbsolute, toAbsolute);
       }
     },
+  });
+
+  createEffect(() => {
+    const dragging = draggingId();
+    if (!dragging) return;
+
+    if (!visibleTerminals().some((terminal) => terminal.id === dragging)) {
+      cancelDrag();
+    }
   });
 
   onMount(() => {
@@ -117,12 +126,16 @@ export default function TilingLayout() {
                   }}
                   isDragging={draggingId() === terminal.id}
                 >
-                  <TerminalPanel
-                    id={terminal.id}
-                    cwd={terminal.cwd}
-                    isActive={terminal.id === state.activeTerminalId}
-                    onDragStart={(e) => handlePointerDown(terminal.id, index(), e)}
-                  />
+                  <Show when={terminal.id} keyed>
+                    {(terminalId) => (
+                      <TerminalPanel
+                        id={terminalId}
+                        cwd={terminal.cwd}
+                        isActive={terminalId === state.activeTerminalId}
+                        onDragStart={(e) => handlePointerDown(terminalId, index(), e)}
+                      />
+                    )}
+                  </Show>
                 </ResizablePanel>
               </>
             )}

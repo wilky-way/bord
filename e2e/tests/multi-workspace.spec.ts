@@ -224,4 +224,71 @@ test.describe("Multi-workspace isolation", () => {
     await page.waitForTimeout(500);
     expect(await terminalPanel.visibleCount()).toBe(countA);
   });
+
+  test("workspace switch + stash cycles remain interactive", async ({
+    page,
+    sidebar,
+    topbar,
+    terminalPanel,
+  }) => {
+    const wsButtons = sidebar.rail.locator("button[title^='fixture-']");
+    const count = await wsButtons.count();
+    if (count < 2) {
+      test.skip();
+      return;
+    }
+
+    // Workspace A should have at least 2 terminals to exercise stash/unstash.
+    await wsButtons.nth(0).click();
+    await page.waitForTimeout(500);
+    while ((await terminalPanel.visibleCount()) < 2) {
+      await topbar.addTerminal();
+      await page.waitForTimeout(800);
+    }
+
+    for (let cycle = 0; cycle < 3; cycle++) {
+      // Workspace hop away and back.
+      await wsButtons.nth(1).click();
+      await page.waitForTimeout(450);
+      await wsButtons.nth(0).click();
+      await page.waitForTimeout(450);
+
+      expect(await terminalPanel.visibleCount()).toBeGreaterThanOrEqual(1);
+
+      // Stash one terminal then immediately unstash from tray.
+      await terminalPanel.stashFirst();
+      await page.waitForTimeout(350);
+
+      await sidebar.ensureExpanded();
+      await page.waitForTimeout(250);
+
+      const trayButton = page.locator(
+        '[data-bord-sidebar-panel="expanded"] [data-stash-tray-button]',
+      );
+      if (!(await trayButton.isVisible())) {
+        test.skip();
+        return;
+      }
+      await trayButton.click();
+      await page.waitForTimeout(250);
+
+      const stashedItems = page.locator("[data-sidebar-stash-zone] button.flex-1");
+      expect(await stashedItems.count()).toBeGreaterThan(0);
+
+      await stashedItems.first().click();
+      await page.waitForTimeout(350);
+
+      // Heartbeat interaction: density controls still respond.
+      const nextDensity = (cycle % 3) + 1;
+      await topbar.setDensity(nextDensity);
+      await page.waitForTimeout(250);
+      expect(await topbar.getActiveDensity()).toBe(nextDensity);
+    }
+
+    // Final sanity: topbar actions still work after churn.
+    const before = await terminalPanel.visibleCount();
+    await topbar.addTerminal();
+    await page.waitForTimeout(900);
+    expect(await terminalPanel.visibleCount()).toBeGreaterThanOrEqual(before);
+  });
 });
