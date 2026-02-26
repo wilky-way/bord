@@ -51,7 +51,7 @@ export class SettingsPO {
 
   /** Get the font picker select element. */
   fontSelect(): Locator {
-    return this.modal.locator("select");
+    return this.modal.locator('label:has-text("Terminal Font") + div select');
   }
 
   /** Get notification toggle buttons. */
