@@ -45,7 +45,7 @@ export const sel = {
   settingsCloseButton: 'button[title="Close"]',
 
   // SettingsPanel.tsx — Features section
-  featureToggle: (name: string) => `div:has-text("${name}") button`,
+  featureToggle: (name: string) => `button[role="switch"][aria-label="${name}"]`,
 
   // GitPanel.tsx — branch switch
   branchSwitchButton: 'button[title="Switch branch"]',
