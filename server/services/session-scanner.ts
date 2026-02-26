@@ -1,3 +1,4 @@
+import { Database as SQLiteDatabase } from "bun:sqlite";
 import { readdir, readFile, stat } from "fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "path";
@@ -38,6 +39,11 @@ const OPENCODE_SESSIONS_DIRS = [
   join(homedir(), ".local", "share", "opencode", "storage", "session"),
   join(homedir(), "Library", "Application Support", "opencode", "storage", "session"),
 ];
+const OPENCODE_DB_PATHS = [
+  join(homedir(), ".local", "share", "opencode", "opencode.db"),
+  join(homedir(), "Library", "Application Support", "opencode", "opencode.db"),
+  join(homedir(), "Library", "Application Support", "ai.opencode.desktop", "opencode.db"),
+];
 
 export function normalizeSessionTitle(title: string, maxLength: number = 80): string {
   const normalized = title.replace(/\s+/g, " ").trim();
@@ -46,8 +52,23 @@ export function normalizeSessionTitle(title: string, maxLength: number = 80): st
 }
 
 export function normalizeSessionTime(raw: unknown, fallback: string): string {
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    const epochMs = raw < 1_000_000_000_000 ? raw * 1000 : raw;
+    const parsed = new Date(epochMs);
+    return Number.isNaN(parsed.getTime()) ? fallback : parsed.toISOString();
+  }
+
   if (typeof raw !== "string" || !raw.trim()) return fallback;
-  const parsed = new Date(raw);
+
+  const trimmed = raw.trim();
+  const numeric = Number(trimmed);
+  if (Number.isFinite(numeric) && /^\d+$/.test(trimmed)) {
+    const epochMs = numeric < 1_000_000_000_000 ? numeric * 1000 : numeric;
+    const parsed = new Date(epochMs);
+    return Number.isNaN(parsed.getTime()) ? fallback : parsed.toISOString();
+  }
+
+  const parsed = new Date(trimmed);
   return Number.isNaN(parsed.getTime()) ? fallback : parsed.toISOString();
 }
 
@@ -60,6 +81,26 @@ async function existingOpenCodeSessionDirs(): Promise<string[]> {
     }
   }
   return dirs;
+}
+
+async function existingOpenCodeDbPaths(): Promise<string[]> {
+  const paths: string[] = [];
+  for (const dbPath of OPENCODE_DB_PATHS) {
+    const dbStat = await stat(dbPath).catch(() => null);
+    if (dbStat?.isFile()) {
+      paths.push(dbPath);
+    }
+  }
+  return paths;
+}
+
+function matchesProjectPath(projectPath: string | undefined, cwd: string): boolean {
+  if (!projectPath) return true;
+  const normalizedProject = projectPath.endsWith("/") ? projectPath : projectPath + "/";
+  const normalizedCwd = cwd.endsWith("/") ? cwd : cwd + "/";
+  return cwd === projectPath
+    || normalizedCwd.startsWith(normalizedProject)
+    || normalizedProject.startsWith(normalizedCwd);
 }
 
 /** Decode Claude project dir name back to an absolute path.
@@ -253,7 +294,79 @@ export async function scanCodexSessions(projectPath?: string): Promise<SessionIn
   return sessions;
 }
 
-export async function scanOpenCodeSessions(projectPath?: string): Promise<SessionInfo[]> {
+interface OpenCodeDbSessionRow {
+  id: string;
+  slug: string | null;
+  directory: string | null;
+  title: string | null;
+  summary_files?: number | null;
+  time_created: number | string | null;
+  time_updated: number | string | null;
+}
+
+function queryOpenCodeDbSessions(db: SQLiteDatabase): OpenCodeDbSessionRow[] {
+  try {
+    return db.query(`
+      SELECT id, slug, directory, title, summary_files, time_created, time_updated
+      FROM session
+      WHERE time_archived IS NULL
+      ORDER BY time_updated DESC
+    `).all() as OpenCodeDbSessionRow[];
+  } catch {
+    return db.query(`
+      SELECT id, slug, directory, title, NULL AS summary_files, time_created, time_updated
+      FROM session
+      ORDER BY time_updated DESC
+    `).all() as OpenCodeDbSessionRow[];
+  }
+}
+
+async function scanOpenCodeSessionsFromDb(projectPath?: string): Promise<SessionInfo[]> {
+  const sessions: SessionInfo[] = [];
+  const dbPaths = await existingOpenCodeDbPaths();
+
+  for (const dbPath of dbPaths) {
+    let db: SQLiteDatabase | null = null;
+    try {
+      db = new SQLiteDatabase(dbPath);
+      const rows = queryOpenCodeDbSessions(db);
+      for (const row of rows) {
+        const sessionId = typeof row.id === "string" ? row.id : "";
+        if (!sessionId) continue;
+
+        const cwd = typeof row.directory === "string" ? row.directory : "";
+        if (!cwd) continue;
+        if (!matchesProjectPath(projectPath, cwd)) continue;
+
+        const title = normalizeSessionTitle(row.title || row.slug || "Untitled Session", 80);
+        const created = normalizeSessionTime(row.time_created, new Date(0).toISOString());
+        const updated = normalizeSessionTime(row.time_updated, created);
+
+        sessions.push({
+          id: sessionId,
+          title,
+          projectPath: cwd,
+          startedAt: created,
+          updatedAt: updated,
+          messageCount: (row.summary_files ?? 0) > 0 ? 1 : 0,
+          provider: "opencode",
+        });
+      }
+    } catch {
+      // OpenCode database may not exist yet, or may be mid-migration
+    } finally {
+      try {
+        db?.close();
+      } catch {
+        // ignore close errors
+      }
+    }
+  }
+
+  return sessions;
+}
+
+async function scanOpenCodeSessionsFromJson(projectPath?: string): Promise<SessionInfo[]> {
   const sessions: SessionInfo[] = [];
   try {
     // OpenCode stores sessions as JSON files under .../storage/session/{projectHash}/*.json
@@ -278,16 +391,8 @@ export async function scanOpenCodeSessions(projectPath?: string): Promise<Sessio
             const title = normalizeSessionTitle(session.title || session.slug || "Untitled Session", 80);
             const sessionId = session.id ?? file.replace(".json", "");
 
-            // Filter by projectPath
-            if (projectPath && cwd) {
-              const normalizedProject = projectPath.endsWith("/") ? projectPath : projectPath + "/";
-              const normalizedCwd = cwd.endsWith("/") ? cwd : cwd + "/";
-              if (cwd !== projectPath && !normalizedCwd.startsWith(normalizedProject) && !normalizedProject.startsWith(normalizedCwd)) {
-                continue;
-              }
-            }
-
             if (!cwd) continue;
+            if (!matchesProjectPath(projectPath, cwd)) continue;
 
             const created = normalizeSessionTime(session.time?.created, fileStat.birthtime.toISOString());
             const updated = normalizeSessionTime(session.time?.updated, fileStat.mtime.toISOString());
@@ -310,6 +415,17 @@ export async function scanOpenCodeSessions(projectPath?: string): Promise<Sessio
   } catch {
     // OpenCode sessions dir may not exist
   }
+
+  return sessions;
+}
+
+export async function scanOpenCodeSessions(projectPath?: string): Promise<SessionInfo[]> {
+  const [dbSessions, jsonSessions] = await Promise.all([
+    scanOpenCodeSessionsFromDb(projectPath),
+    scanOpenCodeSessionsFromJson(projectPath),
+  ]);
+
+  const sessions = [...dbSessions, ...jsonSessions];
 
   const deduped = new Map<string, SessionInfo>();
   for (const session of sessions) {

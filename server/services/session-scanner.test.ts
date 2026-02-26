@@ -67,6 +67,16 @@ describe("normalizeSessionTime", () => {
     expect(result).toBe("2024-06-15T10:30:00.000Z");
   });
 
+  test("handles epoch milliseconds", () => {
+    const result = normalizeSessionTime(1772139248299, "fallback");
+    expect(result).toBe("2026-02-26T20:54:08.299Z");
+  });
+
+  test("handles epoch numeric strings", () => {
+    const result = normalizeSessionTime("1772139248299", "fallback");
+    expect(result).toBe("2026-02-26T20:54:08.299Z");
+  });
+
   test("handles ISO date strings without time", () => {
     const result = normalizeSessionTime("2024-01-01", "fallback");
     expect(result).toMatch(/^2024-01-01/);
@@ -84,9 +94,9 @@ describe("normalizeSessionTime", () => {
     expect(normalizeSessionTime(undefined, "fb")).toBe("fb");
   });
 
-  test("returns fallback for non-string types", () => {
-    expect(normalizeSessionTime(12345, "fb")).toBe("fb");
+  test("returns fallback for unsupported non-string types", () => {
     expect(normalizeSessionTime(true, "fb")).toBe("fb");
+    expect(normalizeSessionTime({} as any, "fb")).toBe("fb");
   });
 
   test("returns fallback for invalid date strings", () => {
