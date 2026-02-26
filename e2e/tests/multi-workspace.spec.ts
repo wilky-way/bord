@@ -231,6 +231,15 @@ test.describe("Multi-workspace isolation", () => {
     topbar,
     terminalPanel,
   }) => {
+    const ptySwapErrors: string[] = [];
+    page.on("console", (msg) => {
+      if (msg.type() !== "error") return;
+      const text = msg.text();
+      if (text.includes("TerminalView reused across PTY ids")) {
+        ptySwapErrors.push(text);
+      }
+    });
+
     const wsButtons = sidebar.rail.locator("button[title^='fixture-']");
     const count = await wsButtons.count();
     if (count < 2) {
@@ -290,5 +299,6 @@ test.describe("Multi-workspace isolation", () => {
     await topbar.addTerminal();
     await page.waitForTimeout(900);
     expect(await terminalPanel.visibleCount()).toBeGreaterThanOrEqual(before);
+    expect(ptySwapErrors).toEqual([]);
   });
 });

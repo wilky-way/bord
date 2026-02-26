@@ -9,12 +9,18 @@ mock.module("./ws", () => ({
   },
 }));
 
-// Mock api to avoid real HTTP calls from handlePaste
+// Mock api — provide uploadClipboardImage for paste handler tests
+const uploadedImages: { base64: string; type: string }[] = [];
 mock.module("./api", () => ({
-  api: {},
+  api: {
+    uploadClipboardImage: (base64: string, type: string) => {
+      uploadedImages.push({ base64, type });
+      return Promise.resolve({ path: "/tmp/bord-paste/image.png" });
+    },
+  },
 }));
 
-import { createTerminalKeyHandler } from "./terminal-shortcuts";
+import { createTerminalKeyHandler, createTerminalPasteHandler } from "./terminal-shortcuts";
 import { fontSize, resetFontSize } from "../store/settings";
 
 // Create a mock terminal object matching the subset of Terminal API used by the handler
@@ -193,11 +199,119 @@ describe("createTerminalKeyHandler", () => {
     });
   });
 
+  test("Cmd+V passes through (handled by paste event listener)", () => {
+    const term = createMockTerminal();
+    const handler = createTerminalKeyHandler("pty-1", term as any);
+    const e = makeKeyEvent({ key: "v", metaKey: true });
+    const result = handler(e);
+    expect(result).toBe(false);
+    expect(e.defaultPrevented).toBe(false);
+  });
+
   test("unhandled key returns false (pass through)", () => {
     const term = createMockTerminal();
     const handler = createTerminalKeyHandler("pty-1", term as any);
     const e = makeKeyEvent({ key: "x" });
     const result = handler(e);
     expect(result).toBe(false);
+  });
+});
+
+describe("createTerminalPasteHandler", () => {
+  beforeEach(() => {
+    uploadedImages.length = 0;
+  });
+
+  // Minimal mock container — bun test has no DOM
+  function createMockContainer() {
+    const listeners: Map<string, Array<(e: any) => void>> = new Map();
+    return {
+      listeners,
+      addEventListener(type: string, fn: any, _opts?: any) {
+        if (!listeners.has(type)) listeners.set(type, []);
+        listeners.get(type)!.push(fn);
+      },
+      removeEventListener(type: string, fn: any, _opts?: any) {
+        const arr = listeners.get(type);
+        if (arr) {
+          const idx = arr.indexOf(fn);
+          if (idx >= 0) arr.splice(idx, 1);
+        }
+      },
+    } as unknown as HTMLElement & { listeners: Map<string, Array<(e: any) => void>> };
+  }
+
+  function makePasteEvent(opts: {
+    types: string[];
+    items: Array<{ type: string; getAsFile: () => Blob | null }>;
+  }) {
+    let defaultPrevented = false;
+    let propagationStopped = false;
+    return {
+      clipboardData: {
+        types: opts.types,
+        items: opts.items,
+      },
+      preventDefault: () => { defaultPrevented = true; },
+      stopPropagation: () => { propagationStopped = true; },
+      get defaultPrevented() { return defaultPrevented; },
+      get propagationStopped() { return propagationStopped; },
+    } as unknown as ClipboardEvent & { propagationStopped: boolean };
+  }
+
+  test("image paste is intercepted and uploaded", async () => {
+    const term = createMockTerminal();
+    const container = createMockContainer();
+    const cleanup = createTerminalPasteHandler("pty-1", term as any, container);
+
+    const imageBlob = new Blob([new Uint8Array([0x89, 0x50])], { type: "image/png" });
+    const e = makePasteEvent({
+      types: ["image/png"],
+      items: [{ type: "image/png", getAsFile: () => imageBlob }],
+    });
+
+    const handlers = container.listeners.get("paste") ?? [];
+    expect(handlers.length).toBe(1);
+    handlers[0](e);
+
+    expect(e.defaultPrevented).toBe(true);
+    expect(e.propagationStopped).toBe(true);
+
+    // Wait for async image upload
+    await new Promise((r) => setTimeout(r, 50));
+    expect(uploadedImages.length).toBe(1);
+    expect(uploadedImages[0].type).toBe("image/png");
+    expect(term.calls).toContain("paste(/tmp/bord-paste/image.png)");
+
+    cleanup();
+  });
+
+  test("text paste is not intercepted (left to ghostty-web)", () => {
+    const term = createMockTerminal();
+    const container = createMockContainer();
+    const cleanup = createTerminalPasteHandler("pty-1", term as any, container);
+
+    const e = makePasteEvent({
+      types: ["text/plain"],
+      items: [{ type: "text/plain", getAsFile: () => null }],
+    });
+
+    const handlers = container.listeners.get("paste") ?? [];
+    handlers[0](e);
+
+    expect(e.defaultPrevented).toBe(false);
+    expect(e.propagationStopped).toBe(false);
+
+    cleanup();
+  });
+
+  test("cleanup removes the listener", () => {
+    const term = createMockTerminal();
+    const container = createMockContainer();
+    const cleanup = createTerminalPasteHandler("pty-1", term as any, container);
+
+    expect(container.listeners.get("paste")?.length).toBe(1);
+    cleanup();
+    expect(container.listeners.get("paste")?.length).toBe(0);
   });
 });

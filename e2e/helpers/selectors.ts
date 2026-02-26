@@ -3,7 +3,9 @@
 export const sel = {
   // TerminalPanel.tsx
   terminalPanel: (id?: string) =>
-    id ? `[data-terminal-id="${id}"]` : "[data-terminal-id]",
+    id ? `[data-terminal-id="${id}"]` : "[data-terminal-id]:visible",
+  /** All terminal panels in the DOM, including hidden (other-workspace) ones. */
+  terminalPanelAll: () => "[data-terminal-id]",
   terminalProvider: (provider: string) => `[data-provider="${provider}"]`,
   titlebar: "[data-titlebar]",
   stashAction: '[data-action="stash-terminal"]',

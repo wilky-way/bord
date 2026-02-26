@@ -161,8 +161,11 @@ export default function TerminalPanel(props: Props) {
   let interval: ReturnType<typeof setInterval>;
   onMount(() => {
     fetchGitInfo();
-    interval = setInterval(fetchGitInfo, 10_000);
-    if (props.isActive && panelRef) {
+    interval = setInterval(() => {
+      if (state.activeWorkspaceId && terminal()?.workspaceId !== state.activeWorkspaceId) return;
+      fetchGitInfo();
+    }, 10_000);
+    if (props.isActive && panelRef?.offsetParent !== null) {
       panelRef.scrollIntoView({ inline: "nearest", behavior: "instant" });
     }
   });
@@ -180,14 +183,26 @@ export default function TerminalPanel(props: Props) {
       fetchGitInfo();
       // Restart the polling interval so we don't double-fetch
       clearInterval(interval);
-      interval = setInterval(fetchGitInfo, 10_000);
+      interval = setInterval(() => {
+        if (state.activeWorkspaceId && terminal()?.workspaceId !== state.activeWorkspaceId) return;
+        fetchGitInfo();
+      }, 10_000);
     }, 300);
   });
   onCleanup(() => clearTimeout(cwdDebounce));
 
   createEffect(() => {
-    if (props.isActive && panelRef) {
+    if (props.isActive && panelRef?.offsetParent !== null) {
       panelRef.scrollIntoView({ inline: "nearest", behavior: "instant" });
+    }
+  });
+
+  // Re-fetch git info immediately when workspace becomes active
+  createEffect(() => {
+    const wsId = state.activeWorkspaceId;
+    const termWs = terminal()?.workspaceId;
+    if (wsId && termWs === wsId) {
+      fetchGitInfo();
     }
   });
 
@@ -408,24 +423,21 @@ export default function TerminalPanel(props: Props) {
       <div class="flex-1 min-h-0 overflow-hidden relative">
         {/* TerminalView uses CSS hide to preserve ghostty-web WASM state */}
         <div class={terminalView() === "terminal" ? "contents" : "hidden"}>
-          <Show when={props.id} keyed>
-            {(ptyId) => (
-              <TerminalView
-                ptyId={ptyId}
-                onTitleChange={(newTitle: string) => {
-                  setTitle(newTitle);
-                  setTerminalOscTitle(ptyId, newTitle);
-                }}
-                onCwdChange={(newCwd: string) => {
-                  setTerminalDynamicCwd(ptyId, newCwd);
-                }}
-                onFileLinkOpen={(path: string) => {
-                  openPath(path);
-                }}
-                getCwd={() => effectiveCwd()}
-              />
-            )}
-          </Show>
+          <TerminalView
+            ptyId={props.id}
+            isActive={props.isActive}
+            onTitleChange={(newTitle: string) => {
+              setTitle(newTitle);
+              setTerminalOscTitle(props.id, newTitle);
+            }}
+            onCwdChange={(newCwd: string) => {
+              setTerminalDynamicCwd(props.id, newCwd);
+            }}
+            onFileLinkOpen={(path: string) => {
+              openPath(path);
+            }}
+            getCwd={() => effectiveCwd()}
+          />
         </div>
         <Show when={terminalView() === "filetree"}>
           <FileTree
@@ -438,8 +450,8 @@ export default function TerminalPanel(props: Props) {
         </Show>
       </div>
 
-      {/* Git popover via Portal */}
-      <Show when={isFeatureEnabled("git") && isGitPanelOpen()}>
+      {/* Git popover via Portal — hidden when terminal's workspace is not active */}
+      <Show when={isFeatureEnabled("git") && isGitPanelOpen() && (!state.activeWorkspaceId || terminal()?.workspaceId === state.activeWorkspaceId)}>
         <Portal>
           <div
             ref={popoverRef}

@@ -3,6 +3,12 @@ import { sendToTerminal } from "./ws";
 import { api } from "./api";
 import { increaseFontSize, decreaseFontSize, resetFontSize } from "../store/settings";
 
+type PtyIdSource = string | (() => string);
+
+function resolvePtyId(source: PtyIdSource): string {
+  return typeof source === "function" ? source() : source;
+}
+
 /**
  * Creates a key event handler for a terminal instance.
  * Attach via terminal.attachCustomKeyEventHandler(handler).
@@ -10,7 +16,7 @@ import { increaseFontSize, decreaseFontSize, resetFontSize } from "../store/sett
  * ghostty-web convention: return true = "I handled it, stop" / return false = "pass through"
  */
 export function createTerminalKeyHandler(
-  ptyId: string,
+  ptyIdSource: PtyIdSource,
   terminal: Terminal,
 ): (e: KeyboardEvent) => boolean {
   return (e: KeyboardEvent): boolean => {
@@ -21,6 +27,7 @@ export function createTerminalKeyHandler(
     // --- Shift+Tab fix (ghostty-web bug: sends \t instead of \x1b[Z) ---
     if (e.key === "Tab" && shift && !meta && !alt && !e.ctrlKey) {
       e.preventDefault();
+      const ptyId = resolvePtyId(ptyIdSource);
       sendToTerminal(ptyId, "\x1b[Z");
       return true;
     }
@@ -44,6 +51,7 @@ export function createTerminalKeyHandler(
           if (!shift) {
             e.preventDefault();
             terminal.clear();
+            const ptyId = resolvePtyId(ptyIdSource);
             sendToTerminal(ptyId, "\x0c");
             return true;
           }
@@ -53,6 +61,7 @@ export function createTerminalKeyHandler(
         case "l":
           if (!shift) {
             e.preventDefault();
+            const ptyId = resolvePtyId(ptyIdSource);
             sendToTerminal(ptyId, "\x0c");
             return true;
           }
@@ -67,19 +76,16 @@ export function createTerminalKeyHandler(
               if (text) navigator.clipboard.writeText(text);
               terminal.clearSelection();
             } else {
+              const ptyId = resolvePtyId(ptyIdSource);
               sendToTerminal(ptyId, "\x03");
             }
             return true;
           }
           break;
 
-        // Cmd+V: Paste with bracketed paste support + image paste
+        // Cmd+V: Let native paste event flow through — handled by paste listener
         case "v":
-          if (!shift) {
-            e.preventDefault();
-            handlePaste(ptyId, terminal);
-            return true;
-          }
+          if (!shift) return false;
           break;
 
         // Cmd+A: Select all
@@ -122,53 +128,61 @@ export function createTerminalKeyHandler(
   };
 }
 
-async function handlePaste(ptyId: string, terminal: Terminal) {
+/**
+ * Attaches a paste event listener to the terminal container that handles
+ * image paste via the native ClipboardEvent.clipboardData — no browser
+ * permission prompt.  Text paste is left to ghostty-web's own handler.
+ *
+ * Returns a cleanup function.
+ */
+export function createTerminalPasteHandler(
+  ptyIdSource: PtyIdSource,
+  terminal: Terminal,
+  container: HTMLElement,
+): () => void {
+  const handler = (e: ClipboardEvent) => {
+    const cd = e.clipboardData;
+    if (!cd) return;
+
+    // Only intercept pure-image paste (no text/plain companion)
+    if (cd.types.includes("text/plain")) return;
+
+    const imageItem = Array.from(cd.items).find((item) =>
+      item.type.startsWith("image/"),
+    );
+    if (!imageItem) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    const blob = imageItem.getAsFile();
+    if (blob) {
+      handleImagePaste(ptyIdSource, terminal, blob, imageItem.type);
+    }
+  };
+
+  // Capture phase so we see the event before ghostty-web's bubble handlers
+  container.addEventListener("paste", handler, { capture: true });
+  return () => container.removeEventListener("paste", handler, { capture: true });
+}
+
+async function handleImagePaste(
+  ptyIdSource: PtyIdSource,
+  terminal: Terminal,
+  blob: Blob,
+  mimeType: string,
+) {
   try {
-    const items = await navigator.clipboard.read();
-    let pastedText = false;
-
-    for (const item of items) {
-      // Check for image types first
-      const imageType = item.types.find((t) => t.startsWith("image/"));
-      if (imageType && !item.types.includes("text/plain")) {
-        const blob = await item.getType(imageType);
-        const buffer = await blob.arrayBuffer();
-        const base64 = btoa(
-          new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), ""),
-        );
-        try {
-          const result = await api.uploadClipboardImage(base64, imageType);
-          terminal.paste(result.path);
-        } catch (err) {
-          console.error("[bord] clipboard image upload failed:", err);
-        }
-        pastedText = true;
-        continue;
-      }
-
-      // Text paste with bracketed paste
-      if (item.types.includes("text/plain")) {
-        const blob = await item.getType("text/plain");
-        const text = await blob.text();
-        if (text) {
-          terminal.paste(text); // Uses bracketed paste (\x1b[200~...\x1b[201~)
-          pastedText = true;
-        }
-      }
-    }
-
-    // Fallback: if clipboard.read() returned nothing useful, try readText()
-    if (!pastedText) {
-      const text = await navigator.clipboard.readText();
-      if (text) terminal.paste(text);
-    }
-  } catch {
-    // Fallback for browsers that don't support clipboard.read()
-    try {
-      const text = await navigator.clipboard.readText();
-      if (text) terminal.paste(text);
-    } catch (err) {
-      console.error("[bord] clipboard read failed:", err);
-    }
+    const buffer = await blob.arrayBuffer();
+    const base64 = btoa(
+      new Uint8Array(buffer).reduce(
+        (data, byte) => data + String.fromCharCode(byte),
+        "",
+      ),
+    );
+    const result = await api.uploadClipboardImage(base64, mimeType);
+    terminal.paste(result.path);
+  } catch (err) {
+    console.error("[bord] clipboard image upload failed:", err);
   }
 }

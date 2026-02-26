@@ -11,14 +11,17 @@ const GAP = 4; // gap-1
 
 export default function TilingLayout() {
   const visibleTerminals = () => getVisibleTerminals();
+  const allNonStashed = () => state.terminals.filter(t => !t.stashed);
 
   const [containerWidth, setContainerWidth] = createSignal(0);
   let containerRef: HTMLDivElement | undefined;
-  const panelRefs: HTMLElement[] = [];
+  const panelRefMap = new Map<string, HTMLElement>();
 
   // Drag reorder
   const { draggingId, dropIndex, handlePointerDown, cancelDrag } = useDragReorder({
-    getPanelElements: () => panelRefs.slice(0, visibleTerminals().length),
+    getPanelElements: () => getVisibleTerminals()
+      .map(t => panelRefMap.get(t.id))
+      .filter((el): el is HTMLElement => !!el),
     getVisibleCount: () => visibleTerminals().length,
     onDrop: (fromVisible, toVisible) => {
       // Convert visible indices to absolute indices in state.terminals
@@ -84,14 +87,22 @@ export default function TilingLayout() {
       class="flex flex-nowrap h-full p-0.5 gap-1 overflow-x-auto overflow-y-hidden flex-1 min-w-0"
     >
       <Show
-        when={visibleTerminals().length > 0}
+        when={allNonStashed().length > 0}
         fallback={
           <div class="flex items-center justify-center w-full h-full text-[var(--text-secondary)]">
             <div class="text-center">
-              <div class="text-lg mb-2">Welcome to Bord</div>
-              <div class="text-sm opacity-70 mb-4">
-                Add a workspace to get started
-              </div>
+              <Show when={state.workspaces.length > 0} fallback={
+                <>
+                  <div class="text-lg mb-2">Welcome to Bord</div>
+                  <div class="text-sm opacity-70 mb-4">
+                    Add a workspace to get started
+                  </div>
+                </>
+              }>
+                <div class="text-sm opacity-70 mb-4">
+                  Open a terminal to get started
+                </div>
+              </Show>
               <Show when={!state.sidebarOpen}>
                 <button
                   class="px-3 py-1.5 text-xs rounded-[var(--btn-radius)] bg-[var(--bg-tertiary)] hover:bg-[var(--border)] text-[var(--text-primary)] transition-colors"
@@ -105,40 +116,51 @@ export default function TilingLayout() {
         }
       >
         <>
-          <For each={visibleTerminals()}>
-            {(terminal, index) => (
-              <>
-                {/* Drop indicator before this panel */}
-                <Show when={dropIndex() === index()}>
-                  <div class="drop-indicator" />
-                </Show>
-                <ResizablePanel
-                  index={index()}
-                  total={visibleTerminals().length}
-                  size={terminal.panelSize ?? 1}
-                  pixelWidth={panelWidth(index())}
-                  unitWidth={unitWidth()}
-                  onResize={(newSize) => {
-                    setState("terminals", (t) => t.id === terminal.id, "panelSize", newSize);
-                  }}
-                  ref={(el) => {
-                    panelRefs[index()] = el;
-                  }}
-                  isDragging={draggingId() === terminal.id}
-                >
-                  <Show when={terminal.id} keyed>
-                    {(terminalId) => (
-                      <TerminalPanel
-                        id={terminalId}
-                        cwd={terminal.cwd}
-                        isActive={terminalId === state.activeTerminalId}
-                        onDragStart={(e) => handlePointerDown(terminalId, index(), e)}
-                      />
-                    )}
+          <Show when={visibleTerminals().length === 0}>
+            <div class="flex items-center justify-center w-full h-full text-[var(--text-secondary)]">
+              <div class="text-center">
+                <div class="text-sm opacity-70">No terminals in this workspace</div>
+              </div>
+            </div>
+          </Show>
+          <For each={allNonStashed()}>
+            {(terminal) => {
+              const isVisible = () => {
+                const wsId = state.activeWorkspaceId;
+                return !wsId || terminal.workspaceId === wsId;
+              };
+              const visIdx = () => getVisibleTerminals().findIndex(t => t.id === terminal.id);
+
+              onCleanup(() => panelRefMap.delete(terminal.id));
+
+              return (
+                <div style={{ display: isVisible() ? "contents" : "none" }}>
+                  {/* Drop indicator before this panel */}
+                  <Show when={isVisible() && dropIndex() === visIdx()}>
+                    <div class="drop-indicator" />
                   </Show>
-                </ResizablePanel>
-              </>
-            )}
+                  <ResizablePanel
+                    index={isVisible() ? visIdx() : 0}
+                    total={isVisible() ? visibleTerminals().length : 1}
+                    size={terminal.panelSize ?? 1}
+                    pixelWidth={isVisible() ? panelWidth(visIdx()) : 0}
+                    unitWidth={unitWidth()}
+                    onResize={(newSize) => {
+                      setState("terminals", (t) => t.id === terminal.id, "panelSize", newSize);
+                    }}
+                    ref={(el) => { panelRefMap.set(terminal.id, el); }}
+                    isDragging={draggingId() === terminal.id}
+                  >
+                    <TerminalPanel
+                      id={terminal.id}
+                      cwd={terminal.cwd}
+                      isActive={terminal.id === state.activeTerminalId}
+                      onDragStart={(e) => handlePointerDown(terminal.id, visIdx(), e)}
+                    />
+                  </ResizablePanel>
+                </div>
+              );
+            }}
           </For>
           {/* Drop indicator after last panel */}
           <Show when={dropIndex() !== null && dropIndex()! >= visibleTerminals().length}>

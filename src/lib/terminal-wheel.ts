@@ -1,6 +1,12 @@
 import type { Terminal } from "ghostty-web";
 import { sendToTerminal } from "./ws";
 
+type PtyIdSource = string | (() => string);
+
+function resolvePtyId(source: PtyIdSource): string {
+  return typeof source === "function" ? source() : source;
+}
+
 const DOM_DELTA_PIXEL = 0;
 const DOM_DELTA_LINE = 1;
 const DOM_DELTA_PAGE = 2;
@@ -73,7 +79,7 @@ function isHorizontalDominantWheel(event: WheelEvent): boolean {
 }
 
 export function createTerminalWheelHandler(
-  ptyId: string,
+  ptyIdSource: PtyIdSource,
   terminal: Terminal,
 ): (event: WheelEvent) => boolean {
   return (event: WheelEvent): boolean => {
@@ -92,6 +98,7 @@ export function createTerminalWheelHandler(
     const sequence = useSgr
       ? encodeSgrWheel(buttonCode, col, row)
       : encodeX10Wheel(buttonCode, col, row);
+    const ptyId = resolvePtyId(ptyIdSource);
 
     for (let i = 0; i < steps; i++) {
       sendToTerminal(ptyId, sequence);

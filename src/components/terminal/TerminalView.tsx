@@ -4,7 +4,7 @@ import { connectTerminal, sendToTerminal, sendResize } from "../../lib/ws";
 import { createTerminalWriter } from "../../lib/terminal-writer";
 import { setTerminalConnected } from "../../store/terminals";
 import { terminalTheme } from "../../lib/theme";
-import { createTerminalKeyHandler } from "../../lib/terminal-shortcuts";
+import { createTerminalKeyHandler, createTerminalPasteHandler } from "../../lib/terminal-shortcuts";
 import { createTerminalWheelHandler } from "../../lib/terminal-wheel";
 import { createTerminalFileLinkProvider } from "../../lib/terminal-file-links";
 import { fontSize, fontFamily } from "../../store/settings";
@@ -12,6 +12,7 @@ import { fontSize, fontFamily } from "../../store/settings";
 
 interface Props {
   ptyId: string;
+  isActive?: boolean;
   onTitleChange?: (title: string) => void;
   onCwdChange?: (cwd: string) => void;
   onFileLinkOpen?: (path: string) => void;
@@ -70,22 +71,93 @@ function ensureWasm(): Promise<void> {
   return wasmReady;
 }
 
+let terminalViewInstanceCounter = 0;
+const DEV_TERMINAL_LOGS = !!(import.meta as any).env?.DEV;
+
 export default function TerminalView(props: Props) {
+  const viewInstanceId = ++terminalViewInstanceCounter;
   let containerRef!: HTMLDivElement;
   let terminal: Terminal | undefined;
   let wsCleanup: (() => void) | undefined;
   let fitAddon: FitAddon | undefined;
   let writerDispose: (() => void) | undefined;
+  let pasteCleanup: (() => void) | undefined;
   let resizeSubscription: { dispose(): void } | undefined;
+  let containerResizeObserver: ResizeObserver | undefined;
   let disposed = false;
+  let attachedPtyId = props.ptyId;
+  let fitRafId: number | undefined;
+  const fitTimerIds: number[] = [];
+  let bindConnection: ((nextPtyId: string, reason: "mount" | "swap") => void) | undefined;
+
+  function debugTerminalView(message: string, meta?: Record<string, unknown>) {
+    if (!DEV_TERMINAL_LOGS) return;
+    console.debug(`[bord][terminal-view#${viewInstanceId}] ${message}`, {
+      ptyId: attachedPtyId,
+      ...(meta ?? {}),
+    });
+  }
+
+  function clearScheduledFits() {
+    if (fitRafId !== undefined && typeof cancelAnimationFrame === "function") {
+      cancelAnimationFrame(fitRafId);
+      fitRafId = undefined;
+    }
+
+    while (fitTimerIds.length > 0) {
+      const id = fitTimerIds.pop();
+      if (id !== undefined) {
+        clearTimeout(id);
+      }
+    }
+  }
+
+  function fitAndSync(): boolean {
+    if (!terminal || disposed) return false;
+    if (!containerRef?.isConnected) return false;
+
+    const rect = containerRef.getBoundingClientRect();
+    if (rect.width < 2 || rect.height < 2) return false;
+
+    fitAddon?.fit();
+    sendCurrentResize();
+    return terminal.cols > 0 && terminal.rows > 0;
+  }
+
+  function scheduleStabilizedFit() {
+    if (disposed) return;
+    clearScheduledFits();
+
+    const retryDelays = [40, 120, 260, 520];
+    const tryFit = () => {
+      if (fitAndSync()) {
+        clearScheduledFits();
+      }
+    };
+
+    if (typeof requestAnimationFrame === "function") {
+      fitRafId = requestAnimationFrame(() => {
+        fitRafId = undefined;
+        tryFit();
+      });
+    } else {
+      fitTimerIds.push(window.setTimeout(tryFit, 16));
+    }
+
+    for (const delay of retryDelays) {
+      fitTimerIds.push(window.setTimeout(tryFit, delay));
+    }
+  }
 
   const sendCurrentResize = () => {
     if (!terminal) return;
     if (terminal.cols <= 0 || terminal.rows <= 0) return;
-    sendResize(props.ptyId, terminal.cols, terminal.rows);
+    sendResize(attachedPtyId, terminal.cols, terminal.rows);
   };
 
   onMount(() => {
+    debugTerminalView("mount", { initialPtyId: attachedPtyId });
+
     createEffect(() => {
       const size = fontSize();
       if (!terminal || disposed) return;
@@ -100,10 +172,49 @@ export default function TerminalView(props: Props) {
       fitAddon?.fit();
     });
 
+    createEffect(() => {
+      const active = !!props.isActive;
+      if (!active) return;
+      scheduleStabilizedFit();
+    });
+
+    createEffect(() => {
+      const nextPtyId = props.ptyId;
+      if (nextPtyId === attachedPtyId) return;
+
+      const previousPtyId = attachedPtyId;
+      attachedPtyId = nextPtyId;
+
+      console.error("[bord] TerminalView reused across PTY ids; rebinding", {
+        viewInstanceId,
+        from: previousPtyId,
+        to: nextPtyId,
+      });
+
+      if (!terminal || disposed || !bindConnection) {
+        return;
+      }
+
+      setTerminalConnected(previousPtyId, false);
+
+      try {
+        (terminal as any).reset?.();
+      } catch {
+        terminal.clear();
+      }
+
+      bindConnection(nextPtyId, "swap");
+      scheduleStabilizedFit();
+    });
+
     onCleanup(() => {
       disposed = true;
+      debugTerminalView("cleanup");
+      clearScheduledFits();
       writerDispose?.();
+      pasteCleanup?.();
       resizeSubscription?.dispose();
+      containerResizeObserver?.disconnect();
       wsCleanup?.();
       fitAddon?.dispose();
       terminal?.dispose();
@@ -128,12 +239,35 @@ export default function TerminalView(props: Props) {
       terminal.loadAddon(fitAddon);
       fitAddon.observeResize();
 
+      if (typeof ResizeObserver !== "undefined") {
+        containerResizeObserver = new ResizeObserver(() => {
+          scheduleStabilizedFit();
+        });
+        containerResizeObserver.observe(containerRef);
+      }
+
+      const onVisibilityChange = () => {
+        if (document.visibilityState === "visible") {
+          scheduleStabilizedFit();
+        }
+      };
+      const onWindowFocus = () => {
+        scheduleStabilizedFit();
+      };
+      document.addEventListener("visibilitychange", onVisibilityChange);
+      window.addEventListener("focus", onWindowFocus);
+      onCleanup(() => {
+        document.removeEventListener("visibilitychange", onVisibilityChange);
+        window.removeEventListener("focus", onWindowFocus);
+      });
+
       if (typeof terminal.attachCustomKeyEventHandler === "function") {
-        terminal.attachCustomKeyEventHandler(createTerminalKeyHandler(props.ptyId, terminal));
+        terminal.attachCustomKeyEventHandler(createTerminalKeyHandler(() => attachedPtyId, terminal));
       }
       if (typeof terminal.attachCustomWheelEventHandler === "function") {
-        terminal.attachCustomWheelEventHandler(createTerminalWheelHandler(props.ptyId, terminal));
+        terminal.attachCustomWheelEventHandler(createTerminalWheelHandler(() => attachedPtyId, terminal));
       }
+      pasteCleanup = createTerminalPasteHandler(() => attachedPtyId, terminal, containerRef);
       if (props.onFileLinkOpen) {
         terminal.registerLinkProvider(createTerminalFileLinkProvider(
           terminal,
@@ -149,49 +283,64 @@ export default function TerminalView(props: Props) {
 
       resizeSubscription = terminal.onResize(({ cols, rows }) => {
         if (cols > 0 && rows > 0) {
-          sendResize(props.ptyId, cols, rows);
+          sendResize(attachedPtyId, cols, rows);
         }
       });
 
-      wsCleanup = connectTerminal(
-        props.ptyId,
-        (data) => {
-          if (data instanceof ArrayBuffer) {
-            const bytes = new Uint8Array(data);
-            writer.write(bytes);
-            // ghostty-web only scans strings for OSC titles, so scan binary ourselves
-            const title = extractOscTitle(bytes);
-            if (title) {
-              props.onTitleChange?.(title);
-            }
-            if (props.onCwdChange) {
-              const cwd = extractOsc7Cwd(bytes);
-              if (cwd) props.onCwdChange(cwd);
-            }
-          } else if (typeof data === "string") {
-            writer.write(data);
+      const handleIncomingData = (data: ArrayBuffer | string) => {
+        if (data instanceof ArrayBuffer) {
+          const bytes = new Uint8Array(data);
+          writer.write(bytes);
+          // ghostty-web only scans strings for OSC titles, so scan binary ourselves
+          const title = extractOscTitle(bytes);
+          if (title) {
+            props.onTitleChange?.(title);
           }
-        },
-        (connected) => {
-          setTerminalConnected(props.ptyId, connected);
-          if (!connected || !terminal) return;
-          fitAddon?.fit();
-          sendCurrentResize();
-        },
-        {
-          onReplayDone: () => {
-            if (disposed || !terminal) return;
-            requestAnimationFrame(() => {
-              if (!disposed && terminal) {
-                terminal.scrollToBottom();
-              }
-            });
+          if (props.onCwdChange) {
+            const cwd = extractOsc7Cwd(bytes);
+            if (cwd) props.onCwdChange(cwd);
+          }
+        } else if (typeof data === "string") {
+          writer.write(data);
+        }
+      };
+
+      bindConnection = (nextPtyId: string, reason: "mount" | "swap") => {
+        const previousPtyId = attachedPtyId;
+        if (nextPtyId === previousPtyId && wsCleanup) return;
+
+        wsCleanup?.();
+        wsCleanup = undefined;
+
+        attachedPtyId = nextPtyId;
+        debugTerminalView("bind websocket", { nextPtyId, previousPtyId, reason });
+
+        wsCleanup = connectTerminal(
+          nextPtyId,
+          handleIncomingData,
+          (connected) => {
+            setTerminalConnected(nextPtyId, connected);
+            if (!connected || !terminal) return;
+            scheduleStabilizedFit();
           },
-        },
-      );
+          {
+            onReplayDone: () => {
+              if (disposed || !terminal) return;
+              scheduleStabilizedFit();
+              requestAnimationFrame(() => {
+                if (!disposed && terminal) {
+                  terminal.scrollToBottom();
+                }
+              });
+            },
+          },
+        );
+      };
+
+      bindConnection(attachedPtyId, "mount");
 
       terminal.onData((data: string) => {
-        sendToTerminal(props.ptyId, data);
+        sendToTerminal(attachedPtyId, data);
       });
 
       if (terminal.onTitleChange) {
@@ -200,8 +349,7 @@ export default function TerminalView(props: Props) {
         });
       }
 
-      fitAddon.fit();
-      sendCurrentResize();
+      scheduleStabilizedFit();
     })();
   });
 
