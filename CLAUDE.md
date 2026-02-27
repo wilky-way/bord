@@ -16,6 +16,8 @@ Bord is a workspace-scoped terminal manager with tiling layout, git integration,
 | `server/services/git-service.ts` | Shells out to `git` for status, diff, stage, commit, push, pull |
 | `server/services/feature-flags.ts` | Persists and evaluates feature/provider enablement flags |
 | `server/services/editor-service.ts` | Spawns `code .` or `cursor .` |
+| `server/services/crash-log.ts` | JSONL crash log writer + in-memory ring buffer, auto-rotating at 512KB |
+| `server/routes/crash-log.ts` | GET `/api/crash-log` — returns recent crash entries + log file path |
 | `server/ws/protocol.ts` | WebSocket control message types (resize, ping/pong, cursor, idle/active, configure) |
 | `server/ws/handler.ts` | WS upgrade, message dispatch, close handling |
 | `server/schema.sql` | SQLite schema — workspaces, session_cache, app_state |
@@ -27,13 +29,13 @@ Bord is a workspace-scoped terminal manager with tiling layout, git integration,
 | `src/store/features.ts` | Feature flags state (git/docker/sessions/providers) + active provider reconciliation |
 | `src/lib/api.ts` | Typed HTTP client wrapping all `/api/*` routes |
 | `src/lib/terminal-shortcuts.ts` | Terminal key handler — Cmd+C/V/K/A, Option+arrows, font size, bracketed paste, image paste |
-| `src/lib/ws.ts` | WebSocket connection manager, idle/active event handling, output volume tracking |
+| `src/lib/ws.ts` | WebSocket connection manager, idle/active event handling, output volume tracking, server health monitor |
 | `src/lib/notifications/` | Notification store (localStorage-persisted), types, dual-indexed reactive index, sound system |
 | `src/lib/debounce.ts` | Burst coalescer + keyed batch coalescer for WS event batching |
 | `src/styles.css` | CSS variable defaults + Tailwind import (overridden at runtime by active theme) |
 | `src/lib/theme.ts` | Reactive theme manager — signals, localStorage persistence, CSS var application |
 | `src/lib/themes/index.ts` | 15 curated theme definitions (chrome + terminal palettes) |
-| `src/components/settings/SettingsPanel.tsx` | Settings modal (appearance, notifications, features, about/updater) |
+| `src/components/settings/SettingsPanel.tsx` | Settings modal (appearance, notifications, features, about/updater, diagnostics/crash log viewer) |
 
 ## Store Architecture
 
@@ -58,6 +60,8 @@ Bun native HTTP server with manual route matching (no framework):
 - **Database** — `bun:sqlite` with tables: `workspaces`, `session_cache`, `app_state`
 
 PTY manager maintains an in-memory Map of sessions, each with a 2MB circular buffer for replay on reconnect. Multiple WS clients can subscribe to the same PTY.
+
+**Error handling:** Global `uncaughtException` / `unhandledRejection` handlers log to `crash-log.ts`. The HTTP `fetch()` handler is wrapped in try/catch. PTY unexpected exits and WebSocket message errors are logged. The crash log writes JSONL to disk (next to the DB file) and keeps the last 100 entries in memory for the `/api/crash-log` endpoint. Frontend catches `window.onerror` and `unhandledrejection`, surfacing errors via the notification system. A health monitor pings the server every 15s and notifies on connection loss/recovery.
 
 ## Conventions
 

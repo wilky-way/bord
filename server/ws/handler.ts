@@ -1,5 +1,6 @@
 import type { ServerWebSocket } from "bun";
 import { attachWs, detachWs, writeToPty, resizePty, configurePty } from "../services/pty-manager";
+import { logCrash } from "../services/crash-log";
 
 interface WsData {
   path: string;
@@ -29,40 +30,51 @@ export function handleWsUpgrade(ws: ServerWebSocket<WsData>) {
 }
 
 export function handleWsMessage(ws: ServerWebSocket<WsData>, message: string | Buffer) {
-  const path = ws.data.path;
-  const ptyMatch = path.match(/^\/ws\/pty\/(.+)$/);
-  if (!ptyMatch) return;
+  try {
+    const path = ws.data.path;
+    const ptyMatch = path.match(/^\/ws\/pty\/(.+)$/);
+    if (!ptyMatch) return;
 
-  const ptyId = ptyMatch[1];
+    const ptyId = ptyMatch[1];
 
-  // Binary data = raw terminal input
-  if (message instanceof Buffer || message instanceof Uint8Array) {
-    writeToPty(ptyId, message as Uint8Array);
-    return;
-  }
-
-  // String data = could be JSON control frame or raw text input
-  if (typeof message === "string") {
-    try {
-      const ctrl = JSON.parse(message);
-      if (ctrl.type === "resize" && typeof ctrl.cols === "number" && typeof ctrl.rows === "number") {
-        const cols = Math.max(2, Math.min(1000, Math.floor(ctrl.cols)));
-        const rows = Math.max(1, Math.min(500, Math.floor(ctrl.rows)));
-        resizePty(ptyId, cols, rows);
-        return;
-      }
-      if (ctrl.type === "ping") {
-        ws.send(JSON.stringify({ type: "pong" }));
-        return;
-      }
-      if (ctrl.type === "configure" && typeof ctrl.idleThresholdMs === "number") {
-        configurePty(ptyId, ctrl.idleThresholdMs);
-        return;
-      }
-    } catch {
-      // Not JSON, treat as raw input
+    // Binary data = raw terminal input
+    if (message instanceof Buffer || message instanceof Uint8Array) {
+      writeToPty(ptyId, message as Uint8Array);
+      return;
     }
-    writeToPty(ptyId, message);
+
+    // String data = could be JSON control frame or raw text input
+    if (typeof message === "string") {
+      try {
+        const ctrl = JSON.parse(message);
+        if (ctrl.type === "resize" && typeof ctrl.cols === "number" && typeof ctrl.rows === "number") {
+          const cols = Math.max(2, Math.min(1000, Math.floor(ctrl.cols)));
+          const rows = Math.max(1, Math.min(500, Math.floor(ctrl.rows)));
+          resizePty(ptyId, cols, rows);
+          return;
+        }
+        if (ctrl.type === "ping") {
+          ws.send(JSON.stringify({ type: "pong" }));
+          return;
+        }
+        if (ctrl.type === "configure" && typeof ctrl.idleThresholdMs === "number") {
+          configurePty(ptyId, ctrl.idleThresholdMs);
+          return;
+        }
+      } catch {
+        // Not JSON, treat as raw input
+      }
+      writeToPty(ptyId, message);
+    }
+  } catch (err) {
+    const e = err instanceof Error ? err : new Error(String(err));
+    logCrash({
+      level: "error",
+      source: "ws-handler",
+      message: e.message,
+      stack: e.stack,
+      context: { path: ws.data.path },
+    });
   }
 }
 

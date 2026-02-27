@@ -174,7 +174,7 @@ export function markAllViewedForWorkspace(workspaceId: string) {
 /** Remove notifications whose terminalId no longer exists in the live terminal list. */
 export function pruneStaleNotifications(liveTerminalIds: Set<string>) {
   setNotifications((prev) => {
-    const next = prev.filter((n) => liveTerminalIds.has(n.terminalId));
+    const next = prev.filter((n) => n.terminalId === "__system__" || liveTerminalIds.has(n.terminalId));
     if (next.length !== prev.length) saveNotifications(next);
     return next;
   });

@@ -6,7 +6,7 @@ import {
 } from "../store/terminals";
 import { state } from "../store/core";
 import { addNotification, getSettings } from "./notifications/store";
-import { getWsBase } from "./server";
+import { getHttpBase, getWsBase } from "./server";
 import { createKeyedBatchCoalescer } from "./debounce";
 import type { Provider, TerminalInstance } from "../store/types";
 
@@ -879,4 +879,46 @@ export function sendConfigureToAll(idleThresholdMs: number) {
       conn.ws.send(msg);
     }
   }
+}
+
+// Server health monitor
+let serverAlive = true;
+let healthCheckInterval: ReturnType<typeof setInterval> | undefined;
+
+export function startServerHealthCheck() {
+  if (healthCheckInterval) return;
+
+  healthCheckInterval = setInterval(async () => {
+    try {
+      const res = await fetch(`${getHttpBase()}/api/health`, {
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!res.ok) throw new Error(`Health check returned ${res.status}`);
+      if (!serverAlive) {
+        serverAlive = true;
+        addNotification({
+          type: "error",
+          terminalId: "__system__",
+          workspaceId: "__system__",
+          title: "Server reconnected",
+          body: "Connection to the Bord server has been restored.",
+          isActiveTerminal: false,
+          isAppFocused: document.hasFocus(),
+        });
+      }
+    } catch {
+      if (serverAlive) {
+        serverAlive = false;
+        addNotification({
+          type: "error",
+          terminalId: "__system__",
+          workspaceId: "__system__",
+          title: "Server connection lost",
+          body: "The Bord server is not responding. Terminals may be unresponsive.",
+          isActiveTerminal: false,
+          isAppFocused: document.hasFocus(),
+        });
+      }
+    }
+  }, 15_000);
 }

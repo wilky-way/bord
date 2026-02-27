@@ -9,8 +9,10 @@ import { editorRoutes } from "./routes/editor";
 import { dockerRoutes } from "./routes/docker";
 import { clipboardRoutes } from "./routes/clipboard";
 import { featureRoutes } from "./routes/features";
+import { crashLogRoutes } from "./routes/crash-log";
 import { initDb } from "./services/db";
 import { isFeatureEnabled } from "./services/feature-flags";
+import { logCrash } from "./services/crash-log";
 
 const PORT = parseInt(process.env.BORD_PORT ?? "4200");
 const ALLOWED_ORIGINS = [
@@ -21,6 +23,26 @@ const ALLOWED_ORIGINS = [
 
 // Initialize database
 initDb();
+
+// Global error handlers
+process.on("uncaughtException", (err) => {
+  logCrash({
+    level: "fatal",
+    source: "uncaughtException",
+    message: err.message,
+    stack: err.stack,
+  });
+});
+
+process.on("unhandledRejection", (reason) => {
+  const err = reason instanceof Error ? reason : new Error(String(reason));
+  logCrash({
+    level: "error",
+    source: "unhandledRejection",
+    message: err.message,
+    stack: err.stack,
+  });
+});
 
 const server = Bun.serve({
   port: PORT,
@@ -49,51 +71,65 @@ const server = Bun.serve({
       return new Response(null, { headers: corsHeaders });
     }
 
-    // Feature flag gating
-    if (url.pathname.startsWith("/api/git") && !isFeatureEnabled("git")) {
-      return Response.json({ error: "Git integration is disabled" }, { status: 404, headers: corsHeaders });
-    }
-    if (url.pathname.startsWith("/api/docker") && !isFeatureEnabled("docker")) {
-      return Response.json({ error: "Docker integration is disabled" }, { status: 404, headers: corsHeaders });
-    }
-    if (url.pathname.startsWith("/api/sessions") && !isFeatureEnabled("sessions")) {
-      return Response.json({ error: "Session history is disabled" }, { status: 404, headers: corsHeaders });
-    }
-
-    // Route matching
-    let response: Response | null = null;
-
-    if (url.pathname === "/api/health") {
-      response = healthRoute(req);
-    } else if (url.pathname.startsWith("/api/pty")) {
-      response = await ptyRoutes(req, url);
-    } else if (url.pathname.startsWith("/api/workspaces")) {
-      response = await workspaceRoutes(req, url);
-    } else if (url.pathname.startsWith("/api/sessions")) {
-      response = await sessionRoutes(req, url);
-    } else if (url.pathname.startsWith("/api/git")) {
-      response = await gitRoutes(req, url);
-    } else if (url.pathname.startsWith("/api/fs")) {
-      response = await fsRoutes(req, url);
-    } else if (url.pathname.startsWith("/api/editor")) {
-      response = await editorRoutes(req, url);
-    } else if (url.pathname.startsWith("/api/docker")) {
-      response = await dockerRoutes(req, url);
-    } else if (url.pathname.startsWith("/api/clipboard")) {
-      response = await clipboardRoutes(req, url);
-    } else if (url.pathname.startsWith("/api/features")) {
-      response = await featureRoutes(req, url);
-    }
-
-    if (response) {
-      // Add CORS headers to all responses
-      for (const [key, value] of Object.entries(corsHeaders)) {
-        response.headers.set(key, value);
+    try {
+      // Feature flag gating
+      if (url.pathname.startsWith("/api/git") && !isFeatureEnabled("git")) {
+        return Response.json({ error: "Git integration is disabled" }, { status: 404, headers: corsHeaders });
       }
-      return response;
-    }
+      if (url.pathname.startsWith("/api/docker") && !isFeatureEnabled("docker")) {
+        return Response.json({ error: "Docker integration is disabled" }, { status: 404, headers: corsHeaders });
+      }
+      if (url.pathname.startsWith("/api/sessions") && !isFeatureEnabled("sessions")) {
+        return Response.json({ error: "Session history is disabled" }, { status: 404, headers: corsHeaders });
+      }
 
-    return new Response("Not Found", { status: 404, headers: corsHeaders });
+      // Route matching
+      let response: Response | null = null;
+
+      if (url.pathname === "/api/health") {
+        response = healthRoute(req);
+      } else if (url.pathname.startsWith("/api/pty")) {
+        response = await ptyRoutes(req, url);
+      } else if (url.pathname.startsWith("/api/workspaces")) {
+        response = await workspaceRoutes(req, url);
+      } else if (url.pathname.startsWith("/api/sessions")) {
+        response = await sessionRoutes(req, url);
+      } else if (url.pathname.startsWith("/api/git")) {
+        response = await gitRoutes(req, url);
+      } else if (url.pathname.startsWith("/api/fs")) {
+        response = await fsRoutes(req, url);
+      } else if (url.pathname.startsWith("/api/editor")) {
+        response = await editorRoutes(req, url);
+      } else if (url.pathname.startsWith("/api/docker")) {
+        response = await dockerRoutes(req, url);
+      } else if (url.pathname.startsWith("/api/clipboard")) {
+        response = await clipboardRoutes(req, url);
+      } else if (url.pathname.startsWith("/api/features")) {
+        response = await featureRoutes(req, url);
+      } else if (url.pathname.startsWith("/api/crash-log")) {
+        response = crashLogRoutes(req, url);
+      }
+
+      if (response) {
+        // Add CORS headers to all responses
+        for (const [key, value] of Object.entries(corsHeaders)) {
+          response.headers.set(key, value);
+        }
+        return response;
+      }
+
+      return new Response("Not Found", { status: 404, headers: corsHeaders });
+    } catch (err) {
+      const e = err instanceof Error ? err : new Error(String(err));
+      logCrash({
+        level: "error",
+        source: "http-handler",
+        message: e.message,
+        stack: e.stack,
+        context: { method: req.method, url: url.pathname },
+      });
+      return new Response("Internal Server Error", { status: 500, headers: corsHeaders });
+    }
   },
   websocket: {
     open(ws) {

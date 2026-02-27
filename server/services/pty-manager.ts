@@ -1,4 +1,5 @@
 import type { ServerWebSocket } from "bun";
+import { logCrash } from "./crash-log";
 
 const BUFFER_LIMIT = 2 * 1024 * 1024; // 2MB circular buffer
 const BUFFER_CHUNK = 64 * 1024; // 64KB replay chunks
@@ -218,6 +219,19 @@ export function createPty(
   session.proc = proc;
   sessions.set(id, session);
   startCwdPolling(session);
+
+  // Log unexpected PTY exits
+  proc.exited.then((exitCode: number) => {
+    if (exitCode !== 0) {
+      logCrash({
+        level: "warn",
+        source: "pty-exit",
+        message: `PTY ${id} exited with code ${exitCode}`,
+        context: { ptyId: id, cwd, exitCode, pid: proc.pid },
+      });
+    }
+  });
+
   return session;
 }
 

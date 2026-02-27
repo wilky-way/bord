@@ -9,13 +9,14 @@ import { listProviders } from "../../lib/providers";
 import type { BordTheme } from "../../lib/themes";
 import { getFileOpenTarget, getPreferredEditor, setFileOpenTarget, setPreferredEditor, type Editor } from "../../lib/editor-preference";
 import { FILE_ICON_PACKS, type FileIconPackId } from "../../lib/file-icons";
+import { api } from "../../lib/api";
 
 interface Props {
   open: boolean;
   onClose: () => void;
 }
 
-type Section = "appearance" | "notifications" | "features" | "about";
+type Section = "appearance" | "notifications" | "features" | "about" | "diagnostics";
 
 export default function SettingsPanel(props: Props) {
   const [section, setSection] = createSignal<Section>("appearance");
@@ -91,13 +92,23 @@ export default function SettingsPanel(props: Props) {
                 </svg>
               }
             />
+            <NavItem
+              label="Diagnostics"
+              active={section() === "diagnostics"}
+              onClick={() => setSection("diagnostics")}
+              icon={
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M2 8h3l2-4 2 8 2-4h3" />
+                </svg>
+              }
+            />
           </div>
 
           {/* Content area */}
           <div class="flex-1 overflow-y-auto p-5">
             <div class="flex items-center justify-between mb-5">
               <h3 class="text-sm font-semibold text-[var(--text-primary)]">
-                {section() === "appearance" ? "Appearance" : section() === "notifications" ? "Notifications" : section() === "features" ? "Features" : "About"}
+                {section() === "appearance" ? "Appearance" : section() === "notifications" ? "Notifications" : section() === "features" ? "Features" : section() === "diagnostics" ? "Diagnostics" : "About"}
               </h3>
               <button
                 class="w-7 h-7 rounded-md flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
@@ -153,6 +164,10 @@ export default function SettingsPanel(props: Props) {
 
             <Show when={section() === "about"}>
               <AboutSection />
+            </Show>
+
+            <Show when={section() === "diagnostics"}>
+              <DiagnosticsSection />
             </Show>
           </div>
         </div>
@@ -559,6 +574,123 @@ function AboutSection() {
           </div>
         </Show>
       </div>
+    </div>
+  );
+}
+
+interface CrashEntry {
+  timestamp: string;
+  level: string;
+  source: string;
+  message: string;
+  stack?: string;
+  context?: Record<string, unknown>;
+}
+
+function DiagnosticsSection() {
+  const [entries, setEntries] = createSignal<CrashEntry[]>([]);
+  const [logPath, setLogPath] = createSignal("");
+  const [loading, setLoading] = createSignal(true);
+  const [expanded, setExpanded] = createSignal<Set<string>>(new Set());
+
+  onMount(async () => {
+    try {
+      const data = await api.getCrashLog();
+      setEntries(data.entries);
+      setLogPath(data.logPath);
+    } catch {
+      // Server may not support this endpoint yet
+    } finally {
+      setLoading(false);
+    }
+  });
+
+  function toggleExpanded(id: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function levelColor(level: string) {
+    if (level === "fatal") return "var(--terminal-red, #e55)";
+    if (level === "error") return "var(--terminal-yellow, #eb5)";
+    return "var(--text-secondary)";
+  }
+
+  function formatTime(ts: string) {
+    try {
+      const d = new Date(ts);
+      return d.toLocaleString(undefined, {
+        month: "short", day: "numeric",
+        hour: "2-digit", minute: "2-digit", second: "2-digit",
+      });
+    } catch {
+      return ts;
+    }
+  }
+
+  return (
+    <div class="space-y-4">
+      <div>
+        <label class="text-xs font-medium text-[var(--text-secondary)] mb-2 block">Crash Log</label>
+        <Show when={logPath()}>
+          <p class="text-[10px] text-[var(--text-secondary)] mb-2 font-mono break-all">{logPath()}</p>
+        </Show>
+      </div>
+      <Show when={!loading()} fallback={<p class="text-xs text-[var(--text-secondary)]">Loading...</p>}>
+        <Show when={entries().length > 0} fallback={
+          <div class="rounded-md border border-[var(--border)] bg-[var(--bg-tertiary)] px-3 py-4 text-center">
+            <p class="text-xs text-[var(--text-secondary)]">No crash logs recorded</p>
+          </div>
+        }>
+          <div class="space-y-1.5 max-h-[400px] overflow-y-auto">
+            <For each={entries()}>
+              {(entry, i) => {
+                const id = () => `${entry.timestamp}-${i()}`;
+                const isExpanded = () => expanded().has(id());
+                const hasDetails = () => !!(entry.stack || entry.context);
+                return (
+                  <div
+                    class="rounded-md border border-[var(--border)] bg-[var(--bg-tertiary)] px-2.5 py-2 cursor-pointer hover:border-[var(--text-secondary)]/30 transition-colors"
+                    classList={{ "cursor-default": !hasDetails() }}
+                    onClick={() => hasDetails() && toggleExpanded(id())}
+                  >
+                    <div class="flex items-center gap-2">
+                      <span
+                        class="text-[9px] font-bold uppercase px-1 py-0.5 rounded"
+                        style={{
+                          color: levelColor(entry.level),
+                          background: `color-mix(in srgb, ${levelColor(entry.level)} 15%, transparent)`,
+                        }}
+                      >
+                        {entry.level}
+                      </span>
+                      <span class="text-[10px] text-[var(--text-secondary)] font-mono">{entry.source}</span>
+                      <span class="text-[10px] text-[var(--text-secondary)] ml-auto">{formatTime(entry.timestamp)}</span>
+                    </div>
+                    <p class="text-[11px] text-[var(--text-primary)] mt-1 break-words">{entry.message}</p>
+                    <Show when={isExpanded() && hasDetails()}>
+                      <Show when={entry.stack}>
+                        <pre class="text-[9px] text-[var(--text-secondary)] mt-2 whitespace-pre-wrap break-words font-mono bg-[var(--bg-primary)] rounded p-2 max-h-[200px] overflow-y-auto">
+                          {entry.stack}
+                        </pre>
+                      </Show>
+                      <Show when={entry.context}>
+                        <pre class="text-[9px] text-[var(--text-secondary)] mt-1 whitespace-pre-wrap break-words font-mono">
+                          {JSON.stringify(entry.context, null, 2)}
+                        </pre>
+                      </Show>
+                    </Show>
+                  </div>
+                );
+              }}
+            </For>
+          </div>
+        </Show>
+      </Show>
     </div>
   );
 }

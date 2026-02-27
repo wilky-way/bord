@@ -227,4 +227,18 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ path, content }),
     }),
+
+  // Crash log
+  getCrashLog: () =>
+    request<{
+      entries: Array<{
+        timestamp: string;
+        level: string;
+        source: string;
+        message: string;
+        stack?: string;
+        context?: Record<string, unknown>;
+      }>;
+      logPath: string;
+    }>("/crash-log"),
 };
